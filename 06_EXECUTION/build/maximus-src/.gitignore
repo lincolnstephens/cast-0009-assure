@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.netlify/
+.netlify-build/
+.netlify-build-test/
+.env
+.env.*
+!.env.example
+*.local
+coverage/
+deno.lock
+.DS_Store
+Thumbs.db
+
+test-results/
+playwright-report/
+

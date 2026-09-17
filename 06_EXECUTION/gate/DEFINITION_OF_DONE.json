@@ -1,0 +1,120 @@
+{
+  "iteration": "v1.0",
+  "written": "2026-09-16",
+  "lines": [
+    {
+      "id": 1,
+      "line": "Sign-in succeeds and lands on the client portal.",
+      "drive": "playwright",
+      "check": "sign_in_lands_on_portal",
+      "pass": "The demo sign-in form accepts the gate credentials and the overview view is present in the DOM within 5 seconds.",
+      "email_selector": "input[type='email']",
+      "password_selector": "input[type='password']",
+      "submit_selector": "button[type='submit']",
+      "success_selector": "[data-view='overview']",
+      "timeout_ms": 5000,
+      "applies_to": ["1920x1080", "1366x768", "390x844"]
+    },
+    {
+      "id": 2,
+      "line": "Every client portal view loads and renders a heading: overview, guide, request, value, policies, posture.",
+      "drive": "playwright",
+      "check": "views_render",
+      "pass": "Each nav element carrying data-view for the listed id is clickable and a non-empty h1 or h2 appears after the click.",
+      "views": ["overview", "guide", "request", "value", "policies", "posture"],
+      "heading_selector": "h1, h2",
+      "settle_ms": 400,
+      "applies_to": ["1920x1080", "1366x768", "390x844"]
+    },
+    {
+      "id": 3,
+      "line": "Every admin view loads and renders a heading: queue, record, clocks, policies-admin, posture-admin, settings, audit.",
+      "drive": "playwright",
+      "check": "views_render",
+      "pass": "Each nav element carrying data-view for the listed id is clickable and a non-empty h1 or h2 appears after the click, entering the admin workspace first if it is not already reachable.",
+      "views": ["queue", "record", "clocks", "policies-admin", "posture-admin", "settings", "audit"],
+      "heading_selector": "h1, h2",
+      "admin_entry_selector": "[data-testid='enter-admin']",
+      "settle_ms": 400,
+      "applies_to": ["1920x1080", "1366x768", "390x844"]
+    },
+    {
+      "id": 4,
+      "line": "The Record table in the Value view renders at least one row.",
+      "drive": "playwright",
+      "check": "record_table_has_rows",
+      "pass": "data-testid='record-table' contains at least one tbody row.",
+      "view": "value",
+      "table_selector": "[data-testid='record-table']",
+      "row_selector": "tbody tr",
+      "settle_ms": 400,
+      "applies_to": ["1920x1080", "1366x768", "390x844"]
+    },
+    {
+      "id": 5,
+      "line": "The Statement renders and contains the limitations paragraph.",
+      "drive": "playwright",
+      "check": "statement_contains",
+      "pass": "data-testid='statement' text includes the phrase 'have not been independently verified'.",
+      "view": "value",
+      "statement_selector": "[data-testid='statement']",
+      "must_contain": "have not been independently verified",
+      "settle_ms": 400,
+      "applies_to": ["1920x1080", "1366x768", "390x844"]
+    },
+    {
+      "id": 6,
+      "line": "The Statement contains no illustrative entries when show illustrative is off.",
+      "drive": "playwright",
+      "check": "statement_excludes_illustrative_when_off",
+      "pass": "With the illustrative toggle set off, the string 'illustrative' does not appear in the Statement text.",
+      "view": "value",
+      "statement_selector": "[data-testid='statement']",
+      "toggle_selector": "[data-testid='toggle-illustrative']",
+      "forbidden_text": "illustrative",
+      "settle_ms": 400,
+      "applies_to": ["1920x1080", "1366x768", "390x844"]
+    },
+    {
+      "id": 7,
+      "line": "Print output hides the header and navigation and shows the Statement.",
+      "drive": "playwright",
+      "check": "print_hides_chrome_shows_statement",
+      "pass": "With media emulated as print, the header/nav element is not visible and the Statement element is visible.",
+      "view": "value",
+      "chrome_selector": "header, nav",
+      "statement_selector": "[data-testid='statement']",
+      "print_button_selector": "[data-testid='statement-print']",
+      "settle_ms": 400,
+      "applies_to": ["1920x1080", "1366x768", "390x844"]
+    },
+    {
+      "id": 8,
+      "line": "At 390 pixels wide, no view produces horizontal overflow.",
+      "drive": "playwright",
+      "check": "no_horizontal_overflow",
+      "pass": "document.documentElement.scrollWidth does not exceed window.innerWidth + 1 on any listed view.",
+      "views": ["overview", "guide", "request", "value", "policies", "posture",
+                "queue", "record", "clocks", "policies-admin", "posture-admin", "settings", "audit"],
+      "admin_entry_selector": "[data-testid='enter-admin']",
+      "settle_ms": 400,
+      "applies_to": ["390x844"]
+    },
+    {
+      "id": 9,
+      "line": "No console errors or page errors occur across the whole run.",
+      "drive": "playwright",
+      "check": "console_clean",
+      "pass": "Zero entries collected from the page's console error and pageerror events.",
+      "applies_to": ["1920x1080", "1366x768", "390x844"]
+    },
+    {
+      "id": 10,
+      "line": "The deployed page declares noindex in the head.",
+      "drive": "playwright",
+      "check": "noindex_in_head",
+      "pass": "The rendered head contains a noindex directive.",
+      "applies_to": ["1920x1080", "1366x768", "390x844"]
+    }
+  ]
+}

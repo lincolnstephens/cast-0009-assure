@@ -1,0 +1,25 @@
+{
+  "name": "tessera-assure",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Tessera Assure - the record of MITMARK's work under a retained DPO and vCISO contract, and the statement it produces",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "netlify dev --offline --filter @maximus/web",
+    "build": "pnpm --filter @maximus/shared build && pnpm --filter @maximus/web build",
+    "seed": "pnpm --filter @maximus/server seed",
+    "seed:demo": "pnpm --filter @maximus/server seed:demo",
+    "seed:reset": "pnpm --filter @maximus/server seed:reset",
+    "test": "pnpm -r test",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
+    "verify:functions": "node scripts/verify-function-bundle.mjs"
+  },
+  "packageManager": "pnpm@10.34.2",
+  "devDependencies": {
+    "@netlify/functions": "^3.1.0",
+    "@playwright/test": "^1.52.0"
+  }
+}

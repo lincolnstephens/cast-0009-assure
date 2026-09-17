@@ -1,0 +1,48 @@
+# Tessera Assure - Netlify configuration (repo root).
+#
+# Note on the build base: Netlify resolves the functions directory relative to
+# the base directory, which would force functions under apps/web/netlify/functions.
+# To keep the API at repo-root netlify/functions, base is omitted and the build
+# command and publish path target apps/web explicitly. Carried over from the
+# prior build; see DECISIONS.md.
+
+[build]
+  command = "pnpm --filter @maximus/shared build && pnpm --filter @maximus/web build"
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Explicit api config: esbuild inlines workspace and npm deps into one artifact.
+[functions."api"]
+  node_bundler = "esbuild"
+
+[dev]
+  framework = "vite"
+  command = "pnpm --filter @maximus/web dev"
+  targetPort = 5173
+  port = 8888
+  autoLaunch = false
+
+# The beta is unlisted. It is not to be indexed until Sunray says otherwise.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+
+# API routes first; the SPA fallback must come after so /api/* is never swallowed.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

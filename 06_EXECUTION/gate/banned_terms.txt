@@ -1,0 +1,8 @@
+# banned_terms.txt: one term per line, case-insensitive, matched anywhere in the product and the pack.
+# Standing entries below are structural. Sunray adds the operation's own list at Phase 1:
+# every other client's name, every real person not in the room, any internal codename that must not surface.
+# Lines starting with # are ignored.
+lorem ipsum
+TODO
+placeholder
+{{

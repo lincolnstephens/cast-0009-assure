@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Tessera Assure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --surface-base:#050E0A;--surface-panel:rgba(10,24,18,0.7);--border:rgba(54,200,74,0.24);
+  --accent:#36C84A;--accent-2:#26B23E;--text:#E8F4F0;--text-2:#8FA8B8;--text-3:#4A6580;
+  --class:#C9A02E;--radius:0;
+  --sev-protected:#2EE6A6;--sev-low:#7BC96F;--sev-moderate:#E8C547;--sev-elevated:#F5A623;--sev-high:#E8743C;--sev-critical:#D63A3A;
+  --c1:#26B23E;--c2:#3987e5;
+  --sans:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="day"]{
+  --surface-base:#FAFAF7;--surface-panel:#FFFFFF;--border:#D4D4CE;--accent:#1E8A2E;--accent-2:#166B22;
+  --text:#1F2937;--text-2:#6B7280;--text-3:#9CA3AF;--radius:8px;--c1:#1E8A2E;--c2:#2a78d6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--surface-base);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+header{border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface-base);z-index:5}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:12px}
+.brand h1{font-size:18px;font-weight:600;margin:0;letter-spacing:0.01em}
+.brand .sub{font-family:var(--mono);font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:0.18em}
+.class{font-family:var(--mono);font-size:11px;color:var(--class);text-transform:uppercase;letter-spacing:0.18em;border:1px solid var(--class);padding:2px 8px}
+nav{display:flex;gap:4px;flex-wrap:wrap;padding-bottom:8px}
+nav button{background:none;border:1px solid transparent;color:var(--text-2);padding:6px 12px;cursor:pointer;border-radius:var(--radius);font-size:14px}
+nav button[aria-selected="true"]{color:var(--text);border-color:var(--border);background:var(--surface-panel)}
+nav button:hover{color:var(--text)}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{background:var(--surface-panel);border:1px solid var(--border);padding:6px 12px;cursor:pointer;border-radius:var(--radius);font-size:13px;color:var(--text)}
+.btn.primary{border-color:var(--accent);color:var(--accent)}
+.btn:hover{border-color:var(--accent)}
+select,input[type=text],input[type=number],input[type=date],textarea{background:var(--surface-panel);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);width:100%}
+main{padding:24px 0 64px}
+section[hidden]{display:none}
+.eyebrow{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--text-2);margin:0 0 8px}
+h2{font-size:20px;font-weight:600;margin:0 0 12px}
+h3{font-size:15px;font-weight:600;margin:0 0 8px}
+p{max-width:58ch}
+.note{color:var(--text-2);font-size:13px;max-width:88ch}
+.banner{border:1px solid var(--sev-moderate);color:var(--text);padding:10px 12px;margin-bottom:20px;font-size:13px;display:flex;gap:12px;align-items:center;border-radius:var(--radius)}
+.banner b{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--sev-moderate)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0 24px}
+.tile{background:var(--surface-panel);border:1px solid var(--border);padding:14px 16px;border-radius:var(--radius)}
+.tile .k{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--text-2)}
+.tile .v{font-family:var(--mono);font-size:26px;font-variant-numeric:tabular-nums;margin:6px 0 2px}
+.tile .d{font-size:12px;color:var(--text-2)}
+.panel{background:var(--surface-panel);border:1px solid var(--border);padding:16px;border-radius:var(--radius);margin-bottom:16px}
+.filters{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:12px}
+.filters label{display:block;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--text-2);margin-bottom:4px}
+.filters > div{min-width:160px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-2);text-align:left;font-weight:500;padding:8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
+#recTable{min-width:900px}
+td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.mono{font-family:var(--mono);white-space:nowrap}
+.tag{display:inline-block;font-family:var(--mono);font-size:11px;padding:1px 6px;border:1px solid var(--border);color:var(--text-2);border-radius:var(--radius);white-space:nowrap}
+.tag.ill{border-color:var(--sev-moderate);color:var(--sev-moderate)}
+.tag.rev{border-color:var(--accent);color:var(--accent)}
+.tag.dead{border-color:var(--sev-elevated);color:var(--sev-elevated)}
+.status{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px}
+.status i{width:8px;height:8px;display:inline-block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+.bar{height:8px;background:var(--border);position:relative}
+.bar span{position:absolute;left:0;top:0;bottom:0;background:var(--c1)}
+.svc{display:grid;grid-template-columns:40px 1fr 140px 120px 120px;gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--border)}
+.svc .rank{font-family:var(--mono);font-size:20px;color:var(--text-3)}
+.svc .why{font-size:13px;color:var(--text-2);margin-top:4px;max-width:70ch}
+@media (max-width:760px){.svc{grid-template-columns:32px 1fr}.svc .m{grid-column:2}}
+form.entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+form.entry label{display:block;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:0.18em;color:var(--text-2);margin-bottom:4px}
+form.entry .full{grid-column:1/-1}
+.stmt{background:var(--surface-panel);border:1px solid var(--border);padding:32px;max-width:820px;border-radius:var(--radius)}
+.stmt h2{font-size:22px}
+.stmt .meta{font-family:var(--mono);font-size:12px;color:var(--text-2);margin-bottom:24px}
+.stmt table{margin:12px 0 20px}
+.stmt .sig{margin-top:32px;border-top:1px solid var(--border);padding-top:12px;font-size:13px;color:var(--text-2)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;font-size:13px}
+.kv dt{color:var(--text-2)}
+.kv dd{margin:0;font-family:var(--mono)}
+.spend{border-bottom:1px solid var(--border);padding:12px 0}
+.spend .cost{font-family:var(--mono);color:var(--accent)}
+footer{border-top:1px solid var(--border);padding:16px 0;font-size:12px;color:var(--text-3);font-family:var(--mono)}
+@media print{
+  header,nav,.tools,.no-print,footer,.banner{display:none!important}
+  body{background:#fff;color:#111}
+  :root{--surface-panel:#fff;--border:#bbb;--text:#111;--text-2:#444;--text-3:#666;--accent:#1E8A2E}
+  .stmt{border:none;padding:0;max-width:none}
+  main{padding:0}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <h1>Tessera Assure</h1>
+        <span class="sub">Service record, retained DPO and vCISO contract</span>
+      </div>
+      <div class="tools">
+        <span class="class">Beta v0.1, internal</span>
+        <button class="btn" id="themeBtn" type="button">Day view</button>
+      </div>
+    </div>
+    <nav role="tablist" aria-label="Views">
+      <button role="tab" data-view="record" aria-selected="true">Record</button>
+      <button role="tab" data-view="statement">CFO statement</button>
+      <button role="tab" data-view="services">Service lines</button>
+      <button role="tab" data-view="operator">Operator</button>
+      <button role="tab" data-view="spend">Where spend would help</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<div class="banner" id="illBanner"><b>Illustrative</b><span>Entries marked illustrative are examples of the record's structure, not a log of work done. They are replaced as the operator enters real items. Figures depend on the rates set in Operator.</span></div>
+
+<!-- RECORD -->
+<section id="view-record" role="tabpanel">
+  <p class="eyebrow">For the Information Officer</p>
+  <h2>What MITMARK did on your behalf, and what it saved you</h2>
+  <p class="note">Each line is one piece of work MITMARK completed under the retainer. The hours are an estimate of your time it replaced. The cost equivalent is those hours at the rate set in Operator, and what a contractor would have charged for the same work. Every line is reviewed by a named MITMARK person before it appears here.</p>
+
+  <div class="filters no-print">
+    <div><label for="fPeriod">Period</label><select id="fPeriod"></select></div>
+    <div><label for="fLine">Service line</label><select id="fLine"><option value="">All twelve</option></select></div>
+    <div><label for="fIll">Show</label><select id="fIll"><option value="all">All entries</option><option value="real">Real only</option></select></div>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="panel" style="overflow:auto">
+    <table id="recTable">
+      <thead><tr>
+        <th style="width:110px">Date</th><th style="width:90px">Line</th><th style="width:30%">What MITMARK did</th><th style="width:26%">Outcome</th><th class="num">Hours</th><th class="num">Cost eq.</th><th class="num">Contractor eq.</th><th>Reviewed</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <p class="eyebrow">Hours saved by service line</p>
+      <div id="lineBars"></div>
+    </div>
+    <div class="panel">
+      <p class="eyebrow">Deadlines and obligations met</p>
+      <div id="deadlines"></div>
+      <p class="note" style="margin-top:12px">Statutory clocks MITMARK tracked so you did not have to: DSAR one month, breach 72 hours to the ICO, vendor DPA before go-live.</p>
+    </div>
+  </div>
+</section>
+
+<!-- STATEMENT -->
+<section id="view-statement" role="tabpanel" hidden>
+  <p class="eyebrow no-print">Forwardable</p>
+  <div class="tools no-print" style="margin-bottom:16px">
+    <button class="btn primary" type="button" onclick="window.print()">Print or save as PDF</button>
+    <span class="note">Plain statement of work and value for the period selected in Record. No product language. Written to be forwarded as it stands.</span>
+  </div>
+  <div class="stmt" id="stmt"></div>
+</section>
+
+<!-- SERVICES -->
+<section id="view-services" role="tabpanel" hidden>
+  <p class="eyebrow">Assessment</p>
+  <h2>The twelve service lines, prioritised for this contract</h2>
+  <p class="note">Priority is set by three tests, in this order: the line is already being delivered under the retainer; a missed obligation on that line carries a regulatory or financial consequence; the line replaces the most of the Information Officer's own hours per instance. Status is the operator's entry, not an assumption.</p>
+  <div class="panel" id="svcList"></div>
+</section>
+
+<!-- OPERATOR -->
+<section id="view-operator" role="tabpanel" hidden>
+  <p class="eyebrow">MITMARK only</p>
+  <h2>Operator</h2>
+  <p class="note">The MITMARK contract lead keeps this record. The Information Officer reads it and forwards the statement; she enters nothing. In this beta, entries are held in this browser and exported as a file. A shared store is the first item under Where spend would help.</p>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>Rates and names</h3>
+      <form class="entry" id="settingsForm">
+        <div><label>Client display name</label><input type="text" name="clientName" placeholder="e.g. The Estate"></div>
+        <div><label>Information Officer (name or role)</label><input type="text" name="ioName" placeholder="Information Officer"></div>
+        <div><label>Her loaded hourly rate, £</label><input type="number" name="ioRate" min="0" step="1"></div>
+        <div><label>Contractor day rate, £ ex VAT</label><input type="number" name="dayRate" min="0" step="1"></div>
+        <div><label>Retainer fee per month, £ ex VAT</label><input type="number" name="retainer" min="0" step="1" placeholder="not entered"></div>
+        <div><label>MITMARK contract lead</label><input type="text" name="lead" placeholder="name"></div>
+        <div class="full"><button class="btn primary" type="submit">Save rates</button> <span class="note">Rates are assumptions until you confirm them; the statement says so.</span></div>
+      </form>
+    </div>
+    <div class="panel">
+      <h3>Service line status</h3>
+      <div id="svcStatus" class="kv"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Add an entry</h3>
+    <form class="entry" id="entryForm">
+      <div><label>Date completed</label><input type="date" name="date" required></div>
+      <div><label>Service line</label><select name="line" required></select></div>
+      <div><label>Her hours saved</label><input type="number" name="hours" min="0" step="0.5" required></div>
+      <div><label>Reviewed by</label><input type="text" name="reviewer" required placeholder="MITMARK name"></div>
+      <div class="full"><label>What MITMARK did</label><input type="text" name="what" required placeholder="one line, plain, past tense"></div>
+      <div class="full"><label>Outcome, deadline met, or risk prevented</label><input type="text" name="outcome" placeholder="e.g. ICO 72-hour assessment completed in 6 hours; no notification required"></div>
+      <div><label>Statutory deadline involved</label><select name="deadline"><option value="">None</option><option>DSAR one month</option><option>Breach 72 hours</option><option>DPA before go-live</option><option>Board or audit date</option></select></div>
+      <div class="full"><button class="btn primary" type="submit">Add entry</button></div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h3>Data</h3>
+    <div class="tools">
+      <button class="btn" type="button" id="exportBtn">Export record (JSON)</button>
+      <label class="btn" for="importFile" style="cursor:pointer">Import record (JSON)</label><input type="file" id="importFile" accept="application/json" style="display:none">
+      <button class="btn" type="button" id="clearIll">Remove all illustrative entries</button>
+      <button class="btn" type="button" id="resetBtn">Reset to illustrative set</button>
+    </div>
+    <p class="note" style="margin-top:8px">Export before clearing your browser. The file is the record; this page only shows it.</p>
+  </div>
+</section>
+
+<!-- SPEND -->
+<section id="view-spend" role="tabpanel" hidden>
+  <p class="eyebrow">Delivered at £0</p>
+  <h2>Where modest spend would improve this</h2>
+  <p class="note">The beta is a static page on MITMARK's existing Netlify plan, unlisted. Nothing below is needed for the record to work. Each item states what it adds, what it costs, and who it is for.</p>
+  <div class="panel" id="spendList"></div>
+</section>
+
+</main>
+<footer><div class="wrap">Tessera Assure, MITMARK Intelligence Ltd. Internal beta. No client identified on this page or in its address.</div></footer>
+
+<script>
+// ---------- Reference data ----------
+const LINES = [
+ {id:1, name:"DPIAs", short:"DPIA", hoursPer:16, deadline:false, why:"A DPIA is the single largest block of specialist hours a part-time officer faces; it is also the item an auditor asks for first."},
+ {id:2, name:"ROPA management", short:"ROPA", hoursPer:8, deadline:false, why:"The ROPA is the evidence base for everything else. Keeping it current is slow, unglamorous work that is easy to let slip."},
+ {id:3, name:"Policy and procedure suite", short:"Policies", hoursPer:10, deadline:false, why:"Six documents on a review cycle. Each refresh is a day she does not have."},
+ {id:4, name:"DSAR support", short:"DSAR", hoursPer:6, deadline:true, why:"One-month statutory clock. A missed DSAR is an ICO complaint and a reputational cost."},
+ {id:5, name:"Breach advisory", short:"Breach", hoursPer:8, deadline:true, why:"72-hour ICO clock. The judgement call on notification is the one she least wants to make alone."},
+ {id:6, name:"Vendor due diligence and DPAs", short:"Vendors", hoursPer:5, deadline:true, why:"Every new supplier is a contract question she cannot park; the DPA has to exist before go-live."},
+ {id:7, name:"Staff training", short:"Training", hoursPer:6, deadline:false, why:"Annual obligation. Building and delivering it herself costs more than the session."},
+ {id:8, name:"Monthly threat intelligence report", short:"Monthly report", hoursPer:4, deadline:false, why:"The vCISO half of the retainer made visible each month; the item the CFO sees most often."},
+ {id:9, name:"Board briefing", short:"Board", hoursPer:8, deadline:true, why:"Quarterly. This is where the CFO forms his view of the service; it should be the best thing MITMARK produces."},
+ {id:10, name:"Quarterly log review", short:"Log review", hoursPer:6, deadline:false, why:"The work behind the board briefing. Without it the briefing is opinion."},
+ {id:11, name:"Annual compliance cycle", short:"Annual cycle", hoursPer:12, deadline:true, why:"ISMS, access review, BC/DR/IR test, policy refresh. The audit-facing year."},
+ {id:12, name:"Ad hoc assurance and advisory", short:"Advisory", hoursPer:1, deadline:false, why:"The questions she would otherwise sit on. Small each, many in total, and the reason the relationship feels present."}
+];
+const STATUS_OPTS = ["Live","Available","Recommended","Not in scope"];
+const DEFAULT_SETTINGS = {clientName:"", ioName:"Information Officer", ioRate:45, dayRate:650, retainer:"", lead:""};
+const DEFAULT_STATUS = {1:"Available",2:"Live",3:"Live",4:"Live",5:"Live",6:"Live",7:"Available",8:"Live",9:"Live",10:"Live",11:"Available",12:"Live"};
+
+// Illustrative entries, Q3 2026. Marked ill:true and shown as such.
+const ILL = [
+ ["2026-07-03",8,"Prepared and issued the July threat and data protection report","Two actions raised, both closed by end of month",4,""],
+ ["2026-07-08",12,"Advised on legitimate interests basis for a tenant communication","Answer same day; no consent campaign needed",1,""],
+ ["2026-07-15",4,"Handled a subject access request end to end: acknowledgment, search checklist, response letter","Responded in 19 days against the one-month limit",6,"DSAR one month"],
+ ["2026-07-22",6,"Reviewed a new CCTV maintenance supplier and issued a UK GDPR Article 28 DPA","DPA signed before the supplier started on site",5,"DPA before go-live"],
+ ["2026-07-29",3,"Refreshed the data retention and deletion schedule","Schedule approved; two legacy categories scheduled for deletion",10,""],
+ ["2026-08-04",8,"Prepared and issued the August threat and data protection report","Flagged a phishing pattern seen at two comparable estates",4,""],
+ ["2026-08-11",5,"Assessed a misdirected email containing tenant details against the ICO notification threshold","Assessed within 6 hours of report; below threshold, no notification, breach register entry made",8,"Breach 72 hours"],
+ ["2026-08-14",12,"Answered a landlord's insurer questionnaire on data protection controls","Returned in 3 working days with evidence references",4,""],
+ ["2026-08-20",2,"Updated the record of processing activities for the new visitor management system","ROPA current; one missing legal basis corrected",8,""],
+ ["2026-08-27",12,"Advised on retention of leaver HR files","Written answer with ICO reference",1,""],
+ ["2026-09-02",8,"Prepared and issued the September threat and data protection report","No actions raised",4,""],
+ ["2026-09-05",4,"Handled a second subject access request from a former contractor","Responded in 12 days; third-party data redacted",6,"DSAR one month"],
+ ["2026-09-09",10,"Reviewed Q3 access change and DSAR logs ahead of the board briefing","Two dormant accounts flagged for removal",6,""],
+ ["2026-09-12",9,"Prepared the Q3 data protection board briefing and one-page summary","Delivered for the board pack deadline",8,"Board or audit date"],
+ ["2026-09-15",12,"Advised on cookie consent for the estate website refresh","Banner wording and consent categories supplied",2,""]
+].map((r,i)=>({id:"ill-"+i, date:r[0], line:r[1], what:r[2], outcome:r[3], hours:r[4], deadline:r[5], reviewer:"MITMARK (illustrative)", ill:true}));
+
+const SPEND = [
+ {what:"Shared store for the record, so the operator and the Information Officer see the same entries from any device", cost:"£0 to £25 per month", who:"Operator and reader", note:"A small hosted database or a spreadsheet the page reads. Removes the browser-only limit of this beta."},
+ {what:"Password on the page", cost:"£0 on the current Netlify plan", who:"Reader", note:"Site-wide password before anything client-facing is shared. One setting."},
+ {what:"Monthly email digest to the Information Officer with the month's entries and the running total", cost:"£0 to £15 per month", who:"Reader", note:"She sees the value without opening anything. The digest is the statement in short form."},
+ {what:"Document vault: each entry links to the deliverable MITMARK produced", cost:"£5 to £20 per month", who:"Reader, auditor", note:"Turns the record into evidence. Needed before an audit, not before a renewal conversation."},
+ {what:"ICO guidance and enforcement feed into the monthly report", cost:"£0 to £30 per month", who:"Operator", note:"Cuts the operator's preparation time for line 8. Value to MITMARK, not to the client."},
+ {what:"Second client tenancy", cost:"£0", who:"MITMARK", note:"The page is client-agnostic by design. A second retained client is a second export file, not a second build."}
+];
+
+// ---------- State ----------
+const KEY="tessera-assure-v1";
+let state = load();
+function load(){
+  try{ const s=JSON.parse(localStorage.getItem(KEY)); if(s && s.entries) return s; }catch(e){}
+  return {settings:{...DEFAULT_SETTINGS}, status:{...DEFAULT_STATUS}, entries:ILL.slice()};
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+
+// ---------- Helpers ----------
+const gbp = n => "£"+Math.round(n).toLocaleString("en-GB");
+const fmtDate = d => new Date(d+"T00:00:00").toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+const lineOf = id => LINES.find(l=>l.id===+id);
+function quarterOf(d){ const [y,m]=d.split("-").map(Number); return y+" Q"+(Math.floor((m-1)/3)+1); }
+function periods(){
+  const set=new Set(state.entries.map(e=>quarterOf(e.date)));
+  return [...set].sort().reverse();
+}
+function filtered(){
+  const p=document.getElementById("fPeriod").value, l=document.getElementById("fLine").value, ill=document.getElementById("fIll").value;
+  return state.entries.filter(e=>(!p||quarterOf(e.date)===p)&&(!l||e.line===+l)&&(ill==="all"||!e.ill)).sort((a,b)=>a.date<b.date?1:-1);
+}
+function costs(e){ const s=state.settings; return {io:e.hours*(+s.ioRate||0), con:(e.hours/8)*(+s.dayRate||0)}; }
+
+// ---------- Render: Record ----------
+function renderFilters(){
+  const fp=document.getElementById("fPeriod"); const cur=fp.value;
+  fp.innerHTML='<option value="">All periods</option>'+periods().map(p=>`<option>${p}</option>`).join("");
+  fp.value = periods().includes(cur)?cur:(periods()[0]||"");
+  const fl=document.getElementById("fLine");
+  if(fl.options.length===1) LINES.forEach(l=>fl.add(new Option(l.id+". "+l.name,l.id)));
+}
+function renderRecord(){
+  const rows=filtered(); const s=state.settings;
+  const hours=rows.reduce((a,e)=>a+ +e.hours,0);
+  const io=rows.reduce((a,e)=>a+costs(e).io,0), con=rows.reduce((a,e)=>a+costs(e).con,0);
+  const dl=rows.filter(e=>e.deadline).length;
+  const anyIll=rows.some(e=>e.ill);
+  document.getElementById("illBanner").style.display = state.entries.some(e=>e.ill)?"flex":"none";
+  document.getElementById("tiles").innerHTML=`
+    <div class="tile"><div class="k">Items delivered</div><div class="v">${rows.length}</div><div class="d">${anyIll?"includes illustrative entries":"all real entries"}</div></div>
+    <div class="tile"><div class="k">Your hours saved</div><div class="v">${hours}</div><div class="d">estimated hours of your time replaced</div></div>
+    <div class="tile"><div class="k">Cost equivalent</div><div class="v">${gbp(io)}</div><div class="d">at £${s.ioRate}/h loaded rate (assumption until confirmed)</div></div>
+    <div class="tile"><div class="k">Contractor equivalent</div><div class="v">${gbp(con)}</div><div class="d">at £${s.dayRate}/day ex VAT</div></div>
+    <div class="tile"><div class="k">Statutory deadlines met</div><div class="v">${dl}</div><div class="d">DSAR, breach, DPA, board dates</div></div>`;
+  document.querySelector("#recTable tbody").innerHTML = rows.length? rows.map(e=>{
+    const c=costs(e); const l=lineOf(e.line);
+    return `<tr>
+      <td class="mono">${fmtDate(e.date)}</td>
+      <td>${l.short}</td>
+      <td>${esc(e.what)}${e.ill?' <span class="tag ill">illustrative</span>':""}</td>
+      <td>${esc(e.outcome||"")}${e.deadline?` <span class="tag dead">${e.deadline}</span>`:""}</td>
+      <td class="num">${e.hours}</td>
+      <td class="num">${gbp(c.io)}</td>
+      <td class="num">${gbp(c.con)}</td>
+      <td><span class="tag rev">${esc(e.reviewer||"")}</span></td></tr>`;
+  }).join("") : `<tr><td colspan="8" class="note">No entries for this selection.</td></tr>`;
+  // bars
+  const byLine=LINES.map(l=>({l,h:rows.filter(e=>e.line===l.id).reduce((a,e)=>a+ +e.hours,0)})).filter(x=>x.h>0).sort((a,b)=>b.h-a.h);
+  const max=Math.max(1,...byLine.map(x=>x.h));
+  document.getElementById("lineBars").innerHTML = byLine.length? byLine.map(x=>`
+    <div style="display:grid;grid-template-columns:150px 1fr 40px;gap:8px;align-items:center;margin:6px 0;font-size:13px">
+      <span>${x.l.short}</span><div class="bar"><span style="width:${x.h/max*100}%"></span></div><span class="num mono" style="text-align:right;font-family:var(--mono)">${x.h}h</span></div>`).join("") : '<p class="note">Nothing yet.</p>';
+  const dls=rows.filter(e=>e.deadline);
+  document.getElementById("deadlines").innerHTML = dls.length? `<table><thead><tr><th>Date</th><th>Clock</th><th>Result</th></tr></thead><tbody>${dls.map(e=>`<tr><td class="mono">${fmtDate(e.date)}</td><td>${e.deadline}</td><td>${esc(e.outcome||"")}</td></tr>`).join("")}</tbody></table>` : '<p class="note">No statutory deadlines in this selection.</p>';
+  renderStatement(rows);
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// ---------- Render: Statement ----------
+function renderStatement(rows){
+  const s=state.settings; const p=document.getElementById("fPeriod").value||"all periods";
+  const hours=rows.reduce((a,e)=>a+ +e.hours,0);
+  const io=rows.reduce((a,e)=>a+costs(e).io,0), con=rows.reduce((a,e)=>a+costs(e).con,0);
+  const dl=rows.filter(e=>e.deadline);
+  const anyIll=rows.some(e=>e.ill);
+  const byLine=LINES.map(l=>({l,n:rows.filter(e=>e.line===l.id).length,h:rows.filter(e=>e.line===l.id).reduce((a,e)=>a+ +e.hours,0)})).filter(x=>x.n>0);
+  const months = p==="all periods"? Math.max(1,new Set(rows.map(e=>e.date.slice(0,7))).size) : 3;
+  const fee = s.retainer? +s.retainer*months : null;
+  document.getElementById("stmt").innerHTML=`
+    <p class="eyebrow">Statement of work and value</p>
+    <h2>Data protection and information security support, ${p}</h2>
+    <div class="meta">Prepared by MITMARK Intelligence Ltd for ${esc(s.clientName||"the client")}, for the attention of the ${esc(s.ioName||"Information Officer")} and the finance lead.${anyIll?" This statement contains illustrative entries and is not a record of work done.":""}</div>
+
+    <h3>What was done</h3>
+    <p>In ${p} MITMARK completed ${rows.length} items of work under the retainer across ${byLine.length} of the twelve service lines. ${dl.length} of them carried a statutory or governance deadline; all were met. Each item was reviewed by a named MITMARK person before it was recorded.</p>
+    <table><thead><tr><th>Service line</th><th class="num">Items</th><th class="num">Hours of the officer's time replaced</th></tr></thead>
+    <tbody>${byLine.map(x=>`<tr><td>${x.l.name}</td><td class="num">${x.n}</td><td class="num">${x.h}</td></tr>`).join("")}
+    <tr><td><b>Total</b></td><td class="num"><b>${rows.length}</b></td><td class="num"><b>${hours}</b></td></tr></tbody></table>
+
+    <h3>What it would otherwise have cost</h3>
+    <p>The ${esc(s.ioName||"Information Officer")} role is part-time within a full-time post. The hours above are an estimate of the officer's own time the work would have taken. Two comparators are given; both depend on rates that should be confirmed by the client.</p>
+    <table><thead><tr><th>Comparator</th><th>Basis</th><th class="num">Amount</th></tr></thead><tbody>
+      <tr><td>Officer's own time</td><td>${hours} hours at £${s.ioRate}/hour loaded</td><td class="num">${gbp(io)}</td></tr>
+      <tr><td>External consultant</td><td>${(hours/8).toFixed(1)} days at £${s.dayRate}/day ex VAT</td><td class="num">${gbp(con)}</td></tr>
+      <tr><td>Retainer for the period</td><td>${fee!==null?`${months} months at £${(+s.retainer).toLocaleString("en-GB")}/month ex VAT`:"fee not entered"}</td><td class="num">${fee!==null?gbp(fee):"not entered"}</td></tr>
+    </tbody></table>
+    ${fee!==null?`<p>Against the retainer, the consultant comparator is ${(con/fee).toFixed(1)}x and the officer's-time comparator is ${(io/fee).toFixed(1)}x. Neither comparator includes the cost of a missed statutory deadline, which is not estimated here.</p>`:`<p>No ratio is shown because the retainer fee has not been entered. When it is, this paragraph states the comparators against it.</p>`}
+
+    <h3>Obligations met</h3>
+    ${dl.length?`<table><thead><tr><th>Date</th><th>Obligation</th><th>Result</th></tr></thead><tbody>${dl.map(e=>`<tr><td class="mono">${fmtDate(e.date)}</td><td>${e.deadline}</td><td>${esc(e.outcome||"")}</td></tr>`).join("")}</tbody></table>`:"<p>No statutory deadlines fell in this period.</p>"}
+
+    <h3>Limitations</h3>
+    <p>Hours are estimates made by MITMARK at the time of the work and have not been independently verified. Rates are assumptions until the client confirms them. This statement records work completed; it does not assess the client's overall compliance position.</p>
+    <div class="sig">Prepared by ${esc(s.lead||"MITMARK contract lead")}, MITMARK Intelligence Ltd. Generated ${new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"long",year:"numeric"})}.</div>`;
+}
+
+// ---------- Render: Services ----------
+function priority(){
+  const rank = l => {
+    const st=state.status[l.id]||"Available";
+    const live = st==="Live"?0:st==="Recommended"?1:st==="Available"?2:3;
+    return live*1000 + (l.deadline?0:100) + (100-l.hoursPer);
+  };
+  return LINES.slice().sort((a,b)=>rank(a)-rank(b));
+}
+function renderServices(){
+  const list=priority();
+  document.getElementById("svcList").innerHTML=list.map((l,i)=>{
+    const st=state.status[l.id]||"Available";
+    const n=state.entries.filter(e=>e.line===l.id).length;
+    const col = st==="Live"?"var(--accent)":st==="Recommended"?"var(--sev-elevated)":st==="Available"?"var(--text-3)":"var(--border)";
+    return `<div class="svc">
+      <div class="rank">${String(i+1).padStart(2,"0")}</div>
+      <div><b>${l.id}. ${l.name}</b><div class="why">${l.why}</div></div>
+      <div class="m"><span class="status"><i style="background:${col}"></i>${st}</span></div>
+      <div class="m mono" style="font-family:var(--mono);font-size:12px">${l.hoursPer}h per instance</div>
+      <div class="m mono" style="font-family:var(--mono);font-size:12px">${n} on record${l.deadline?"<br>statutory clock":""}</div>
+    </div>`;
+  }).join("");
+  document.getElementById("svcStatus").innerHTML=LINES.map(l=>`<dt>${l.id}. ${l.short}</dt><dd><select data-line="${l.id}" class="stSel">${STATUS_OPTS.map(o=>`<option ${o===(state.status[l.id]||"Available")?"selected":""}>${o}</option>`).join("")}</select></dd>`).join("");
+  document.querySelectorAll(".stSel").forEach(sel=>sel.addEventListener("change",e=>{state.status[+e.target.dataset.line]=e.target.value;save();renderServices();}));
+}
+
+// ---------- Render: Spend ----------
+function renderSpend(){
+  document.getElementById("spendList").innerHTML=SPEND.map((s,i)=>`<div class="spend"><b>${String(i+1).padStart(2,"0")}. ${s.what}</b><div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;font-size:13px"><span class="cost">${s.cost}</span><span class="note">For: ${s.who}</span></div><div class="note" style="margin-top:4px">${s.note}</div></div>`).join("");
+}
+
+// ---------- Operator ----------
+function bindOperator(){
+  const sf=document.getElementById("settingsForm");
+  Object.entries(state.settings).forEach(([k,v])=>{ if(sf.elements[k]) sf.elements[k].value=v; });
+  sf.addEventListener("submit",e=>{e.preventDefault(); const f=new FormData(sf); for(const [k,v] of f.entries()) state.settings[k]=v; save(); renderAll(); flash(sf,"Saved");});
+  const ef=document.getElementById("entryForm");
+  LINES.forEach(l=>ef.elements.line.add(new Option(l.id+". "+l.name,l.id)));
+  ef.addEventListener("submit",e=>{e.preventDefault(); const f=Object.fromEntries(new FormData(ef).entries());
+    state.entries.push({id:"r-"+Date.now(), date:f.date, line:+f.line, what:f.what, outcome:f.outcome, hours:+f.hours, deadline:f.deadline, reviewer:f.reviewer, ill:false});
+    save(); ef.reset(); renderAll(); flash(ef,"Entry added"); });
+  document.getElementById("exportBtn").addEventListener("click",()=>{
+    const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}); const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download="tessera-assure-record-"+new Date().toISOString().slice(0,10)+".json"; a.click(); });
+  document.getElementById("importFile").addEventListener("change",ev=>{ const fr=new FileReader(); fr.onload=()=>{ try{ const s=JSON.parse(fr.result); if(s.entries){ state=s; save(); renderAll(); } }catch(e){ alert("Not a valid record file."); } }; fr.readAsText(ev.target.files[0]); });
+  document.getElementById("clearIll").addEventListener("click",()=>{ state.entries=state.entries.filter(e=>!e.ill); save(); renderAll(); });
+  document.getElementById("resetBtn").addEventListener("click",()=>{ state={settings:{...DEFAULT_SETTINGS},status:{...DEFAULT_STATUS},entries:ILL.slice()}; save(); location.reload(); });
+}
+function flash(form,msg){ const b=form.querySelector("button[type=submit]"); const t=b.textContent; b.textContent=msg; setTimeout(()=>b.textContent=t,1200); }
+
+// ---------- Tabs and theme ----------
+document.querySelectorAll("nav [role=tab]").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("nav [role=tab]").forEach(x=>x.setAttribute("aria-selected",x===b));
+  document.querySelectorAll("main section").forEach(s=>s.hidden = s.id!=="view-"+b.dataset.view);
+  window.scrollTo(0,0);
+}));
+const themeBtn=document.getElementById("themeBtn");
+function applyTheme(t){ document.documentElement.dataset.theme=t; themeBtn.textContent = t==="day"?"Night view":"Day view"; try{localStorage.setItem(KEY+"-theme",t);}catch(e){} }
+themeBtn.addEventListener("click",()=>applyTheme(document.documentElement.dataset.theme==="day"?"night":"day"));
+try{ applyTheme(localStorage.getItem(KEY+"-theme")||"night"); }catch(e){ applyTheme("night"); }
+
+// ---------- Boot ----------
+function renderAll(){ renderFilters(); renderRecord(); renderServices(); renderSpend(); }
+["fPeriod","fLine","fIll"].forEach(id=>document.getElementById(id).addEventListener("change",renderRecord));
+bindOperator(); renderAll();
+</script>
+</body>
+</html>

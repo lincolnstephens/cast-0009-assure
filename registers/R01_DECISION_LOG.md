@@ -1,0 +1,47 @@
+---
+document: R1_DECISION_LOG
+version: v1.0
+status: STANDING TEMPLATE
+authority: Seagull
+sits_beneath: SEAGULL_CYCLE_00_CANON v1.0
+register_id: R1
+instantiated_by: Seagull, opened empty at Phase 1, kept current to Phase 6
+usage: Every decision taken under delegated authority, under the silence rule, or against a preloaded decision. Append-only. One row per decision, at the time it is taken.
+---
+
+# DECISION LOG
+
+Append-only. Rows are added at the bottom, in time order, and are never edited or removed. A decision that is later reversed is a new row that cites the row it reverses.
+
+## Columns
+
+| Column | What goes in it |
+|---|---|
+| Time | Date and 24-hour time the decision was taken, not when it was written down. |
+| ID | `D-{{NN}}`, sequential, never reused. |
+| Decided by | The cell or role. Seagull, a G-cell, or Sunray. Never a model name. |
+| Under which authority | One of: delegated (the canon's delegated list); silence rule (state the item number and that the interval passed); preloaded {{Dn}} (the preloaded decision it rests on, and whether Sunray marked it authenticated, altered or struck); Sunray direct. |
+| What | The decision in one sentence, in the active voice. What was decided, not what was considered. |
+| Why | One sentence, tested against Annex A. If it cannot be tested against Annex A it is not a decision this log holds. |
+| Cost | What it costs the intent: scope, time, quality or a relationship. `None` is a permitted entry and is a claim. |
+| Back-briefed at | Date and time the one-line back-brief went up a layer, and to whom. `Pending` until it has. Every delegated decision of consequence is back-briefed within the working day. |
+
+## Rule for who appends
+
+Any cell appends its own decisions the moment they are taken, without asking. Seagull appends its own and audits the rest. Sunray's decisions are appended by Seagull with the time Sunray gave them. Nobody appends on another cell's behalf except Seagull, and then the row says so in the Why column. A decision that is not in this log did not happen.
+
+## The log
+
+| Time | ID | Decided by | Under which authority | What | Why | Cost | Back-briefed at |
+|---|---|---|---|---|---|---|---|
+| 2026-09-16 15:05 | DC-01 | Sunray | Sunray direct | Open a new Cast job, codename ASSURE; control number CAST-0009 assigned in _JOB_INDEX and the folder cut from _TEMPLATE. | Sunray directed the job open; the intent is awaited and nothing beyond the open is decided. | None | 2026-09-16 15:05, to Sunray (this open) |
+| 2026-09-16 16:20 | DC-02 | Sunray | Sunray direct | H-hour 23:59 16 Sep 2026: a working beta to share with Rich and Lurong; £0 spend on the beta with a clear signal where modest spend would improve it; all twelve service lines assessed and delivery prioritised in support of the intent; renewal date not a driver. | Sunray's run terms for ASSURE, recorded as given. | None | 2026-09-16 16:25, to Sunray (readback) |
+| 2026-09-16 16:25 | DC-03 | Seagull | delegated (Phase 0 drafting) | T01 recorded, T02 v1.0 drafted for readback; client name confined to material/restricted/CLIENT.md; Lurong treated as internal to MITMARK until her role is stated; host authorisation (Netlify) requested of Sunray. | Timing (seven hours to H-hour) requires the intent to be closed on readback, not iterated. | None | 2026-09-16 16:25, to Sunray (readback) |
+| 2026-09-16 16:35 | DC-04 | Sunray | Sunray direct | Netlify authorised for ASSURE (unlisted, noindex, £0 tier). | Prohibited-connector rule lifted per job by Sunray, as for Shield and Cast HQ. | None | 2026-09-16 16:35, to Sunray |
+| 2026-09-16 16:35 | DC-05 | Sunray | Sunray direct | Lurong is MITMARK's data compliance officer and runs the client's DPO contract; the H-hour beta is internal to MITMARK, Lurong operates the record and supplies real entries, the Information Officer reads it. | Settles the open point in T02 A9; A7 line 1 holds because the Information Officer maintains nothing. | None | 2026-09-16 16:35, to Sunray |
+| 2026-09-16 17:05 | DC-06 | Seagull | delegated (A6) | Beta v0.1 built as a single static page, "Tessera Assure": Record, CFO statement (print to PDF), twelve service lines prioritised, Operator (rates, status, add entry, export/import JSON), Where spend would help. Entries held in the browser; illustrative Q3 2026 set marked as such. Deployed to Netlify project tessera-assure (unlisted, noindex), £0. | Form of the record and stack delegated at A6; static page is the only £0 route that Rich and Lurong can open tonight. | Browser-only storage until a shared store is funded (spend item 01). | 2026-09-16 17:05, to Sunray |
+| 2026-09-16 17:40 | DC-07 | Sunray | Sunray direct | v1.0 is a hybrid: the MAXIMUS shell (two-sided portal, Policy Guide on the Anthropic API, statutory clocks, policy pack, review queue, audit log) carrying the ASSURE value layer (Record, Statement, twelve lines, Operator), deployed to tessera-assure in place of v0.1. Build runs in Claude Code from this folder under 06_EXECUTION/CLAUDE_CODE_INITIATING_PROMPT.md. | MAXIMUS is the product surface the archive lacked; ASSURE is the value layer MAXIMUS never developed; one build serves the intent better than two. | Anthropic API usage is the only spend, already attached; £0 otherwise. | 2026-09-16 17:40, to Sunray |
+| 2026-09-16 18:10 | DC-08 | Build session | delegated (A6) | MAXIMUS located at a path on this machine and copied to 06_EXECUTION/build/maximus-src, excluding its .git, its .env, its lockfile and two client-branded paths (a branding asset folder and a policy-pack script). | The order requires the build to run from a copy, and the client's name must not enter this repo; the two excluded paths carried it in their filenames. | The copy has no commit history and no lockfile; dependencies were resolved fresh. | 2026-09-16 18:10, to Sunray (this log) |
+| 2026-09-16 18:25 | DC-09 | Build session | delegated (A6) | MAXIMUS's Neon Postgres store is replaced by a JSON document store on Netlify Blobs: one document per organisation, one for users and sessions, one blob per generated export. Drizzle ORM, @neondatabase/serverless, pg and ws are removed. | Neon is not a prohibited connector but a new ASSURE database needs a DATABASE_URL this session does not hold, and reusing the prior build's would point Tessera Assure at the other product's live tenant data, which breaches A7. Netlify Blobs is named in the order as acceptable, is on the existing plan and needs no credential. | A read-modify-write document store suits one operator and does not suit concurrent writers; noted as a limit, not a defect, at this volume. | 2026-09-16 18:25, to Sunray (this log) |
+| 2026-09-16 18:30 | DC-10 | Build session | delegated (A6) | material/restricted/ is added to this repo's .gitignore so CLIENT.md never enters git history, and the gate reads the restricted names from it at run time without ever printing them. | The names must not appear in commits; keeping the file on disk but out of history satisfies both the read requirement and the no-commit requirement. | None. | 2026-09-16 18:30, to Sunray (this log) |
+| 2026-09-16 18:35 | DC-11 | Build session | delegated (A6) | The prior build's "value snapshot" (activity counters) is deleted rather than ported, and the client portal's Value section is the ASSURE Record and Statement. | The order names the value snapshot as the undeveloped surface the value layer replaces; counting activity is not stating value and would fail A3's "a record, not a claim". | The counters are gone; nothing depended on them. | 2026-09-16 18:35, to Sunray (this log) |

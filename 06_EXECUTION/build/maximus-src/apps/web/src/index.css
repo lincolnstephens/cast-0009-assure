@@ -1,0 +1,242 @@
+@import "tailwindcss";
+
+/*
+ * Tessera house tokens, MITMARK standard.
+ * Values taken verbatim from the prior build's :root and :root[data-theme="day"]
+ * blocks (06_EXECUTION/build/site/index.html). Night is the default theme.
+ * The client portal forces day by carrying data-theme="day" on its own root
+ * element (see ClientLayout.tsx); anything else in the app stays night unless
+ * a future top-level toggle sets data-theme="day" on <html>.
+ */
+:root {
+  --surface-base: #050e0a;
+  --surface-panel: rgba(10, 24, 18, 0.7);
+  --border: rgba(54, 200, 74, 0.24);
+  --accent: #36c84a;
+  --accent-2: #26b23e;
+  --text: #e8f4f0;
+  --text-2: #8fa8b8;
+  --text-3: #4a6580;
+  --class: #c9a02e;
+  --radius: 0;
+  --sev-protected: #2ee6a6;
+  --sev-low: #7bc96f;
+  --sev-moderate: #e8c547;
+  --sev-elevated: #f5a623;
+  --sev-high: #e8743c;
+  --sev-critical: #d63a3a;
+  --c1: #26b23e;
+  --c2: #3987e5;
+  --sans: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/*
+ * Day overrides. Matched against any element carrying data-theme="day", not
+ * only :root, so the client portal can force day locally without a global
+ * toggle. Severity colours and the classification colour are theme-invariant
+ * and are not redeclared here, matching the house standard.
+ */
+[data-theme="day"] {
+  --surface-base: #fafaf7;
+  --surface-panel: #ffffff;
+  --border: #d4d4ce;
+  --accent: #1e8a2e;
+  --accent-2: #166b22;
+  --text: #1f2937;
+  --text-2: #6b7280;
+  --text-3: #9ca3af;
+  --radius: 8px;
+  --c1: #1e8a2e;
+  --c2: #2a78d6;
+}
+
+/* Expose the house tokens to Tailwind so utilities (bg-hud-bg, text-client-muted, ...)
+   resolve to them. Existing class names in components keep working unchanged. */
+@theme {
+  /* Reference (not inline) the house radius so the plain `rounded` utility
+     stays theme-reactive: square at night, 8px in day, per element scope. */
+  --radius: var(--radius);
+
+  --color-hud-bg: var(--surface-base);
+  --color-hud-panel: var(--surface-panel);
+  --color-hud-line: var(--border);
+  --color-hud-accent: var(--accent);
+  --color-hud-gold: var(--class);
+  --color-hud-text: var(--text);
+  --color-hud-muted: var(--text-2);
+
+  --color-client-bg: var(--surface-base);
+  --color-client-surface: var(--surface-panel);
+  --color-client-line: var(--border);
+  --color-client-text: var(--text);
+  /* Tenant accent overrides the house accent only when ClientLayout sets
+     --client-accent from branding.accent (hex, empty when unset). */
+  --color-client-accent: var(--client-accent, var(--accent));
+  --color-client-muted: var(--text-2);
+
+  /* Severity colours, used for status only, never decoration. */
+  --color-status-green: var(--sev-protected);
+  --color-status-amber: var(--sev-elevated);
+  --color-status-red: var(--sev-critical);
+
+  --font-sans: var(--sans);
+  --font-mono: var(--mono);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--surface-base);
+  color: var(--text);
+  font-family: var(--sans);
+}
+
+.client-portal {
+  min-height: 100%;
+  width: 100%;
+  background-color: var(--color-client-bg);
+  color: var(--color-client-text);
+}
+
+.client-portal h1,
+.client-portal h2,
+.client-portal h3 {
+  color: var(--color-client-accent);
+}
+
+.admin-workspace {
+  min-height: 100%;
+  width: 100%;
+  background-color: var(--color-hud-bg);
+  color: var(--color-hud-text);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Figures, labels and eyebrows take the mono face. */
+.font-figures,
+.eyebrow {
+  font-family: var(--font-mono);
+}
+
+/* Policy markdown — client portal */
+.client-portal .markdown-body p {
+  margin-bottom: 0.6em;
+  line-height: 1.65;
+  color: var(--color-client-text);
+}
+.client-portal .markdown-body ul,
+.client-portal .markdown-body ol {
+  margin: 0.4em 0 0.8em 1.2em;
+  list-style: disc;
+  color: var(--color-client-text);
+}
+.client-portal .markdown-body ol {
+  list-style: decimal;
+}
+.client-portal .markdown-body strong {
+  color: var(--color-client-text);
+  font-weight: 600;
+}
+.client-portal .markdown-body a {
+  color: var(--color-client-accent);
+  text-decoration: underline;
+}
+.client-portal .markdown-body code {
+  background: var(--color-client-line);
+  color: var(--color-client-text);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.client-portal .markdown-body h1,
+.client-portal .markdown-body h2,
+.client-portal .markdown-body h3 {
+  font-weight: 600;
+  margin: 0.8em 0 0.4em;
+  color: var(--color-client-accent);
+}
+
+/* Policy markdown — admin HUD */
+.markdown-body p {
+  margin-bottom: 0.6em;
+  line-height: 1.65;
+}
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0.4em 0 0.8em 1.2em;
+  list-style: disc;
+}
+.markdown-body ol {
+  list-style: decimal;
+}
+.markdown-body strong {
+  color: var(--color-hud-text);
+  font-weight: 600;
+}
+.markdown-body a {
+  color: var(--color-hud-accent);
+  text-decoration: underline;
+}
+.markdown-body code {
+  background: var(--color-hud-bg);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  font-weight: 600;
+  margin: 0.8em 0 0.4em;
+}
+
+/*
+ * Print: the statement prints as a plain document. Chrome, controls and
+ * banners are hidden; colours reset to black-on-white regardless of theme.
+ * Based on the prior build's @media print block.
+ */
+@media print {
+  header,
+  nav,
+  .no-print,
+  footer,
+  .banner,
+  button {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #111;
+  }
+  :root,
+  [data-theme="day"] {
+    --surface-base: #fff;
+    --surface-panel: #fff;
+    --border: #bbb;
+    --text: #111;
+    --text-2: #444;
+    --text-3: #666;
+    --accent: #1e8a2e;
+    /* Override the exposed accent directly too, so a tenant's inline
+       --client-accent branding colour cannot leak into the printed page. */
+    --color-hud-accent: #1e8a2e;
+    --color-client-accent: #1e8a2e;
+  }
+  .stmt,
+  .statement {
+    border: none !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+}

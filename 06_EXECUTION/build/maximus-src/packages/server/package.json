@@ -1,0 +1,31 @@
+{
+  "name": "@maximus/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "seed": "tsx scripts/seed.ts --clean",
+    "seed:demo": "tsx scripts/seed.ts --demo",
+    "seed:reset": "tsx scripts/seed.ts --reset --demo"
+  },
+  "dependencies": {
+    "@maximus/shared": "workspace:*",
+    "@netlify/blobs": "^8.1.0",
+    "bcryptjs": "^3.0.2",
+    "hono": "^4.7.0",
+    "jszip": "^3.10.1",
+    "luxon": "^3.7.2",
+    "pdf-lib": "^1.17.1",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.1",
+    "@types/node": "^22.15.0",
+    "dotenv": "^16.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0"
+  }
+}

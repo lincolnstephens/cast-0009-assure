@@ -1,0 +1,214 @@
+import { addClockEventSchema, closeClockSchema, manualIntakeSchema } from "@maximus/shared";
+import { Hono } from "hono";
+import { listOrgIds, mutateOrg, newId, readOrg } from "../db/store.ts";
+import type { ClockEventRecord, ClockRecord } from "../db/model.ts";
+import { writeAudit } from "../lib/audit.ts";
+import { clockStatus } from "../lib/deadlines.ts";
+import {
+  clockReference,
+  createIntakeWithClock,
+  findClockGlobally,
+  recordEntryForClosedClock,
+} from "../lib/intakes.ts";
+import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+
+export const adminRoutes = new Hono<AppEnv>();
+adminRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
+
+function byCreatedDesc(a: ClockEventRecord, b: ClockEventRecord): number {
+  return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0;
+}
+
+/** Accounts for the top-bar client-account switcher. */
+adminRoutes.get("/accounts", async (c) => {
+  const ids = await listOrgIds();
+  const docs = await Promise.all(ids.map((id) => readOrg(id)));
+  const accounts = docs
+    .filter((d): d is NonNullable<typeof d> => d !== null)
+    .map((d) => ({ id: d.id, name: d.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return c.json({ accounts });
+});
+
+/** All clocks for an account, active first. */
+adminRoutes.get("/clocks", async (c) => {
+  const accountId = c.req.query("accountId");
+  if (!accountId) return c.json({ error: "accountId is required" }, 400);
+  const doc = await readOrg(accountId);
+  if (!doc) return c.json({ clocks: [] });
+
+  const now = new Date();
+  const rows = doc.clocks
+    .slice()
+    .sort((a, b) => {
+      if (!a.closedAt !== !b.closedAt) return a.closedAt ? 1 : -1; // open first
+      return a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0;
+    })
+    .map((clock) => {
+      const intake = doc.intakes.find((i) => i.id === clock.intakeId);
+      return {
+        id: clock.id,
+        kind: clock.kind,
+        reference: intake ? clockReference(intake.type, intake.id) : clock.id,
+        summary: intake?.summary ?? null,
+        intakeSource: intake?.source ?? null,
+        startsAt: clock.startedAt,
+        dueAt: clock.dueAt,
+        closedAt: clock.closedAt,
+        outcome: clock.outcome,
+        status: clock.closedAt
+          ? null
+          : clockStatus(new Date(clock.startedAt), new Date(clock.dueAt), now),
+      };
+    });
+
+  return c.json({ clocks: rows });
+});
+
+/** Event timeline for any clock. */
+adminRoutes.get("/clocks/:id/events", async (c) => {
+  const found = await findClockGlobally(c.req.param("id"));
+  if (!found) return c.json({ events: [] });
+  const events = found.doc.clockEvents
+    .filter((e) => e.clockId === found.clock.id)
+    .sort(byCreatedDesc);
+  return c.json({
+    events: events.map((e) => ({
+      id: e.id,
+      event: eventLabel(e, found.clock),
+      note: e.note,
+      createdAt: e.createdAt,
+      actorName: null,
+    })),
+  });
+});
+
+const STARTED_NOTES = new Set([
+  "Statutory one-month SAR clock started.",
+  "72-hour breach assessment clock started.",
+]);
+
+/** See routes/clocks.ts for why this is derived rather than a stored column. */
+function eventLabel(event: ClockEventRecord, clock: ClockRecord): string {
+  if (STARTED_NOTES.has(event.note)) return "started";
+  if (clock.closedAt && event.note === clock.outcome) return "closed";
+  return "note";
+}
+
+/** Add a note/event to a clock. */
+adminRoutes.post("/clocks/:id/events", async (c) => {
+  const parsed = addClockEventSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Enter a note." }, 400);
+
+  const user = c.get("user");
+  const found = await findClockGlobally(c.req.param("id"));
+  if (!found) return c.json({ error: "Not found" }, 404);
+
+  const orgId = found.doc.id;
+  const eventId = await mutateOrg(orgId, (doc) => {
+    const clock = doc.clocks.find((cl) => cl.id === found.clock.id);
+    if (!clock) return null;
+    const event = {
+      id: newId(),
+      clockId: clock.id,
+      note: parsed.data.note,
+      actorId: user.id,
+      createdAt: new Date().toISOString(),
+    };
+    doc.clockEvents.push(event);
+    return event.id;
+  });
+  if (!eventId) return c.json({ error: "Not found" }, 404);
+
+  await writeAudit(orgId, user, "clock.event_add", `Note added to clock ${found.clock.id}.`);
+
+  return c.json({ ok: true }, 201);
+});
+
+/** Close a clock with an outcome; SARs must record whether inside statute. */
+adminRoutes.post("/clocks/:id/close", async (c) => {
+  const parsed = closeClockSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Enter an outcome." }, 400);
+
+  const user = c.get("user");
+  const found = await findClockGlobally(c.req.param("id"));
+  if (!found) return c.json({ error: "Not found" }, 404);
+  if (found.clock.closedAt) return c.json({ error: "Clock is already closed." }, 409);
+  if (found.clock.kind === "sar_1_month" && parsed.data.insideStatute === undefined) {
+    return c.json({ error: "Closing a SAR must record whether it was inside statute." }, 400);
+  }
+
+  const orgId = found.doc.id;
+  const closedAt = new Date();
+  const entry = await mutateOrg(orgId, (doc) => {
+    const clock = doc.clocks.find((cl) => cl.id === found.clock.id);
+    if (!clock || clock.closedAt) return null;
+    clock.closedAt = closedAt.toISOString();
+    clock.closedBy = user.id;
+    clock.outcome = parsed.data.outcome;
+    doc.clockEvents.push({
+      id: newId(),
+      clockId: clock.id,
+      note: parsed.data.outcome,
+      actorId: user.id,
+      createdAt: closedAt.toISOString(),
+    });
+    // Closing a statutory clock creates a Record entry automatically (see
+    // PORTING_BRIEF.md, "the value layer being added") and links it back via
+    // clock.entryId.
+    return recordEntryForClosedClock(doc, clock, {
+      outcome: parsed.data.outcome,
+      closedAt,
+      reviewerName: user.displayName,
+    });
+  });
+  if (!entry) return c.json({ error: "Not found" }, 404);
+
+  const insideStatuteDetail =
+    parsed.data.insideStatute === undefined
+      ? ""
+      : ` Inside statute: ${parsed.data.insideStatute ? "yes" : "no"}.`;
+  await writeAudit(
+    orgId,
+    user,
+    "clock.close",
+    `Clock ${found.clock.id} closed: ${parsed.data.outcome}${insideStatuteDetail} Record entry ${entry.id} created (service line ${entry.line}).`,
+  );
+
+  return c.json({ ok: true });
+});
+
+/** Manual intake creation — same path as the client's "raise a request". */
+adminRoutes.post("/intakes", async (c) => {
+  const parsed = manualIntakeSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ error: "Choose an account, a type and a summary." }, 400);
+  }
+  const user = c.get("user");
+  const orgId = parsed.data.clientAccountId;
+
+  const result = await mutateOrg(orgId, (doc) =>
+    createIntakeWithClock(doc, {
+      type: parsed.data.type,
+      source: "manual",
+      summary: parsed.data.summary,
+      raisedBy: user.id,
+    }),
+  );
+
+  await writeAudit(
+    orgId,
+    user,
+    "intake.create",
+    `${parsed.data.type === "sar" ? "SAR" : "Breach"} intake created manually by the officer (${result.intake.id}).`,
+  );
+
+  return c.json(
+    {
+      intakeId: result.intake.id,
+      clockId: result.clock.id,
+      reference: clockReference(result.intake.type, result.intake.id),
+    },
+    201,
+  );
+});

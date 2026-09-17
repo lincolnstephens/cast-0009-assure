@@ -1,0 +1,154 @@
+import { raiseRequestSchema } from "@maximus/shared";
+import { Hono } from "hono";
+import { mutateOrg, readOrg } from "../db/store.ts";
+import type { ClockEventRecord, ClockRecord } from "../db/model.ts";
+import { writeAudit } from "../lib/audit.ts";
+import { clockStatus } from "../lib/deadlines.ts";
+import { clockReference, createIntakeWithClock, findClockGlobally } from "../lib/intakes.ts";
+import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+
+export const clockRoutes = new Hono<AppEnv>();
+clockRoutes.use("*", requireAuth, requireRole("client"));
+
+/** The two fixed notes `createIntakeWithClock` writes when a clock starts. */
+const STARTED_NOTES = new Set([
+  "Statutory one-month SAR clock started.",
+  "72-hour breach assessment clock started.",
+]);
+
+/**
+ * The event's kind, derived rather than stored — the store's `ClockEventRecord`
+ * carries only a note (db/model.ts), not an event-type column. The opening
+ * note is one of two fixed strings this codebase alone writes; the closing
+ * note is always exactly the clock's outcome. Anything else is a plain note.
+ */
+function eventLabel(event: ClockEventRecord, clock: ClockRecord): string {
+  if (STARTED_NOTES.has(event.note)) return "started";
+  if (clock.closedAt && event.note === clock.outcome) return "closed";
+  return "note";
+}
+
+/** Newest-started first, mirroring the previous `orderBy(desc(startsAt))`. */
+function byStartedDesc(a: ClockRecord, b: ClockRecord): number {
+  return a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0;
+}
+
+function byCreatedDesc(a: ClockEventRecord, b: ClockEventRecord): number {
+  return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0;
+}
+
+function latestNoteFor(events: ClockEventRecord[], clockId: string): string | null {
+  const forClock = events.filter((e) => e.clockId === clockId).sort(byCreatedDesc);
+  return forClock[0]?.note ?? null;
+}
+
+/** List the signed-in client's clocks, scoped to their organisation by construction. */
+clockRoutes.get("/", async (c) => {
+  const user = c.get("user");
+  if (!user.clientAccountId) return c.json({ active: [], closed: [] });
+  const doc = await readOrg(user.clientAccountId);
+  if (!doc) return c.json({ active: [], closed: [] });
+
+  const now = new Date();
+  const items = doc.clocks
+    .slice()
+    .sort(byStartedDesc)
+    .map((clock) => {
+      const intake = doc.intakes.find((i) => i.id === clock.intakeId);
+      return {
+        id: clock.id,
+        kind: clock.kind,
+        reference: intake ? clockReference(intake.type, intake.id) : clock.id,
+        startsAt: clock.startedAt,
+        dueAt: clock.dueAt,
+        closedAt: clock.closedAt,
+        outcome: clock.outcome,
+        status: clock.closedAt
+          ? null
+          : clockStatus(new Date(clock.startedAt), new Date(clock.dueAt), now),
+        latestNote: latestNoteFor(doc.clockEvents, clock.id),
+      };
+    });
+
+  return c.json({
+    active: items.filter((i) => !i.closedAt),
+    closed: items.filter((i) => i.closedAt),
+  });
+});
+
+/** A clock's event timeline (read-only). Cross-tenant access -> 403, missing -> 404. */
+clockRoutes.get("/:id", async (c) => {
+  const user = c.get("user");
+  const found = await findClockGlobally(c.req.param("id"));
+  if (!found) return c.json({ error: "Not found" }, 404);
+  if (found.doc.id !== user.clientAccountId) return c.json({ error: "Forbidden" }, 403);
+
+  const events = found.doc.clockEvents
+    .filter((e) => e.clockId === found.clock.id)
+    .sort(byCreatedDesc);
+
+  return c.json({
+    id: found.clock.id,
+    kind: found.clock.kind,
+    reference: found.intake ? clockReference(found.intake.type, found.intake.id) : found.clock.id,
+    summary: found.intake?.summary ?? null,
+    startsAt: found.clock.startedAt,
+    dueAt: found.clock.dueAt,
+    closedAt: found.clock.closedAt,
+    outcome: found.clock.outcome,
+    status: found.clock.closedAt
+      ? null
+      : clockStatus(new Date(found.clock.startedAt), new Date(found.clock.dueAt), new Date()),
+    events: events.map((e) => ({
+      id: e.id,
+      event: eventLabel(e, found.clock),
+      note: e.note,
+      createdAt: e.createdAt,
+      // No per-event actor display-name lookup against the separate users
+      // document in this beta — the note itself has always carried the
+      // substance the timeline needs.
+      actorName: null,
+    })),
+  });
+});
+
+export const requestRoutes = new Hono<AppEnv>();
+requestRoutes.use("*", requireAuth, requireRole("client"));
+
+/**
+ * "Raise a request" — the client portal's two intakes (data request, report a
+ * concern) are the only things the Information Officer ever fills in here.
+ */
+requestRoutes.post("/", async (c) => {
+  const parsed = raiseRequestSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ error: "Choose a request type and describe it briefly." }, 400);
+  }
+  const user = c.get("user");
+  if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
+
+  const result = await mutateOrg(user.clientAccountId, (doc) =>
+    createIntakeWithClock(doc, {
+      type: parsed.data.type === "data_request" ? "sar" : "breach",
+      source: "manual",
+      summary: parsed.data.details,
+      raisedBy: user.id,
+    }),
+  );
+
+  await writeAudit(
+    user.clientAccountId,
+    user,
+    "intake.create",
+    `${parsed.data.type === "data_request" ? "SAR" : "Breach"} intake raised by the client (${result.intake.id}).`,
+  );
+
+  return c.json(
+    {
+      intakeId: result.intake.id,
+      clockId: result.clock.id,
+      reference: clockReference(result.intake.type, result.intake.id),
+    },
+    201,
+  );
+});
