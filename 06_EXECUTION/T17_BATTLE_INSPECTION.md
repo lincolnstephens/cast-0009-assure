@@ -9,7 +9,7 @@ authority: Seagull, executed by the build session under T02 A6
 # ASSURE battle inspection, v1.0
 
 - URL: https://tessera-assure.netlify.app (Netlify project `tessera-assure`, site id `62b23338-2994-49ca-bc9e-0a4ba1cd5aaa`, unlisted, noindex, no password)
-- Deployed: 2026-09-17, production deploy `6aabde33cb9f57a980aa4cf4`
+- Deployed: 2026-09-17, production deploy `6aabe0ac5884128cb5314a12`
 - Source: `06_EXECUTION/build/maximus-src/`, built output copied to `06_EXECUTION/build/dist/`
 - Spend: £0. Netlify on the existing team plan, Netlify Blobs on the same plan, no database, no new service.
 - Client name: absent from the page, the source, the built output, the store, the seed data, the URL and the project name. Checked by `06_EXECUTION/gate/check_restricted.py`, which reads the names at run time and never prints them.

@@ -9,7 +9,7 @@ authority: Seagull, executed by the build session under T02 A6
 # Tessera Assure v1.0, build report
 
 **Live:** https://tessera-assure.netlify.app
-**Production deploy:** `6aabde33cb9f57a980aa4cf4`, 2026-09-17
+**Production deploy:** `6aabe0ac5884128cb5314a12`, 2026-09-17
 **Gate:** PASS, 36 of 36, against the production URL
 **Spend:** £0
 
