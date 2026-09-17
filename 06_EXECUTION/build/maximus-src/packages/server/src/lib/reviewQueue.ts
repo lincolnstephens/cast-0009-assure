@@ -91,10 +91,18 @@ export async function pendingReviewItems(
 function reviewContext(doc: OrgDoc, item: ReviewItemRecord): Record<string, unknown> {
   if (item.type === "chat_amber") {
     const escalation = doc.escalations.find((e) => e.id === item.refId);
+    // The reply that belongs to this escalation is the Guide message at or
+    // just after it was raised, not simply the latest one in the thread: a
+    // later question would otherwise be shown against an earlier escalation.
     const reply = escalation
       ? doc.messages
-          .filter((m) => m.threadId === escalation.threadId && m.sender === "guide")
-          .slice(-1)[0]
+          .filter(
+            (m) =>
+              m.threadId === escalation.threadId &&
+              m.sender === "guide" &&
+              m.createdAt >= escalation.createdAt,
+          )
+          .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))[0]
       : undefined;
     return {
       question: escalation?.question ?? item.summary,
@@ -121,7 +129,10 @@ function reviewContext(doc: OrgDoc, item: ReviewItemRecord): Record<string, unkn
     const intake = doc.intakes.find((i) => i.id === item.refId);
     return {
       intakeType: intake?.type === "breach" ? "Reported concern" : "Data request",
-      source: intake?.source ?? "manual",
+      source:
+        intake?.source === "chat"
+          ? "the Policy Guide"
+          : "the client portal",
       summary: intake?.summary ?? item.summary,
     };
   }

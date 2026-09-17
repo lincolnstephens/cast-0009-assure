@@ -576,3 +576,46 @@
 | 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow. | PASS | 6 views checked, no overflow |
 | 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
 | 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+
+## Run 2026-09-17 12:48Z - https://tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.0. **Verdict:** PASS, 36 of 36.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 98 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | driven: definition of done present | PASS | 10 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='guide'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Policy Guide, re | PASS | 6 views render a heading |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | PASS | 9 views render a heading |
+| 4 | L4 @1920x1080: The Record table in the Value view renders at least one row. | PASS | 21 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='guide'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Policy Guide, re | PASS | 6 views render a heading |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | PASS | 9 views render a heading |
+| 4 | L4 @1366x768: The Record table in the Value view renders at least one row. | PASS | 21 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='guide'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Policy Guide, re | PASS | 6 views render a heading |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | PASS | 9 views render a heading |
+| 4 | L4 @390x844: The Record table in the Value view renders at least one row. | PASS | 21 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow. | PASS | 6 views checked, no overflow |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
