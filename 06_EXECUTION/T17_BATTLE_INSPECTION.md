@@ -9,7 +9,7 @@ authority: Seagull, executed by the build session under T02 A6
 # ASSURE battle inspection, v1.0
 
 - URL: https://tessera-assure.netlify.app (Netlify project `tessera-assure`, site id `62b23338-2994-49ca-bc9e-0a4ba1cd5aaa`, unlisted, noindex, no password)
-- Deployed: 2026-09-17, production deploy `6aabd4f08da2e6146d2d98c7`
+- Deployed: 2026-09-17, production deploy `6aabde33cb9f57a980aa4cf4`
 - Source: `06_EXECUTION/build/maximus-src/`, built output copied to `06_EXECUTION/build/dist/`
 - Spend: £0. Netlify on the existing team plan, Netlify Blobs on the same plan, no database, no new service.
 - Client name: absent from the page, the source, the built output, the store, the seed data, the URL and the project name. Checked by `06_EXECUTION/gate/check_restricted.py`, which reads the names at run time and never prints them.
@@ -39,6 +39,8 @@ authority: Seagull, executed by the build session under T02 A6
 ## Also inspected by the build session
 
 - Screenshots taken of the client Record, the client Statement, the Policy Guide, the admin Record, admin Settings and the review queue at 1440 wide.
+- Every one of the nine admin views driven by hand with a pending review item present, reading each heading: no console errors.
+- The Policy Guide asked its three example questions against the deployed product, and a data request raised from the client portal, worked and closed in admin, checked to create exactly one Record entry naming the operator.
 - Client portal renders light, admin workspace dark, both from the Tessera tokens. Inter for text, JetBrains Mono for figures and labels. Square corners at night, 8px in day. Severity colours on status only. Neither retired colour anywhere.
 - 102 unit and integration tests pass. A local end to end smoke test of the API passes: sign-in, the Record, the Statement, the illustrative rule, the v0.1 import, and clock-to-entry.
 - The v0.1 JSON export format imports cleanly, takes the valid rows, and reports the rows it could not read rather than dropping them silently.
@@ -61,11 +63,13 @@ These were not visible from reading the code and are the reason the gate is driv
 3. Two sign-ins at once could lose each other's write, because sessions lived in one shared document. Sessions are now their own blobs.
 4. A signed-out visitor's first page load produced a console error. The session probe now answers 200.
 5. The prior build's stub Users page shipped as an empty screen. Removed.
+6. The first item to reach the review queue took the whole admin workspace down: the queue renders detail the ported API had stopped sending. The detail is sent again, and the queue degrades to a thinner card rather than a blank page if it is ever absent. Found by raising a request as the Information Officer and then opening the operator's side.
+7. The Policy Guide reported itself busy on every question. It called the Anthropic API with a model id that no longer exists and an assistant prefill that current models reject, and reported every failure as a transient one. The model id is now `claude-opus-5`, the prefill is gone, and a permanent failure falls back to the deterministic matcher rather than promising an answer that will never come.
 
 ## Known limits at this version
 
 - The record is seeded with fifteen illustrative entries and one open data request, all marked illustrative where they are entries. It is real in structure and illustrative in content until Lurong enters real items.
 - Rates are defaults, £45 an hour and £650 a day, and the Statement says they are assumptions until the client confirms them. The retainer fee is not entered, so the Statement shows no ratio and says why.
-- `ANTHROPIC_API_KEY` is not set on this site, so the Policy Guide answers from its deterministic keyword matching rather than the Anthropic API. It still answers from approved policies only. Setting the key is one step and is the smallest next decision for Sunray.
+- The Policy Guide answers from its deterministic keyword matching, not the Anthropic API. No key is set on this site; a team-level `ANTHROPIC_API_KEY` is injected into every project on the Netlify team and the Anthropic API rejects it with `401 invalid x-api-key`. Checked by hand against the three example questions: the letting-agent question answers green with a citation from the approved Data Protection Policy, the CCTV retention question escalates to the officer as amber, and the former-employee request opens the statutory process as red. Putting a working key on the project is the smallest next decision for Sunray.
 - Posture and exposure carry demo data and say so on screen.
 - The two demo accounts use a demo password. Change both before anything is shown outside MITMARK.

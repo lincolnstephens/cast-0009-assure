@@ -9,7 +9,7 @@ authority: Seagull, executed by the build session under T02 A6
 # Tessera Assure v1.0, build report
 
 **Live:** https://tessera-assure.netlify.app
-**Production deploy:** `6aabd4f08da2e6146d2d98c7`, 2026-09-17
+**Production deploy:** `6aabde33cb9f57a980aa4cf4`, 2026-09-17
 **Gate:** PASS, 36 of 36, against the production URL
 **Spend:** £0
 
@@ -49,17 +49,19 @@ The MAXIMUS shell carrying the ASSURE value layer, as a single product.
 
 ## 3. What the gate caught that reading the code did not
 
-The gate drives the deployed product. Five defects only appeared that way.
+The gate drives the deployed product, and the product was then exercised by hand. Seven defects only appeared that way.
 
 1. **Illustrative entries kept reaching the client after the operator switched them off.** The v1 function could not read the store strongly, so the two sides disagreed and never converged. This was the A7 breach in the build and the reason for the v2 change.
 2. **A stale read could wipe an organisation.** The seeder treated one empty read as proof the organisation did not exist and wrote a fresh empty document over it. It now requires two agreeing reads, and a seed marker stops any re-seed over the operator's work.
 3. **Concurrent sign-ins could lose each other.** Sessions lived as rows inside one shared document, read and rewritten on every sign-in. They are now one blob each.
 4. **A signed-out first page load logged a console error.** The bootstrap probe now answers 200 with a null user.
 5. **A stub Users page shipped as an empty screen.** Removed rather than left in.
+6. **The first item to reach the review queue took the whole admin workspace down.** The queue renders detail about the thing being reviewed, and the ported API had stopped sending it, so the operator's side white-screened the moment the Information Officer raised a request. The API sends it again, and the queue now degrades to a thinner card rather than a blank page if it is ever missing.
+7. **The Policy Guide told the officer it was busy, forever.** It called the Anthropic API with a model id that no longer exists and an assistant prefill that current models reject, and every failure was reported as "busy, try again in a few seconds". The model id is now `claude-opus-5`, the prefill is gone, and a permanent failure (a bad key, a bad request) falls back to the deterministic matcher instead of promising an answer that would never arrive. A genuine rate limit still says busy.
 
 ## 4. What was deferred, and why
 
-- **The Anthropic API key is not set on this site.** The Policy Guide therefore answers from its deterministic keyword matching instead of the model. It still answers from approved policies only and still escalates, so the behaviour is right and the answers are weaker. The key was not copied across because the only bulk tool available would have carried the prior build's database credential onto this site with it. This is the smallest next decision, below.
+- **The Anthropic API key reaching this site does not work.** No key is set on the site itself; a team-level `ANTHROPIC_API_KEY` is injected into every project on the Netlify team, and the Anthropic API rejects it with `401 invalid x-api-key`. The Policy Guide therefore answers from its deterministic keyword matching. It still answers from approved policies only, still cites them, and still escalates, so the behaviour is right and the answers are weaker. This is the smallest next decision, below.
 - **Real content.** All fifteen Record entries are illustrative and say so. The record is real in structure and illustrative in content until Lurong enters real items, exactly as A9 anticipated. `00_INTENT/ASSURE_LIVE_REQUIREMENTS.md` lists what is needed; Block 1 alone makes it real and is a morning's work.
 - **Rates and fee.** Defaults of £45 an hour and £650 a day stand, and the Statement says they are assumptions. The retainer fee is not entered, so no ratio is shown and the Statement says why.
 - **Policy section editing.** The prior build stored policy sections as their own rows; the store holds one markdown body per version, with sections parsed out of it for display and citation. Editing a draft now means editing its body rather than a section at a time. The client-facing shape is unchanged.
@@ -75,7 +77,7 @@ Values are not printed anywhere in this pack.
 | `SESSION_SECRET` | Yes | Signs the session cookie. Set fresh for this site. **Worth rotating in the Netlify UI**, because its value passed through the build session's transcript. |
 | `SEED_CLIENT_PASSWORD` | Yes | The Information Officer demo account's password. |
 | `SEED_OFFICER_PASSWORD` | Yes | The operator demo account's password. |
-| `ANTHROPIC_API_KEY` | **No** | The Policy Guide. Absent, it falls back to keyword matching. |
+| `ANTHROPIC_API_KEY` | **Not on this site.** A team-level value is injected and is **rejected by the Anthropic API with 401**. | The Policy Guide. Unusable or absent, it falls back to keyword matching. |
 
 `DATABASE_URL` is no longer read by anything and must not be set on this site.
 
@@ -110,8 +112,10 @@ The `--filter` is needed because the Netlify CLI otherwise stops to ask which wo
 
 ## 8. The smallest next decision for Sunray
 
-**Set `ANTHROPIC_API_KEY` on `tessera-assure`, or say the Guide ships on keyword matching for this beta.**
+**Set a working `ANTHROPIC_API_KEY` on `tessera-assure`, or say the Guide ships on keyword matching for this beta.**
 
-It is one value, set once in the Netlify UI or by `netlify env:set`, and it is the difference between the Policy Guide answering the Information Officer's questions well and answering them adequately. Nothing else in the product is waiting on a decision.
+The team-level key that reaches this site is rejected by the Anthropic API with `401 invalid x-api-key`, so it is not a matter of copying it across: a valid key has to be put on the project, which overrides the team value. It is one value, set once in the Netlify UI, and it is the difference between the Policy Guide answering the Information Officer's questions well and answering them adequately. Nothing else in the product is waiting on a decision.
+
+The deterministic fallback is not a placeholder: on the three example questions it answers the letting-agent question green with a citation from the approved Data Protection Policy, escalates the CCTV retention question to the officer as amber, and opens the statutory process for the former-employee request as red. The model would answer the amber one rather than escalate it.
 
 After that, in order: change the two demo passwords; and put Block 1 of `ASSURE_LIVE_REQUIREMENTS.md` in front of the contract lead, because the record is only illustrative until he fills it.

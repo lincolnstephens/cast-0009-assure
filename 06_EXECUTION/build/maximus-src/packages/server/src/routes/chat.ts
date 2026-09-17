@@ -5,7 +5,7 @@ import { mutateOrg, newId, readUsers } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { buildCorpus } from "../lib/guide/corpus.ts";
 import { enforce, parseRawResult, type EnforcedReply } from "../lib/guide/enforce.ts";
-import { askLlm, GuideBusyError, isLlmConfigured } from "../lib/guide/llm.ts";
+import { askLlm, GuideBusyError, GuideUnavailableError, isLlmConfigured } from "../lib/guide/llm.ts";
 import { askStub } from "../lib/guide/stub.ts";
 import { createIntakeWithClock } from "../lib/intakes.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
@@ -83,8 +83,17 @@ chatRoutes.post("/messages", async (c) => {
           reply = enforce(askStub(corpus, question), corpus);
         }
       } catch (err) {
-        if (err instanceof GuideBusyError) return { kind: "busy" };
-        throw err;
+        if (err instanceof GuideUnavailableError) {
+          // The key or the request is wrong, not the moment. Answering from the
+          // approved policies with the deterministic matcher is better than
+          // telling her to come back in a few seconds for an answer that will
+          // never arrive.
+          reply = enforce(askStub(corpus, question), corpus);
+        } else if (err instanceof GuideBusyError) {
+          return { kind: "busy" };
+        } else {
+          throw err;
+        }
       }
     }
 

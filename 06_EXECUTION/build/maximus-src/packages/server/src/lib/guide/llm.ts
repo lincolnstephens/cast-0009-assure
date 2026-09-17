@@ -1,13 +1,28 @@
 import { renderCorpus, type CorpusSection } from "./corpus.ts";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-5";
+// Claude Opus 5. The id carries no date suffix.
+const MODEL = "claude-opus-5";
 
 /** Raised when the model is rate-limited/overloaded - callers map this to
  * fixed plain-English copy, never a raw error. */
 export class GuideBusyError extends Error {
   constructor(public httpStatus: number) {
     super("Guide temporarily unavailable");
+  }
+}
+
+/**
+ * The model cannot be reached and retrying will not help: a bad or missing
+ * key, a model the key cannot use, a malformed request. This is not a busy
+ * signal. Telling the Information Officer to try again in a few seconds when
+ * the answer will never come is worse than no key at all, so the caller falls
+ * back to the deterministic keyword matching instead, which still answers from
+ * approved policies only.
+ */
+export class GuideUnavailableError extends Error {
+  constructor(public httpStatus: number) {
+    super("Guide not configured correctly");
   }
 }
 
@@ -80,11 +95,11 @@ export async function askLlm(
         model: MODEL,
         max_tokens: 1024,
         system: systemBlocks(clientName, corpus),
-        messages: [
-          { role: "user", content: question },
-          // Prefill nudges the model into bare JSON output.
-          { role: "assistant", content: "{" },
-        ],
+        // Effort is deliberately low: this is a short answer drawn from a small
+        // corpus of approved policy, not a reasoning task, and the Guide is
+        // answering an officer who is waiting.
+        output_config: { effort: "low" },
+        messages: [{ role: "user", content: question }],
       }),
       signal: AbortSignal.timeout(30_000),
     });
@@ -99,7 +114,7 @@ export async function askLlm(
   }
   if (!res.ok) {
     logLlm({ httpStatus: res.status, latencyMs: Date.now() - startedAt });
-    throw new GuideBusyError(res.status);
+    throw new GuideUnavailableError(res.status);
   }
 
   const data = (await res.json()) as {
@@ -125,8 +140,10 @@ export async function askLlm(
     .filter((b) => b.type === "text")
     .map((b) => b.text ?? "")
     .join("");
-  // Re-attach the prefilled opening brace.
-  return { text: `{${text}` };
+  // The reply is bare JSON. An assistant prefill used to force the opening
+  // brace, but current models reject a prefilled last assistant turn with a
+  // 400, so the system prompt asks for JSON and the parser finds the object.
+  return { text };
 }
 
 function logLlm(meta: Record<string, unknown>) {

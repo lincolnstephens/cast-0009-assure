@@ -201,6 +201,25 @@ if (open) {
   );
 }
 
+// --- the review queue carries what the operator's screen renders -----------
+// A pending item with no context used to take the whole admin workspace down.
+const queue = await call("GET", "/admin/review?accountId=demo");
+check("review queue responds", queue.status === 200, `status ${queue.status}`);
+const items = queue.body?.items ?? queue.body ?? [];
+const list = Array.isArray(items) ? items : [];
+check("the raised request is waiting in the review queue", list.length > 0, `${list.length} items`);
+check(
+  "every pending item carries a context object",
+  list.every((i) => i.context && typeof i.context === "object"),
+  "",
+);
+const intakeItem = list.find((i) => i.type === "intake");
+check(
+  "an intake item names its type and its source",
+  Boolean(intakeItem && intakeItem.context.intakeType && intakeItem.context.source),
+  intakeItem ? String(intakeItem.context.intakeType) : "no intake item",
+);
+
 rmSync(dir, { recursive: true, force: true });
 console.log(failures === 0 ? "\nSMOKE PASS" : `\nSMOKE FAIL: ${failures} checks failed`);
 process.exit(failures === 0 ? 0 : 1);

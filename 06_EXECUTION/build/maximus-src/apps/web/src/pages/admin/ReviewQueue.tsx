@@ -102,7 +102,9 @@ export function AdminReviewQueuePage() {
 }
 
 function ReviewCard({ item, onDone }: { item: ReviewItem; onDone: () => Promise<void> }) {
-  const ctx = item.context;
+  // Defensive: the queue is the operator's way in, so a context the API did
+  // not send must degrade to a thinner card, never to a blank workspace.
+  const ctx: Record<string, unknown> = (item.context ?? {}) as Record<string, unknown>;
 
   return (
     <div className="rounded border border-hud-line bg-hud-panel/60 p-4">

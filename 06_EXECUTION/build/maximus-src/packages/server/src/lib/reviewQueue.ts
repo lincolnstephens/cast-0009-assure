@@ -12,7 +12,7 @@
  */
 
 import type { ReviewItemType } from "@maximus/shared";
-import type { ChatMessageRecord } from "../db/model.ts";
+import type { ChatMessageRecord, OrgDoc, ReviewItemRecord } from "../db/model.ts";
 import { exportKey, listOrgIds, mutateOrg, newId, readOrg, writeExportBlob } from "../db/store.ts";
 import { writeAudit } from "./audit.ts";
 import { generateDefenceFile } from "./defenceFile.ts";
@@ -34,6 +34,14 @@ export interface PendingReviewItem {
   refId: string;
   summary: string;
   createdAt: string;
+  /**
+   * What the review queue needs to show about the thing being reviewed. The
+   * Postgres build joined this out of four tables; the store holds them on the
+   * organisation document, so it is assembled here. It is always an object,
+   * never absent: the queue renders from it, and an absent context used to
+   * take the whole admin workspace down the moment a first item arrived.
+   */
+  context: Record<string, unknown>;
 }
 
 /**
@@ -75,7 +83,49 @@ export async function pendingReviewItems(
       refId: item.refId,
       summary: item.summary,
       createdAt: item.createdAt,
+      context: reviewContext(doc, item),
     }));
+}
+
+/** The detail the queue shows for one item, by its type. */
+function reviewContext(doc: OrgDoc, item: ReviewItemRecord): Record<string, unknown> {
+  if (item.type === "chat_amber") {
+    const escalation = doc.escalations.find((e) => e.id === item.refId);
+    const reply = escalation
+      ? doc.messages
+          .filter((m) => m.threadId === escalation.threadId && m.sender === "guide")
+          .slice(-1)[0]
+      : undefined;
+    return {
+      question: escalation?.question ?? item.summary,
+      guideReply: reply?.body ?? "The Guide did not answer and raised this for you.",
+    };
+  }
+  if (item.type === "export_request") {
+    const record = doc.exports.find((e) => e.id === item.refId);
+    return {
+      exportState: record?.state ?? "requested",
+      requestedBy: record?.requestedByName ?? "",
+    };
+  }
+  if (item.type === "alert") {
+    const alert = doc.alerts.find((a) => a.id === item.refId);
+    return {
+      summary: alert?.summary ?? item.summary,
+      kind: alert?.kind ?? "",
+      severity: alert?.severity ?? "",
+      isDemo: alert?.demo ?? true,
+    };
+  }
+  if (item.type === "intake") {
+    const intake = doc.intakes.find((i) => i.id === item.refId);
+    return {
+      intakeType: intake?.type === "breach" ? "Reported concern" : "Data request",
+      source: intake?.source ?? "manual",
+      summary: intake?.summary ?? item.summary,
+    };
+  }
+  return { summary: item.summary };
 }
 
 /** Spec §5.1: answering posts the officer's reply into the client's thread. */
