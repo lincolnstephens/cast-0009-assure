@@ -20,7 +20,7 @@ interface ThreadResponse {
   messages: ChatMessage[];
 }
 
-const PLACEHOLDER =
+const ASK_HINT =
   "Ask anything about how we handle data - e.g. 'Can I share the tenant list with our letting agent?'";
 
 export function GuidePage() {
@@ -142,7 +142,7 @@ export function GuidePage() {
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={PLACEHOLDER}
+          placeholder={ASK_HINT}
           aria-label="Ask the Policy Guide"
           className="flex-1 rounded border border-client-line bg-client-surface px-3 py-2.5 text-sm outline-none placeholder:text-client-muted/70 focus:border-client-accent"
         />

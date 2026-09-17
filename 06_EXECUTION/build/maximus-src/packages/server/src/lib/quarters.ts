@@ -18,7 +18,7 @@ export function previousQuarter(key: QuarterKey): QuarterKey {
   return { year: key.year, quarter: (key.quarter - 1) as Quarter };
 }
 
-/** Inclusive start, exclusive end — Europe/London quarter boundaries. */
+/** Inclusive start, exclusive end - Europe/London quarter boundaries. */
 export function quarterRange(key: QuarterKey): { start: Date; end: Date } {
   const startMonth = (key.quarter - 1) * 3 + 1;
   const start = DateTime.fromObject(

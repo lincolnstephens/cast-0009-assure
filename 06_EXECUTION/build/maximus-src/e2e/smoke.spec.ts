@@ -7,10 +7,10 @@ const OFFICER_PASSWORD = process.env.SEED_OFFICER_PASSWORD ?? "";
 
 const Q1 = "Can I share the tenant contact list with our letting agent?";
 const Q2 =
-  "A tenant wants to put their own camera in the communal hallway — is that allowed?";
+  "A tenant wants to put their own camera in the communal hallway - is that allowed?";
 const Q3 = "A former employee has emailed asking for everything we hold on them";
 const OFFICER_REPLY =
-  "Private cameras in communal areas are not permitted — use the tenant letter template.";
+  "Private cameras in communal areas are not permitted - use the tenant letter template.";
 
 test.beforeAll(() => {
   if (!CLIENT_PASSWORD || !OFFICER_PASSWORD) {
@@ -25,7 +25,7 @@ async function login(page: Page, email: string, password: string) {
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 
-/** Demo seed leaves policies as drafts — officer approves via API before the Guide walkthrough. */
+/** Demo seed leaves policies as drafts - officer approves via API before the Guide walkthrough. */
 async function approveAllDraftPolicies(page: Page) {
   await login(page, OFFICER_EMAIL, OFFICER_PASSWORD);
   const accountsRes = await page.request.get("/api/admin/accounts");
@@ -44,7 +44,7 @@ async function approveAllDraftPolicies(page: Page) {
   await page.getByRole("button", { name: "Sign out" }).click();
 }
 
-test.describe("Policy Guide demo (stub mode — Demo Organisation)", () => {
+test.describe("Policy Guide demo (stub mode - Demo Organisation)", () => {
   test("officer approves policies; client walkthrough; officer answers amber", async ({
     page,
   }) => {
@@ -84,7 +84,7 @@ test.describe("Policy Guide demo (stub mode — Demo Organisation)", () => {
     );
     await expect(page.getByText(Q2)).toBeVisible({ timeout: 15_000 });
     await page
-      .getByPlaceholder("Your answer — posts into the client's chat thread.")
+      .getByPlaceholder("Your answer - posts into the client's chat thread.")
       .fill(OFFICER_REPLY);
     await page.getByRole("button", { name: "Answer as officer" }).click();
     await expect(page.locator("div").filter({ hasText: Q2 }).first()).not.toBeVisible({
@@ -99,9 +99,9 @@ test.describe("Policy Guide demo (stub mode — Demo Organisation)", () => {
     await page.getByRole("button", { name: "Sign out" }).click();
     await login(page, CLIENT_EMAIL, CLIENT_PASSWORD);
     await expect(page.getByText(OFFICER_REPLY)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("Lurong Chen — your compliance officer")).toBeVisible();
+    await expect(page.getByText("Lurong Chen - your compliance officer")).toBeVisible();
     await expect(
-      page.getByText("MAXIMUS — powered by MITMARK Intelligence Tessera"),
+      page.getByText("MAXIMUS - powered by MITMARK Intelligence Tessera"),
     ).toBeVisible();
   });
 });

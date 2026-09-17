@@ -3,7 +3,7 @@ import { renderCorpus, type CorpusSection } from "./corpus.ts";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-5";
 
-/** Raised when the model is rate-limited/overloaded — callers map this to
+/** Raised when the model is rate-limited/overloaded - callers map this to
  * fixed plain-English copy, never a raw error. */
 export class GuideBusyError extends Error {
   constructor(public httpStatus: number) {
@@ -17,7 +17,7 @@ export function isLlmConfigured(): boolean {
 
 /** Spec §4.1 system prompt, verbatim, parameterised. Split into two blocks:
  * the corpus block carries cache_control so the whole (stable) system prompt
- * is cached — repeat messages inside the cache window pay near-zero input
+ * is cached - repeat messages inside the cache window pay near-zero input
  * tokens, which is what keeps a Tier-1 org under 30K input tokens/min. */
 function systemBlocks(clientName: string, corpus: CorpusSection[]) {
   return [
@@ -58,7 +58,7 @@ export interface LlmReply {
 /**
  * One round-trip to the Anthropic Messages API via raw `fetch` (dependency-
  * light, direct control of `cache_control`; see DECISIONS.md #30). Logs
- * metadata ONLY (tokens, latency, status) — message bodies never enter
+ * metadata ONLY (tokens, latency, status) - message bodies never enter
  * application logs; they live in the org document alone.
  */
 export async function askLlm(

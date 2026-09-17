@@ -3,14 +3,14 @@
  *
  * The old schema kept a policy's numbered sections as separate `policySections`
  * rows. The new `PolicyRecord` (db/model.ts) has a single `bodyMarkdown` field
- * — there is no persisted section entity any more. This lane keeps the numbered
+ * - there is no persisted section entity any more. This lane keeps the numbered
  * sections the client panel, the admin editor and the Policy Guide all rely on
  * by writing them as `## <ref> <heading>` markdown headings inside that one
  * field, and parsing them back out on read. Content before the first heading
  * is the policy's preamble.
  *
- * Everything here is a pure function over an already-loaded `OrgDoc` — no
- * store access — so callers do all of one request's reads and writes inside a
+ * Everything here is a pure function over an already-loaded `OrgDoc` - no
+ * store access - so callers do all of one request's reads and writes inside a
  * single `mutateOrg`.
  */
 
@@ -18,7 +18,7 @@ import type { OrgDoc, PolicyRecord } from "../db/model.ts";
 import { listOrgIds, newId, readOrg } from "../db/store.ts";
 
 export interface PolicySection {
-  /** Synthetic — derived from the policy id and the section ref, not stored. */
+  /** Synthetic - derived from the policy id and the section ref, not stored. */
   id: string;
   sectionRef: string;
   heading: string;
@@ -77,7 +77,7 @@ export function renderPolicyDocument(
 }
 
 /**
- * Latest approved version of each policy code — the ONLY corpus the client
+ * Latest approved version of each policy code - the ONLY corpus the client
  * side panel and the Policy Guide read. Drafts and superseded versions are
  * invisible to clients.
  */

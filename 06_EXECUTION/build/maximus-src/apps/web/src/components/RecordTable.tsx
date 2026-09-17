@@ -57,7 +57,7 @@ export function RecordTable({
               const io = e.hours * (Number(ioRate) || 0);
               const con = (e.hours / 8) * (Number(dayRate) || 0);
               return (
-                <tr key={e.id}>
+                <tr key={e.id} data-testid="record-row">
                   <Td className="whitespace-nowrap font-mono">{formatDateGB(e.date)}</Td>
                   <Td>{line?.short ?? e.line}</Td>
                   <Td>

@@ -15,7 +15,7 @@ import {
 export const adminReviewRoutes = new Hono<AppEnv>();
 adminReviewRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
 
-/** Unified review queue — pending items oldest first, optional type filter. */
+/** Unified review queue - pending items oldest first, optional type filter. */
 adminReviewRoutes.get("/review", async (c) => {
   const accountId = c.req.query("accountId");
   if (!accountId) return c.json({ error: "accountId is required" }, 400);

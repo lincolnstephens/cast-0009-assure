@@ -63,6 +63,7 @@ export function StatementPage() {
       <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted print:hidden">
         Forwardable
       </p>
+      <h1 className="mb-3 text-xl font-semibold print:hidden">Statement for the CFO</h1>
 
       <div className="mb-4 flex flex-wrap items-center gap-3 print:hidden">
         <button

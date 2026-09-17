@@ -10,7 +10,7 @@ exportRoutes.use("*", requireAuth);
 /**
  * Find an export by id without knowing its organisation up front. Exports
  * live inside a per-org document (no global table any more), so this scans
- * the small, beta-scale set of organisations — used only for the download
+ * the small, beta-scale set of organisations - used only for the download
  * route, which (like the original API) carries no organisation id.
  */
 async function findExportAnywhere(id: string): Promise<{ orgId: string; row: ExportRecord } | null> {
@@ -39,7 +39,7 @@ exportRoutes.get("/", requireRole("client"), async (c) => {
   });
 });
 
-/** Request a defence-file export — creates a review item for officer approval. */
+/** Request a defence-file export - creates a review item for officer approval. */
 exportRoutes.post("/", requireRole("client"), async (c) => {
   const user = c.get("user");
   if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
@@ -94,7 +94,7 @@ exportRoutes.post("/", requireRole("client"), async (c) => {
   return c.json({ id: created.id }, 201);
 });
 
-/** Download a generated defence file — tenant-scoped for clients, either role signed in. */
+/** Download a generated defence file - tenant-scoped for clients, either role signed in. */
 exportRoutes.get("/:id/download", async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");

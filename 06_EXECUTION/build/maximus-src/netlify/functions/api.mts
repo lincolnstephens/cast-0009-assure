@@ -1,49 +1,26 @@
-import type { Handler, HandlerEvent, HandlerResponse } from "@netlify/functions";
-import { app } from "../../packages/server/src/app.ts";
+// The bundle is produced by scripts/bundle-function.mjs before deploy, so
+// this file has nothing left for the platform bundler to resolve.
+import { app } from "./_api-bundle.mjs";
 
-const FN_PREFIX = "/.netlify/functions/api";
-
-function normaliseApiUrl(rawUrl: string): string {
-  const url = new URL(rawUrl);
-  // Requests normally arrive via the /api/* redirect with the original URL
-  // intact; normalise direct function-path invocations to /api/* as well.
-  if (url.pathname.startsWith(FN_PREFIX)) {
-    url.pathname = "/api" + url.pathname.slice(FN_PREFIX.length);
-  }
-  return url.toString();
+/**
+ * The API, as a Netlify v2 function.
+ *
+ * It was a v1 (Lambda-compatible) handler in the prior build. A v1 handler is
+ * not given the uncached edge URL that Netlify Blobs needs for strong
+ * consistency, so reads were served from a per-instance cache: the operator
+ * could change a setting, see it saved, and the client portal would go on
+ * showing the old value indefinitely. With the demo switch that meant
+ * illustrative entries could keep reaching the Information Officer after the
+ * operator had switched them off, which the standard does not allow.
+ *
+ * A v2 function receives the full Blobs context, so the store reads strongly
+ * and both sides of the product always agree. The bundler stays on esbuild,
+ * which inlines the workspace packages; see netlify.toml.
+ */
+export default async function handler(request: Request): Promise<Response> {
+  return app.fetch(request);
 }
 
-function eventToRequest(event: HandlerEvent): Request {
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(event.headers)) {
-    if (value !== undefined) headers.append(key, value);
-  }
-  const method = event.httpMethod;
-  const init: RequestInit = { method, headers };
-  if (event.body != null && method !== "GET" && method !== "HEAD") {
-    init.body = event.isBase64Encoded ? Buffer.from(event.body, "base64") : event.body;
-  }
-  return new Request(normaliseApiUrl(event.rawUrl), init);
-}
-
-async function toHandlerResponse(res: Response): Promise<HandlerResponse> {
-  const headers: Record<string, string> = {};
-  res.headers.forEach((value, key) => {
-    headers[key] = value;
-  });
-  const body = Buffer.from(await res.arrayBuffer());
-  return {
-    statusCode: res.status,
-    headers,
-    body: body.length === 0 ? "" : body.toString("base64"),
-    isBase64Encoded: body.length > 0,
-  };
-}
-
-// Named `handler` export (Functions v1) so Netlify honours `node_bundler = "esbuild"`.
-// A default Request/Response export is classified as v2 and forces the NFT bundler,
-// which cannot resolve pnpm workspace dependencies in production.
-export const handler: Handler = async (event) => {
-  const res = await app.fetch(eventToRequest(event));
-  return toHandlerResponse(res);
+export const config = {
+  path: "/api/*",
 };

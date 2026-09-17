@@ -20,12 +20,19 @@ export const useAuth = create<AuthState>((set) => ({
 
   bootstrap: async () => {
     try {
-      const me = await api<MeResponse>("/auth/me");
+      // /auth/session answers 200 for a signed-out visitor too, so a cold open
+      // does not put a failed request in the browser console.
+      const me = await api<MeResponse | { user: null }>("/auth/session");
+      if (!me.user) {
+        set({ status: "anonymous", user: null, officerName: null, branding: null });
+        return;
+      }
+      const full = me as MeResponse;
       set({
         status: "authenticated",
-        user: me.user,
-        officerName: me.officer?.displayName ?? null,
-        branding: me.branding,
+        user: full.user,
+        officerName: full.officer?.displayName ?? null,
+        branding: full.branding,
       });
     } catch {
       set({ status: "anonymous", user: null, officerName: null, branding: null });

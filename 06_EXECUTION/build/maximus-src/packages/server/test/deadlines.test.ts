@@ -1,11 +1,11 @@
-// Deadline calculus (spec §3) — these tests were written BEFORE the
+// Deadline calculus (spec §3) - these tests were written BEFORE the
 // implementation, per the operating rules. Unchanged by the store port:
 // this module has no database dependency, before or after.
 //
 // SAR clock: due = same day-of-month one calendar month after starts_at,
 // computed in Europe/London wall-clock time; if the target month has no such
 // day, due = last day of that month. Breach clock: starts_at + 72 hours.
-// Status: green > 50% time remaining, amber 20–50%, red < 20% or overdue.
+// Status: green > 50% time remaining, amber 20-50%, red < 20% or overdue.
 
 import { describe, expect, it } from "vitest";
 import { breachDueAt, sarDueAt } from "../src/lib/deadlines.ts";
@@ -13,7 +13,7 @@ import { clockStatus } from "@maximus/shared";
 
 const utc = (s: string) => new Date(s);
 
-describe("sarDueAt — one calendar month, Europe/London", () => {
+describe("sarDueAt - one calendar month, Europe/London", () => {
   it("14 Jan → 14 Feb (plain case, GMT throughout)", () => {
     expect(sarDueAt(utc("2026-01-14T10:00:00Z")).toISOString()).toBe(
       "2026-02-14T10:00:00.000Z",
@@ -82,7 +82,7 @@ describe("sarDueAt — one calendar month, Europe/London", () => {
   });
 });
 
-describe("breachDueAt — 72 hours flat", () => {
+describe("breachDueAt - 72 hours flat", () => {
   it("adds exactly 72 hours", () => {
     expect(breachDueAt(utc("2026-06-01T08:45:00Z")).toISOString()).toBe(
       "2026-06-04T08:45:00.000Z",
@@ -97,7 +97,7 @@ describe("breachDueAt — 72 hours flat", () => {
   });
 });
 
-describe("clockStatus — thresholds on fraction of time remaining", () => {
+describe("clockStatus - thresholds on fraction of time remaining", () => {
   const startsAt = utc("2026-06-01T00:00:00Z");
   const dueAt = utc("2026-06-11T00:00:00Z"); // 10-day window
   const at = (day: number) => utc(`2026-06-${String(day).padStart(2, "0")}T00:00:00Z`);

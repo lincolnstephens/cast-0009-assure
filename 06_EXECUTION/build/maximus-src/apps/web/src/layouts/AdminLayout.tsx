@@ -16,7 +16,6 @@ const navItems = [
   { to: "/admin/exports", label: "Exports", view: "exports" },
   { to: "/admin/settings", label: "Settings", view: "settings" },
   { to: "/admin/audit", label: "Audit log", view: "audit" },
-  { to: "/admin/users", label: "Users", view: "users" },
 ];
 
 export function AdminLayout() {

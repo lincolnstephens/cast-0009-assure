@@ -6,7 +6,7 @@ import { findPolicyAnywhere, latestApprovedPolicies, parsePolicyDocument } from 
 export const policyRoutes = new Hono<AppEnv>();
 policyRoutes.use("*", requireAuth, requireRole("client"));
 
-/** Latest approved version of each policy — the client's whole policy pack. */
+/** Latest approved version of each policy - the client's whole policy pack. */
 policyRoutes.get("/", async (c) => {
   const user = c.get("user");
   if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);

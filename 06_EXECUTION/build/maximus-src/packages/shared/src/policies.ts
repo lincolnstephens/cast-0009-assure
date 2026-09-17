@@ -6,7 +6,7 @@ export const policyCodeSchema = z
   .regex(/^[A-Z]{2,8}-\d{2}$/, "Code must look like DP-01");
 
 export const createPolicySchema = z.object({
-  clientAccountId: z.string().uuid(),
+  clientAccountId: z.string().min(1).max(120),
   code: policyCodeSchema,
   title: z.string().trim().min(1).max(200),
   bodyMarkdown: z.string().max(20000).optional().default(""),

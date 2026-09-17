@@ -92,7 +92,7 @@ clockRoutes.get("/:id", async (c) => {
       note: e.note,
       createdAt: e.createdAt,
       // No per-event actor display-name lookup against the separate users
-      // document in this beta — the note itself has always carried the
+      // document in this beta - the note itself has always carried the
       // substance the timeline needs.
       actorName: null,
     })),
@@ -103,7 +103,7 @@ export const requestRoutes = new Hono<AppEnv>();
 requestRoutes.use("*", requireAuth, requireRole("client"));
 
 /**
- * "Raise a request" — the client portal's two intakes (data request, report a
+ * "Raise a request" - the client portal's two intakes (data request, report a
  * concern) are the only things the Information Officer ever fills in here.
  */
 requestRoutes.post("/", async (c) => {

@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { ClientLayout } from "./layouts/ClientLayout";
-import { AdminPlaceholder } from "./pages/Placeholder";
 import { AdminAlertsPage } from "./pages/admin/Alerts";
 import { AdminAuditPage } from "./pages/admin/Audit";
 import { AdminExportsPage } from "./pages/admin/Exports";
@@ -75,7 +74,6 @@ export default function App() {
         <Route path="alerts" element={<AdminAlertsPage />} />
         <Route path="exports" element={<AdminExportsPage />} />
         <Route path="audit" element={<AdminAuditPage />} />
-        <Route path="users" element={<AdminPlaceholder title="Users" note="User management arrives in a later phase." />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

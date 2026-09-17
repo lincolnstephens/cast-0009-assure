@@ -4,7 +4,7 @@ import type { CorpusSection } from "../src/lib/guide/corpus.ts";
 import { enforce, parseRawResult } from "../src/lib/guide/enforce.ts";
 import { askStub } from "../src/lib/guide/stub.ts";
 
-/** The real seeded corpus, flattened (ids/versions faked — not under test). */
+/** The real seeded corpus, flattened (ids/versions faked - not under test). */
 const corpus: CorpusSection[] = policyPack.flatMap((p, pi) =>
   p.sections.map((s) => ({
     policyId: `policy-${pi}`,
@@ -39,7 +39,7 @@ describe("parseRawResult", () => {
   });
 });
 
-describe("enforce — never trust the model", () => {
+describe("enforce - never trust the model", () => {
   it("parse failure becomes amber", () => {
     expect(enforce(null, corpus).status).toBe("amber");
   });
@@ -113,9 +113,9 @@ describe("enforce — never trust the model", () => {
   });
 });
 
-describe("stub — three demo behaviours, deterministic", () => {
+describe("stub - three demo behaviours, deterministic", () => {
   const Q1 = "Can I share the tenant contact list with our letting agent?";
-  const Q2 = "A tenant wants to put their own camera in the communal hallway — is that allowed?";
+  const Q2 = "A tenant wants to put their own camera in the communal hallway - is that allowed?";
   const Q3 = "A former employee has emailed asking for everything we hold on them";
 
   it("demo question 1 → green citing DP-01", () => {

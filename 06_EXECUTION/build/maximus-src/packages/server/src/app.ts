@@ -28,6 +28,38 @@ export const app = new Hono<AppEnv>().basePath("/api");
  * arriving together cannot seed twice.
  */
 let seeding: Promise<void> | null = null;
+
+/** Liveness only. It touches nothing, so it answers even if the store is down. */
+app.get("/health", (c) => c.json({ ok: true }));
+
+/**
+ * Store readiness, for diagnosing a deploy. It reports whether the store can be
+ * reached and seeded, and never returns a credential or a value from it.
+ */
+app.get("/ready", async (c) => {
+  try {
+    await ensureSeeded();
+    const { readUsers } = await import("./db/store.ts");
+    const users = await readUsers();
+    return c.json({ ok: true, accounts: users.users.length });
+  } catch (err) {
+    return c.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, 503);
+  }
+});
+
+/**
+ * The API is per-signed-in-user and changes the moment the operator edits
+ * anything, so none of it may be cached. Without this the edge serves a stale
+ * answer to the client portal after a setting has been changed, which would let
+ * illustrative entries keep reaching the Information Officer after the operator
+ * had switched them off.
+ */
+app.use("*", async (c, next) => {
+  await next();
+  c.header("Cache-Control", "no-store, max-age=0");
+  c.header("Netlify-CDN-Cache-Control", "no-store, max-age=0");
+});
+
 app.use("*", async (c, next) => {
   if (!seeding) seeding = ensureSeeded().catch((err) => {
     seeding = null;
@@ -36,8 +68,6 @@ app.use("*", async (c, next) => {
   await seeding;
   await next();
 });
-
-app.get("/health", (c) => c.json({ ok: true }));
 
 app.route("/auth", authRoutes);
 app.route("/chat", chatRoutes);

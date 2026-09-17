@@ -4,7 +4,7 @@
  * 12-week trend.
  *
  * The trend is genuinely supportable from this store: `PostureHistoryRecord`
- * is keyed by (domain, weekOf), one row per ISO week — see db/model.ts. Every
+ * is keyed by (domain, weekOf), one row per ISO week - see db/model.ts. Every
  * officer update upserts that week's row, so repeated edits within the same
  * week collapse to the week's final reading rather than inventing extra
  * points, and a domain that has never been updated still shows one honest
@@ -69,7 +69,7 @@ export function historyForDomain(doc: OrgDoc, domain: PostureDomainRecord): Hist
     .slice(-HISTORY_WEEKS)
     .map((h) => ({ rag: h.rag, weekOf: h.weekOf }));
   if (rows.length > 0) return rows;
-  // No weekly snapshot recorded yet — the domain's current reading is itself
+  // No weekly snapshot recorded yet - the domain's current reading is itself
   // real and dated, so show that single point rather than an empty series.
   return [{ rag: domain.rag, weekOf: mondayOf(new Date(domain.setAt)) }];
 }
@@ -87,7 +87,7 @@ export interface FoundPostureDomain {
 /**
  * Find a posture domain by id without an accountId (the web app's PUT
  * /admin/posture/:id call carries none). The org count in this beta is small
- * enough that a scan is the honest option — see findClockGlobally in
+ * enough that a scan is the honest option - see findClockGlobally in
  * lib/intakes.ts for the same trade-off.
  */
 export async function findPostureDomainGlobally(id: string): Promise<FoundPostureDomain | null> {

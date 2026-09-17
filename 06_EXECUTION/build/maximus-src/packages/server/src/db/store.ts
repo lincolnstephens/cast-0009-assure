@@ -8,9 +8,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile, readdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { EMPTY_USERS_DOC, emptyOrgDoc, type OrgDoc, type UsersDoc } from './model.ts';
+import { EMPTY_USERS_DOC, emptyOrgDoc, type OrgDoc, type SessionRecord, type UsersDoc } from './model.ts';
 
 export const newId = (): string => randomUUID();
 
@@ -21,6 +21,7 @@ interface Driver {
   set(key: string, value: string): Promise<void>;
   getBytes(key: string): Promise<Uint8Array | null>;
   setBytes(key: string, value: Uint8Array): Promise<void>;
+  del(key: string): Promise<void>;
   list(prefix: string): Promise<string[]>;
 }
 
@@ -37,6 +38,9 @@ function blobsDriver(): Driver {
   // Imported lazily so the local driver needs no Netlify package at all.
   const load = async () => {
     const mod = await import('@netlify/blobs');
+    // Strong consistency, so the operator and the client portal never see
+    // different answers. The API runs as a v2 function precisely so that the
+    // uncached edge URL this needs is available; see netlify/functions/api.mts.
     return mod.getStore({ name: STORE_NAME, consistency: 'strong' });
   };
   return {
@@ -57,6 +61,10 @@ function blobsDriver(): Driver {
       const store = await load();
       // Netlify Blobs accepts an ArrayBuffer; hand it the underlying buffer.
       await store.set(key, value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength) as ArrayBuffer);
+    },
+    async del(key) {
+      const store = await load();
+      await store.delete(key);
     },
     async list(prefix) {
       const store = await load();
@@ -98,6 +106,13 @@ function fileDriver(): Driver {
       const p = file(key);
       await ensure(p);
       await writeFile(p, value);
+    },
+    async del(key) {
+      try {
+        await rm(file(key));
+      } catch {
+        // Already gone; deleting a missing session is not an error.
+      }
     },
     async list(prefix) {
       const dir = file(prefix);
@@ -159,12 +174,34 @@ export async function listOrgIds(): Promise<string[]> {
     .map((k) => k.slice(0, -'.json'.length));
 }
 
+/**
+ * Create an organisation only if it genuinely does not exist.
+ *
+ * The store is eventually consistent, so a single read that comes back empty is
+ * not proof of absence. Writing a fresh empty document on that evidence would
+ * wipe a live tenant's record. The read is therefore repeated after a pause,
+ * and an organisation is only created when both reads agree it is missing.
+ */
 export async function ensureOrg(orgId: string, name: string): Promise<OrgDoc> {
-  const existing = await readOrg(orgId);
-  if (existing) return existing;
+  const first = await readOrg(orgId);
+  if (first) return first;
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const second = await readOrg(orgId);
+  if (second) return second;
   const doc = emptyOrgDoc(orgId, name);
   await writeOrg(doc);
   return doc;
+}
+
+const SEEDED_KEY = 'seeded.json';
+
+/** Whether a seed has ever completed against this store. */
+export async function seedMarker(): Promise<string | null> {
+  return getDriver().get(SEEDED_KEY);
+}
+
+export async function setSeedMarker(): Promise<void> {
+  await getDriver().set(SEEDED_KEY, JSON.stringify({ at: new Date().toISOString() }));
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +215,30 @@ export async function readUsers(): Promise<UsersDoc> {
 
 export async function writeUsers(doc: UsersDoc): Promise<void> {
   await getDriver().set(USERS_KEY, JSON.stringify(doc));
+}
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+//
+// A session is its own blob rather than a row inside the users document. The
+// store is eventually consistent, so a read-modify-write of one shared document
+// on every sign-in would lose writes when two of them overlap. A session blob is
+// written once and read by key, which has no such race.
+
+const sessionKey = (id: string) => `sessions/${id}.json`;
+
+export async function readSession(id: string): Promise<SessionRecord | null> {
+  const raw = await getDriver().get(sessionKey(id));
+  return raw ? (JSON.parse(raw) as SessionRecord) : null;
+}
+
+export async function writeSession(session: SessionRecord): Promise<void> {
+  await getDriver().set(sessionKey(session.id), JSON.stringify(session));
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  await getDriver().del(sessionKey(id));
 }
 
 export async function mutateUsers<T>(fn: (doc: UsersDoc) => T | Promise<T>): Promise<T> {

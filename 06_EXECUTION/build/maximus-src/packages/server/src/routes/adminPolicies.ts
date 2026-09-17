@@ -51,7 +51,7 @@ adminPolicyRoutes.get("/policies", async (c) => {
   });
 });
 
-/** One policy version with sections (any status — this is the admin view). */
+/** One policy version with sections (any status - this is the admin view). */
 adminPolicyRoutes.get("/policies/:id", async (c) => {
   const found = await findPolicyAnywhere(c.req.param("id"));
   if (!found) return c.json({ error: "Not found" }, 404);

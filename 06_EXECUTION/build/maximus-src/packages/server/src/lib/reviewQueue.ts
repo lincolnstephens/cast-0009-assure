@@ -3,7 +3,7 @@
  *
  * `ReviewItemRecord` (db/model.ts) already carries a `summary` string set by
  * whichever code created the item, so this lane no longer joins out to the
- * escalation/export/alert/intake it refers to just to describe it — the old
+ * escalation/export/alert/intake it refers to just to describe it - the old
  * Postgres version's `loadContext` join is gone; the item is self-describing.
  *
  * Answering a chat_amber item and approving an export request each raise a
@@ -40,7 +40,7 @@ export interface PendingReviewItem {
  * Find which organisation a review item (or, by their id, an escalation)
  * belongs to. Review items and escalations live inside a per-org document
  * (no global table any more), so a route that only carries the item's own id
- * — as the original API contract does — scans the small, beta-scale set of
+ * - as the original API contract does - scans the small, beta-scale set of
  * organisations rather than requiring a new query parameter.
  */
 export async function findReviewItemOrgId(reviewItemId: string): Promise<string | null> {
@@ -184,7 +184,7 @@ export async function approveExportRequest(
   return exportId;
 }
 
-/** Approve an alert or intake review item — no entry, no side effect beyond the decision. */
+/** Approve an alert or intake review item - no entry, no side effect beyond the decision. */
 export async function approveReviewItem(
   orgId: string,
   reviewItemId: string,

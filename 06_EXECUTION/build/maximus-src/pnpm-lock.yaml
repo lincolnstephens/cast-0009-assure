@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@netlify/blobs':
+        specifier: ^8.2.0
+        version: 8.2.0
       '@netlify/functions':
         specifier: ^3.1.0
         version: 3.1.10(rollup@4.63.3)

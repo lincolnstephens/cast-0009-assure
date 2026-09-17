@@ -15,7 +15,7 @@ function byCreatedDesc(a: ExposureAlertRecord, b: ExposureAlertRecord): number {
 /**
  * Find the organisation holding a given alert id. The web app's triage call
  * (PUT /admin/exposure/:id/state) carries no accountId, and the store has no
- * cross-tenant index — see findClockGlobally in lib/intakes.ts for the same
+ * cross-tenant index - see findClockGlobally in lib/intakes.ts for the same
  * trade-off applied here for the same reason.
  */
 async function findOrgByAlertId(alertId: string): Promise<{ doc: OrgDoc; alert: ExposureAlertRecord } | null> {
@@ -49,7 +49,7 @@ adminExposureRoutes.get("/exposure", async (c) => {
 });
 
 /**
- * Create a demo alert — `demo` is always true and cannot be overridden.
+ * Create a demo alert - `demo` is always true and cannot be overridden.
  *
  * The store carries kind, severity, summary and the officer's note as
  * their own fields, so nothing is folded into a narrative string. The
@@ -109,7 +109,7 @@ adminExposureRoutes.post("/exposure", async (c) => {
 });
 
 /**
- * Officer-only state transition with a note — audited; the note is
+ * Officer-only state transition with a note - audited; the note is
  * client-visible. Since `ExposureAlertRecord` has no dedicated officer-note
  * field (see the comment above the create route), the note is appended to
  * `detail` so it still reaches the client, per DECISIONS.md #46: "the

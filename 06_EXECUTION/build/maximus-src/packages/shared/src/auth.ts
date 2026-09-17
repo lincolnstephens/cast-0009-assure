@@ -9,11 +9,11 @@ export const loginRequestSchema = z.object({
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 
 export const sessionUserSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   email: z.string().email(),
   displayName: z.string(),
   role: roleSchema,
-  clientAccountId: z.string().uuid().nullable(),
+  clientAccountId: z.string().min(1).nullable(),
   clientAccountName: z.string().nullable(),
 });
 export type SessionUser = z.infer<typeof sessionUserSchema>;

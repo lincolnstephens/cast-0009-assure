@@ -19,12 +19,12 @@ import {
  * `createPolicySchema` (packages/shared/src/policies.ts) still validates
  * `clientAccountId` as `z.string().uuid()`, left over from Postgres UUID
  * primary keys. The store's organisation ids are plain strings (`ensureOrg`
- * takes any id — `test/helpers.ts` uses the slug "test-org", `adminRecord.ts`
- * defaults to "demo") — not necessarily UUIDs. `seedTestUsers()`'s "test-org"
+ * takes any id - `test/helpers.ts` uses the slug "test-org", `adminRecord.ts`
+ * defaults to "demo") - not necessarily UUIDs. `seedTestUsers()`'s "test-org"
  * therefore fails that schema on the one route in this suite that validates
  * against it (`POST /admin/policies`). This is a shared-schema/store
  * mismatch outside this lane's owned files (report: `createPolicySchema`
- * needs to accept any non-empty org id, not just a UUID) — worked around
+ * needs to accept any non-empty org id, not just a UUID) - worked around
  * here by seeding this suite's own fixtures with a UUID-shaped org id rather
  * than editing the shared schema or `test/helpers.ts`.
  */
@@ -93,7 +93,7 @@ function req(cookie: string, method: string, body?: unknown): RequestInit {
 
 /**
  * `PolicyRecord` (db/model.ts) has one `bodyMarkdown` field, not a separate
- * `policySections` table — there is no `POST .../sections` route any more
+ * `policySections` table - there is no `POST .../sections` route any more
  * (see routes/adminPolicies.ts). A numbered section is written as a
  * `## <ref> <heading>` markdown heading inside that one field and parsed back
  * out on read (lib/policies.ts, `parsePolicyDocument`).
@@ -209,7 +209,7 @@ describe("client visibility", () => {
     const v1 = await createDraftPolicy();
     await approve(v1);
 
-    // Draft v2 with an edit — client must keep seeing v1.
+    // Draft v2 with an edit - client must keep seeing v1.
     const draftRes = await app.request(
       `/api/admin/policies/${v1}/draft`,
       req(adminCookie, "POST", {}),
@@ -242,7 +242,7 @@ describe("client visibility", () => {
     expect(list[0].id).toBe(v2);
     expect(list[0].version).toBe(2);
 
-    // v1 (superseded but approved) stays openable by id — chat citation
+    // v1 (superseded but approved) stays openable by id - chat citation
     // chips must resolve to the version that served the answer.
     const stale = await app.request(`/api/policies/${v1}`, {
       headers: { cookie: clientCookie },

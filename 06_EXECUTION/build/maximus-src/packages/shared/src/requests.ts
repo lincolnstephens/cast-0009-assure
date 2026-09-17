@@ -22,7 +22,7 @@ export const closeClockSchema = z.object({
 export type CloseClock = z.infer<typeof closeClockSchema>;
 
 export const manualIntakeSchema = z.object({
-  clientAccountId: z.string().uuid(),
+  clientAccountId: z.string().min(1).max(120),
   type: intakeTypeSchema,
   summary: z.string().trim().min(1).max(5000),
 });

@@ -10,7 +10,7 @@ function byCreatedDesc<T extends { createdAt: string }>(a: T, b: T): number {
 }
 
 /**
- * Read-only exposure feed — newest first, scoped to the client's
+ * Read-only exposure feed - newest first, scoped to the client's
  * organisation. Every alert is demo data (db/model.ts: `demo` is always
  * true in this build) and the response says so; it is never presented as
  * live monitoring.

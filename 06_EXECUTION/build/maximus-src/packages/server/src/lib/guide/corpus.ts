@@ -15,7 +15,7 @@ export interface CorpusSection {
 /**
  * The Policy Guide's entire knowledge: every section of the latest approved
  * version of each policy. Order is stable (code, then ref) so prompts are
- * byte-identical between requests — a requirement for prompt caching.
+ * byte-identical between requests - a requirement for prompt caching.
  */
 export function buildCorpus(doc: OrgDoc): CorpusSection[] {
   const approved = latestApprovedPolicies(doc);
@@ -44,7 +44,7 @@ export function renderCorpus(corpus: CorpusSection[]): string {
   return corpus
     .map(
       (s) =>
-        `[${s.policyCode} §${s.sectionRef}] ${s.policyTitle} — ${s.heading}\n${s.body}`,
+        `[${s.policyCode} §${s.sectionRef}] ${s.policyTitle} - ${s.heading}\n${s.body}`,
     )
     .join("\n\n");
 }

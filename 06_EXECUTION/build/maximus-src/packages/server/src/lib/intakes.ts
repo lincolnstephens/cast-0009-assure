@@ -29,7 +29,7 @@ export interface CreateIntakeInput {
   source: IntakeSource;
   /** What was asked, in the raiser's own words. Never contains personal data. */
   summary: string;
-  /** The id of the person raising it — the client user, or the admin on a manual intake. */
+  /** The id of the person raising it - the client user, or the admin on a manual intake. */
   raisedBy: string;
 }
 
@@ -41,7 +41,7 @@ export interface CreateIntakeResult {
 
 /**
  * The single path that turns an intake into a statutory clock + review item,
- * used by "raise a request" and admin manual intake — the only two places the
+ * used by "raise a request" and admin manual intake - the only two places the
  * Information Officer's client portal or MITMARK's admin ever creates one.
  * Pure mutation of `doc`; the caller writes the audit row once the enclosing
  * `mutateOrg` has committed, matching the rest of the codebase's convention.
@@ -114,7 +114,7 @@ const STARTED_NOTES = new Set([
 ]);
 
 /**
- * An event's kind, derived rather than stored — `ClockEventRecord` (db/model.ts)
+ * An event's kind, derived rather than stored - `ClockEventRecord` (db/model.ts)
  * carries only a note, not an event-type column. The opening note is one of
  * two fixed strings only this codebase writes; the closing note is always
  * exactly the clock's outcome. Anything else is a plain note. Shared by the
@@ -136,7 +136,7 @@ export interface FoundClock {
  * Find a clock by id without knowing which organisation holds it. Several
  * existing routes take only a clock id (no accountId), which the store's
  * per-organisation documents cannot resolve directly. The beta's org count is
- * small enough that a scan is the honest option — it keeps the routes' URLs
+ * small enough that a scan is the honest option - it keeps the routes' URLs
  * unchanged rather than forcing a new query parameter onto the web app.
  */
 export async function findClockGlobally(clockId: string): Promise<FoundClock | null> {
@@ -155,7 +155,7 @@ export async function findClockGlobally(clockId: string): Promise<FoundClock | n
 /**
  * Defaults for the Record entry a closed clock creates, by clock kind.
  * `hours` mirrors the corresponding service line's default (line 4 DSAR
- * support, line 5 breach advisory) so the figure is never invented — it is
+ * support, line 5 breach advisory) so the figure is never invented - it is
  * the same estimate the Record uses everywhere else, editable afterwards.
  */
 function entryDefaultsFor(kind: ClockKind): { line: number; what: string; deadline: DeadlineLabel } {
@@ -176,7 +176,7 @@ function entryDefaultsFor(kind: ClockKind): { line: number; what: string; deadli
 /**
  * Closing a statutory clock creates a Record entry automatically (see
  * PORTING_BRIEF.md, "the value layer being added"). Mutates `doc` and the
- * `clock` passed in — sets `clock.entryId` — and returns the new entry. The
+ * `clock` passed in - sets `clock.entryId` - and returns the new entry. The
  * caller must have already set `clock.closedAt`, `closedBy` and `outcome`.
  */
 export function recordEntryForClosedClock(

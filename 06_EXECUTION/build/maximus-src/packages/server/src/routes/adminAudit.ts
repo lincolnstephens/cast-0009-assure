@@ -7,7 +7,7 @@ export const adminAuditRoutes = new Hono<AppEnv>();
 adminAuditRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
 
 /**
- * `entity` / `entityId` no longer exist on `AuditRecord` (db/model.ts) — that
+ * `entity` / `entityId` no longer exist on `AuditRecord` (db/model.ts) - that
  * information is folded into `action` and/or `detail` text by the writer
  * (see `lib/audit.ts`). Filtering here is by `action` only; an `entity` query
  * parameter, if still sent by an older client, is accepted and ignored

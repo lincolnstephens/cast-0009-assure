@@ -17,7 +17,16 @@
 
 import bcrypt from "bcryptjs";
 import type { DeadlineLabel, RagStatus } from "../db/model.ts";
-import { ensureOrg, mutateOrg, mutateUsers, newId, readUsers } from "../db/store.ts";
+import {
+  ensureOrg,
+  mutateOrg,
+  mutateUsers,
+  newId,
+  readOrg,
+  readUsers,
+  seedMarker,
+  setSeedMarker,
+} from "../db/store.ts";
 import { sarDueAt } from "./deadlines.ts";
 
 const ORG_ID = "demo";
@@ -32,35 +41,49 @@ function seedPassword(envVar: "SEED_CLIENT_PASSWORD" | "SEED_OFFICER_PASSWORD"):
   return value ? value : "demo";
 }
 
-async function upsertUser(input: {
+interface SeedUser {
   email: string;
   password: string;
   role: "client" | "mitmark_admin";
   displayName: string;
   orgId: string | null;
-}): Promise<void> {
-  const passwordHash = await bcrypt.hash(input.password, 10);
-  const created = await mutateUsers((doc) => {
-    const existing = doc.users.find((u) => u.email === input.email);
-    if (existing) {
-      existing.passwordHash = passwordHash;
-      existing.displayName = input.displayName;
-      existing.role = input.role;
-      existing.orgId = input.orgId;
-      return false;
+}
+
+/**
+ * Write every seed account in one store write.
+ *
+ * The store is eventually consistent, so writing the accounts one at a time
+ * (read, modify, write, twice) can lose the first write when the second read
+ * has not yet seen it. One read and one write cannot race with itself.
+ */
+async function upsertUsers(inputs: SeedUser[]): Promise<string[]> {
+  const hashed = await Promise.all(
+    inputs.map(async (u) => ({ ...u, passwordHash: await bcrypt.hash(u.password, 10) })),
+  );
+  return mutateUsers((doc) => {
+    const created: string[] = [];
+    for (const u of hashed) {
+      const existing = doc.users.find((x) => x.email === u.email);
+      if (existing) {
+        existing.passwordHash = u.passwordHash;
+        existing.displayName = u.displayName;
+        existing.role = u.role;
+        existing.orgId = u.orgId;
+        continue;
+      }
+      doc.users.push({
+        id: newId(),
+        orgId: u.orgId,
+        email: u.email,
+        passwordHash: u.passwordHash,
+        role: u.role,
+        displayName: u.displayName,
+        createdAt: new Date().toISOString(),
+      });
+      created.push(u.email);
     }
-    doc.users.push({
-      id: newId(),
-      orgId: input.orgId,
-      email: input.email,
-      passwordHash,
-      role: input.role,
-      displayName: input.displayName,
-      createdAt: new Date().toISOString(),
-    });
-    return true;
+    return created;
   });
-  console.log(`${created ? "Created" : "Updated"} user: ${input.email} (${input.role})`);
 }
 
 // ---------------------------------------------------------------------------
@@ -348,20 +371,22 @@ export async function seedAll(opts: SeedOptions = {}): Promise<void> {
   const clientPassword = seedPassword("SEED_CLIENT_PASSWORD");
   const officerPassword = seedPassword("SEED_OFFICER_PASSWORD");
 
-  await upsertUser({
-    email: CLIENT_EMAIL,
-    password: clientPassword,
-    role: "client",
-    displayName: CLIENT_DISPLAY_NAME,
-    orgId: ORG_ID,
-  });
-  await upsertUser({
-    email: OFFICER_EMAIL,
-    password: officerPassword,
-    role: "mitmark_admin",
-    displayName: OFFICER_DISPLAY_NAME,
-    orgId: null,
-  });
+  await upsertUsers([
+    {
+      email: CLIENT_EMAIL,
+      password: clientPassword,
+      role: "client",
+      displayName: CLIENT_DISPLAY_NAME,
+      orgId: ORG_ID,
+    },
+    {
+      email: OFFICER_EMAIL,
+      password: officerPassword,
+      role: "mitmark_admin",
+      displayName: OFFICER_DISPLAY_NAME,
+      orgId: ORG_ID,
+    },
+  ]);
 
   await seedPolicies();
   await seedPosture();
@@ -388,7 +413,25 @@ export async function seedAll(opts: SeedOptions = {}): Promise<void> {
  * worst case is harmless, not corrupt, data.
  */
 export async function ensureSeeded(): Promise<void> {
+  // The guard checks what the product actually needs: the organisation, and
+  // both accounts. A first request that fails partway can leave a half-written
+  // store, and a guard that only counted users would never repair it. seedAll
+  // upserts by email and skips sections that are already populated, so calling
+  // it again on a partial store completes it rather than duplicating it.
+  // A marker written at the end of a successful seed is the first and cheapest
+  // check. Once it is there nothing else is read and nothing is ever written
+  // again, so a store that has been seeded can never be re-seeded over the top
+  // of the operator's work.
+  if (await seedMarker()) return;
+
   const usersDoc = await readUsers();
-  if (usersDoc.users.length > 0) return;
+  const org = await readOrg(ORG_ID);
+  const emails = new Set(usersDoc.users.map((u) => u.email));
+  const complete = Boolean(org) && emails.has(CLIENT_EMAIL) && emails.has(OFFICER_EMAIL);
+  if (complete) {
+    await setSeedMarker();
+    return;
+  }
   await seedAll();
+  await setSeedMarker();
 }

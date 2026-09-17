@@ -25,11 +25,11 @@ export function parseRawResult(text: string): GuideRawResult | null {
 }
 
 /**
- * Server-side enforcement — never trust the model (spec §4.1 step 3):
- *  - citations must match real approved sections, else stripped; surviving
+ * Server-side enforcement - never trust the model (spec §4.1 step 3):
+ * - citations must match real approved sections, else stripped; surviving
  *    citations are re-stamped from the corpus (id + version pinned server-side)
- *  - green with zero surviving citations → amber
- *  - intake present → force red; red without an intake → amber
+ * - green with zero surviving citations → amber
+ * - intake present → force red; red without an intake → amber
  */
 export function enforce(raw: GuideRawResult | null, corpus: CorpusSection[]): EnforcedReply {
   if (!raw) {

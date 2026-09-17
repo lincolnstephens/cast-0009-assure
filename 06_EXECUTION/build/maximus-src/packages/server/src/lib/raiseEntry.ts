@@ -6,7 +6,7 @@
  * approving a policy version, an answered Guide question leaving the review
  * queue, and a completed defence-file export (see PORTING_BRIEF.md, "The
  * value layer being added"). Every entry this helper creates is real,
- * reviewed work — never illustrative — with a named reviewer, so `ill` is
+ * reviewed work - never illustrative - with a named reviewer, so `ill` is
  * always false and `reviewed` is always true.
  *
  * Call this from inside the same `mutateOrg` block as the state change it
@@ -26,7 +26,7 @@ export interface RaiseEntryInput {
   outcome: string;
   hours: number;
   deadline: DeadlineLabel;
-  /** The named MITMARK reviewer — the admin who closed the underlying action. */
+  /** The named MITMARK reviewer - the admin who closed the underlying action. */
   reviewer: string;
   source: EntrySource;
   sourceRef: string | null;
@@ -39,7 +39,7 @@ export function todayLondon(): string {
 
 /**
  * Push a new Record entry onto the organisation document and return it.
- * Pure in-memory work — the caller's `mutateOrg` performs the write.
+ * Pure in-memory work - the caller's `mutateOrg` performs the write.
  */
 export function raiseEntry(doc: OrgDoc, input: RaiseEntryInput): EntryRecord {
   const entry: EntryRecord = {

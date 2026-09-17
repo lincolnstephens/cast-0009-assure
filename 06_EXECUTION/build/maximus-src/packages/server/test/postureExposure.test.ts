@@ -1,20 +1,20 @@
 /**
  * Ported from Drizzle+Postgres to the JSON document store (see
  * PORTING_BRIEF.md). See clocks.test.ts for why lib/middleware.ts and
- * lib/audit.ts are mocked rather than imported for real — both are AUTH-lane
+ * lib/audit.ts are mocked rather than imported for real - both are AUTH-lane
  * files still wired to the deleted db/index.ts and db/schema.ts.
  *
  * Posture history changed shape in the port: `PostureHistoryRecord` is one
  * row per (domain, ISO week) rather than one row per edit (db/model.ts), so
  * the "writes history" assertion below seeds an initial point in an earlier
  * week and checks that an edit in the current week adds a second point,
- * rather than asserting on edit count — that is what the new weekly-snapshot
+ * rather than asserting on edit count - that is what the new weekly-snapshot
  * model actually promises. See this lane's final report for the reasoning.
  *
  * Exposure alerts changed shape too: `ExposureAlertRecord` has only `title`
  * with kind, severity, summary and the officer's note as their own fields
  * columns (db/model.ts). Assertions that read those now read `detail`, which
- * carries the same information as free text — see routes/adminExposure.ts.
+ * carries the same information as free text - see routes/adminExposure.ts.
  */
 import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";

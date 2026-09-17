@@ -2,7 +2,7 @@ import { z } from "zod";
 import { alertStateSchema } from "./enums.ts";
 
 export const createDemoAlertSchema = z.object({
-  clientAccountId: z.string().uuid(),
+  clientAccountId: z.string().min(1).max(120),
   kind: z.string().trim().min(1).max(80),
   severity: z.enum(["critical", "high", "medium", "low", "info"]),
   summary: z.string().trim().min(1).max(500),

@@ -12,7 +12,7 @@ import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
 
 const BUSY_COPY = "The Guide is busy right now. Give me a few seconds and ask that again.";
 const EMPTY_CORPUS_COPY =
-  "Your policy pack is being prepared by your compliance officer. I can't answer from approved policies yet — once they're signed off, ask me again.";
+  "Your policy pack is being prepared by your compliance officer. I can't answer from approved policies yet - once they're signed off, ask me again.";
 const RATE_LIMIT_PER_MINUTE = 10;
 
 export const chatRoutes = new Hono<AppEnv>();
@@ -104,7 +104,7 @@ chatRoutes.post("/messages", async (c) => {
     // A real escalation is raised only for amber with a real corpus (the
     // empty-corpus amber has nothing to escalate to). ChatMessageRecord has
     // no persisted "status" column, so the citations array also carries a
-    // status marker for amber/red replies (see encodeStatusCitations) — the
+    // status marker for amber/red replies (see encodeStatusCitations) - the
     // only reliable way to recover green/amber/red on a later read.
     const escalated = reply.status === "amber" && corpus.length > 0;
     const guideMessage: ChatMessageRecord = {
@@ -123,7 +123,7 @@ chatRoutes.post("/messages", async (c) => {
       createEscalation(doc, { threadId: thread.id, question });
     }
 
-    // Red: same plumbing as "raise a request" — not a parallel path.
+    // Red: same plumbing as "raise a request" - not a parallel path.
     if (reply.status === "red" && reply.intake) {
       createIntakeWithClock(doc, {
         type: reply.intake.type,
@@ -138,7 +138,7 @@ chatRoutes.post("/messages", async (c) => {
 
   if (result.kind === "rate_limited") {
     return c.json(
-      { error: "That's a lot of questions at once — give me a minute, then ask again." },
+      { error: "That's a lot of questions at once - give me a minute, then ask again." },
       429,
     );
   }
@@ -167,7 +167,7 @@ function applyReplyCopy(reply: EnforcedReply, officerName: string): string {
   }
   if (reply.status === "amber") {
     if (reply.answer === EMPTY_CORPUS_COPY) return reply.answer;
-    return `This needs a judgement call from your compliance officer. I've flagged it to ${officerName} — meanwhile, here's what's useful to gather: dates, names, and any documents or messages involved.`;
+    return `This needs a judgement call from your compliance officer. I've flagged it to ${officerName} - meanwhile, here's what's useful to gather: dates, names, and any documents or messages involved.`;
   }
   return reply.answer;
 }
@@ -225,7 +225,7 @@ async function officerDisplayName(): Promise<string> {
 const STATUS_MARKER = "__status:";
 
 /**
- * `ChatMessageRecord.citations` is a plain `string[]` (db/model.ts) — there
+ * `ChatMessageRecord.citations` is a plain `string[]` (db/model.ts) - there
  * is no separate stored status. Green messages store one JSON-encoded
  * `StoredCitation` per citation; amber/red messages (which never carry a
  * citation) store a single status marker instead, so a later read can still
@@ -243,7 +243,7 @@ function decodeCitations(raw: string[]): StoredCitation[] {
     try {
       out.push(JSON.parse(s) as StoredCitation);
     } catch {
-      // Ignore anything that doesn't decode — never surface a raw parse error.
+      // Ignore anything that doesn't decode - never surface a raw parse error.
     }
   }
   return out;

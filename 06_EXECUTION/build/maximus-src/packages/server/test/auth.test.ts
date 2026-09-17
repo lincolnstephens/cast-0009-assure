@@ -100,12 +100,12 @@ describe("GET /api/auth/me", () => {
     const loginRes = await login(TEST_CLIENT_EMAIL, TEST_PASSWORD);
     const cookie = sessionCookieOf(loginRes);
 
-    const { mutateUsers } = await import("../src/db/store.ts");
-    await mutateUsers((doc) => {
-      for (const session of doc.sessions) {
-        session.expiresAt = new Date(Date.now() - 1000).toISOString();
-      }
-    });
+    // Sessions are their own blobs now, not rows inside the users document.
+    const { readSession, writeSession } = await import("../src/db/store.ts");
+    const { decodeSessionCookie } = await import("../src/lib/sessions.ts");
+    const sessionId = decodeSessionCookie(cookie.split("=")[1])!;
+    const session = (await readSession(sessionId))!;
+    await writeSession({ ...session, expiresAt: new Date(Date.now() - 1000).toISOString() });
 
     const res = await app.request("/api/auth/me", { headers: { cookie } });
     expect(res.status).toBe(401);

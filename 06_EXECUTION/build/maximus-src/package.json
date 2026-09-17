@@ -8,17 +8,19 @@
   },
   "scripts": {
     "dev": "netlify dev --offline --filter @maximus/web",
-    "build": "pnpm --filter @maximus/shared build && pnpm --filter @maximus/web build",
+    "build": "pnpm --filter @maximus/shared build && pnpm --filter @maximus/web build && node scripts/bundle-function.mjs",
     "seed": "pnpm --filter @maximus/server seed",
     "seed:demo": "pnpm --filter @maximus/server seed:demo",
     "seed:reset": "pnpm --filter @maximus/server seed:reset",
     "test": "pnpm -r test",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
-    "verify:functions": "node scripts/verify-function-bundle.mjs"
+    "verify:functions": "node scripts/verify-function-bundle.mjs",
+    "bundle:function": "node scripts/bundle-function.mjs"
   },
   "packageManager": "pnpm@10.34.2",
   "devDependencies": {
+    "@netlify/blobs": "^8.2.0",
     "@netlify/functions": "^3.1.0",
     "@playwright/test": "^1.52.0"
   }

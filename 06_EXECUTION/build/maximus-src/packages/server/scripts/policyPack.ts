@@ -3,7 +3,7 @@
  * Security, CCTV, SAR Procedure, Data Retention Schedule and Acceptable Use,
  * written for a generic property-management organisation.
  *
- * This file carries no client name, real or fictional — only generic
+ * This file carries no client name, real or fictional - only generic
  * organisational language ("the organisation", "we", "our"). A previous,
  * client-branded version of this file was deliberately left behind when this
  * job ported the build; this is a fresh replacement.

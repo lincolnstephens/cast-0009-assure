@@ -73,10 +73,10 @@
       "line": "The Record table in the Value view renders at least one row.",
       "drive": "playwright",
       "check": "record_table_has_rows",
-      "pass": "data-testid='record-table' contains at least one tbody row.",
+      "pass": "The Record table contains at least one entry row. The table's empty-state row does not count.",
       "view": "value",
       "table_selector": "[data-testid='record-table']",
-      "row_selector": "tbody tr",
+      "row_selector": "tbody tr[data-testid='record-row']",
       "settle_ms": 400,
       "applies_to": [
         "1920x1080",

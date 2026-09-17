@@ -1,6 +1,6 @@
 /**
  * The defence-file export: a summary PDF plus every approved policy as
- * markdown, zipped. Ported from Drizzle+Postgres to the store — this now
+ * markdown, zipped. Ported from Drizzle+Postgres to the store - this now
  * takes an already-loaded `OrgDoc` (no query joins) and returns the zip
  * bytes for the caller to persist with `writeExportBlob`.
  */
@@ -28,7 +28,7 @@ function clockReference(clock: ClockRecord): string {
 export async function generateDefenceFile(doc: OrgDoc): Promise<Uint8Array> {
   const usersDoc = await readUsers();
   const nameOf = (userId: string | null): string =>
-    (userId && usersDoc.users.find((u) => u.id === userId)?.displayName) || "—";
+    (userId && usersDoc.users.find((u) => u.id === userId)?.displayName) || " - ";
 
   const generatedAt = DateTime.now().setZone(LONDON);
   const pdfBytes = await buildSummaryPdf(doc, generatedAt, nameOf);
@@ -38,7 +38,7 @@ export async function generateDefenceFile(doc: OrgDoc): Promise<Uint8Array> {
 
   const approved = latestApprovedPolicies(doc);
   for (const policy of approved) {
-    const md = `# ${policy.code} — ${policy.title}\n\nVersion ${policy.version}\n\n${policy.bodyMarkdown}\n`;
+    const md = `# ${policy.code} - ${policy.title}\n\nVersion ${policy.version}\n\n${policy.bodyMarkdown}\n`;
     zip.file(`policies/${policy.code}-v${policy.version}.md`, md);
   }
 
@@ -88,7 +88,7 @@ async function buildSummaryPdf(
   if (postureRows.length === 0) draw("No posture domains recorded.");
   for (const row of postureRows) {
     draw(
-      `${row.label}: ${row.rag.toUpperCase()} — ${row.note} (verified by ${nameOf(row.setBy)}, ${formatLondon(row.setAt)})`,
+      `${row.label}: ${row.rag.toUpperCase()} - ${row.note} (verified by ${nameOf(row.setBy)}, ${formatLondon(row.setAt)})`,
     );
   }
   y -= 6;
@@ -98,7 +98,7 @@ async function buildSummaryPdf(
   if (clockRows.length === 0) draw("No statutory clocks recorded.");
   for (const clock of clockRows) {
     const status = clock.closedAt ? `Closed ${formatLondon(clock.closedAt)}` : "Active";
-    const outcome = clock.outcome ? ` — ${clock.outcome}` : "";
+    const outcome = clock.outcome ? ` - ${clock.outcome}` : "";
     draw(
       `${clockReference(clock)} (${clock.kind}): started ${formatLondon(clock.startedAt)}, due ${formatLondon(clock.dueAt)}, ${status}${outcome}`,
     );
@@ -109,8 +109,8 @@ async function buildSummaryPdf(
   const policyRows = latestApprovedPolicies(doc);
   if (policyRows.length === 0) draw("No approved policies.");
   for (const p of policyRows) {
-    const approvedAt = p.approvedAt ? formatLondon(p.approvedAt) : "—";
-    draw(`${p.code} ${p.title} — v${p.version}, approved by ${nameOf(p.approvedBy)} on ${approvedAt}`);
+    const approvedAt = p.approvedAt ? formatLondon(p.approvedAt) : " - ";
+    draw(`${p.code} ${p.title} - v${p.version}, approved by ${nameOf(p.approvedBy)} on ${approvedAt}`);
   }
 
   return pdf.save();

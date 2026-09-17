@@ -174,7 +174,7 @@ adminRoutes.post("/clocks/:id/close", async (c) => {
   return c.json({ ok: true });
 });
 
-/** Manual intake creation — same path as the client's "raise a request". */
+/** Manual intake creation - same path as the client's "raise a request". */
 adminRoutes.post("/intakes", async (c) => {
   const parsed = manualIntakeSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {

@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { SessionRecord } from "../db/model.ts";
-import { mutateUsers, newId, readUsers } from "../db/store.ts";
+import { deleteSession, newId, readSession, readUsers, writeSession } from "../db/store.ts";
 
 export const SESSION_COOKIE = "assure_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -31,11 +31,6 @@ export function decodeSessionCookie(value: string): string | null {
   return sessionId;
 }
 
-/** Drop expired sessions. Called opportunistically from write paths only. */
-function pruneExpired(sessions: SessionRecord[], nowIso: string): SessionRecord[] {
-  return sessions.filter((s) => s.expiresAt > nowIso);
-}
-
 export async function createSession(userId: string): Promise<SessionRecord> {
   const now = new Date();
   const session: SessionRecord = {
@@ -44,19 +39,12 @@ export async function createSession(userId: string): Promise<SessionRecord> {
     expiresAt: new Date(now.getTime() + SESSION_TTL_MS).toISOString(),
     createdAt: now.toISOString(),
   };
-  await mutateUsers((doc) => {
-    doc.sessions = pruneExpired(doc.sessions, now.toISOString());
-    doc.sessions.push(session);
-  });
+  await writeSession(session);
   return session;
 }
 
 export async function destroySession(sessionId: string): Promise<void> {
-  await mutateUsers((doc) => {
-    doc.sessions = pruneExpired(doc.sessions, new Date().toISOString()).filter(
-      (s) => s.id !== sessionId,
-    );
-  });
+  await deleteSession(sessionId);
 }
 
 export interface AuthedUser {
@@ -68,15 +56,19 @@ export interface AuthedUser {
   clientAccountId: string | null;
 }
 
-/** Rejects a missing, unknown or expired session. Does not itself write; the
- * pruning of expired sessions happens on the next write (see createSession,
- * destroySession). */
+/**
+ * Rejects a missing, unknown or expired session. An expired session blob is
+ * removed as it is found, so nothing has to sweep them on a schedule.
+ */
 export async function getUserForSession(sessionId: string): Promise<AuthedUser | null> {
-  const doc = await readUsers();
-  const session = doc.sessions.find((s) => s.id === sessionId);
+  const session = await readSession(sessionId);
   if (!session) return null;
-  if (session.expiresAt <= new Date().toISOString()) return null;
+  if (session.expiresAt <= new Date().toISOString()) {
+    await deleteSession(sessionId);
+    return null;
+  }
 
+  const doc = await readUsers();
   const user = doc.users.find((u) => u.id === session.userId);
   if (!user) return null;
 

@@ -90,7 +90,7 @@ describe("Policy Guide chat (stub mode)", () => {
 
   it("demo question 2 → amber with escalation + pending review item", async () => {
     const res = await ask(
-      "A tenant wants to put their own camera in the communal hallway — is that allowed?",
+      "A tenant wants to put their own camera in the communal hallway - is that allowed?",
     );
     const { messages } = await res.json();
     const guide = messages[1];
@@ -128,7 +128,7 @@ describe("Policy Guide chat (stub mode)", () => {
     const citation = messages[1].citations[0];
 
     // Officer snapshots DP-01 to v2 and approves it directly on the store
-    // (this suite does not mount the admin policy routes — another lane's).
+    // (this suite does not mount the admin policy routes - another lane's).
     const v2Id = await mutateOrg(fixtures.accountId, (doc) => {
       const v1 = doc.policies.find((p) => p.id === citation.policyId)!;
       const v2 = {
@@ -183,7 +183,7 @@ describe("Policy Guide chat (stub mode)", () => {
   });
 
   it("officer reply loop: answer posts into the thread, resolves the review item", async () => {
-    await ask("A tenant wants to put their own camera in the communal hallway — is that allowed?");
+    await ask("A tenant wants to put their own camera in the communal hallway - is that allowed?");
 
     const listRes = await app.request(
       `/api/admin/escalations?accountId=${fixtures.accountId}`,
@@ -197,7 +197,7 @@ describe("Policy Guide chat (stub mode)", () => {
     const answerRes = await app.request(`/api/admin/escalations/${list[0].id}/answer`, {
       method: "POST",
       headers: { cookie: adminCookie, "content-type": "application/json" },
-      body: JSON.stringify({ reply: "Private cameras in communal areas are not permitted — I'll send the tenant letter template." }),
+      body: JSON.stringify({ reply: "Private cameras in communal areas are not permitted - I'll send the tenant letter template." }),
     });
     expect(answerRes.status).toBe(200);
 

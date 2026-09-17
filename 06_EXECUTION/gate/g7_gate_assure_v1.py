@@ -78,10 +78,13 @@ CONFIG = {
     # Which directories the static checks read. None of these need to exist
     # yet; read_source() skips anything absent rather than failing on it.
     "source_globs": [
-        "06_EXECUTION/build/app/apps/web/src",
-        "06_EXECUTION/build/app/packages/shared/src",
-        "06_EXECUTION/build/app/netlify/functions",
-        "06_EXECUTION/build/dist",
+        "06_EXECUTION/build/maximus-src/apps/web/src",
+        "06_EXECUTION/build/maximus-src/apps/web/index.html",
+        "06_EXECUTION/build/maximus-src/packages/shared/src",
+        "06_EXECUTION/build/maximus-src/packages/server/src",
+        "06_EXECUTION/build/maximus-src/packages/server/scripts",
+        "06_EXECUTION/build/maximus-src/netlify/functions",
+        "06_EXECUTION/build/maximus-src/apps/web/dist",
     ],
     "source_suffixes": (".ts", ".tsx", ".mts", ".mjs", ".js", ".jsx",
                          ".css", ".html", ".json", ".py", ".md"),
@@ -219,12 +222,32 @@ def load_restricted_names(cfg):
     return names or None
 
 
+# "placeholder" is on the banned list because unfinished copy must not ship.
+# It is also the name of a standard HTML input attribute, its React prop and a
+# CSS pseudo-element, none of which is copy. Those forms are excluded by shape,
+# so a bare use of the word as text anywhere still fails.
+INNOCENT_FORMS = [
+    re.compile(r"placeholder\s*[=:]", re.I),
+    re.compile(r"::\s*placeholder", re.I),
+    re.compile(r"placeholder\\+:", re.I),  # the Tailwind variant class, escaped in CSS
+    re.compile(r"placeholder(Text|Color|Shown)", re.I),
+]
+
+
+def _strip_innocent_forms(text):
+    """Blank out the attribute and property spellings before matching."""
+    for pattern in INNOCENT_FORMS:
+        text = pattern.sub("_", text)
+    return text
+
+
 def check_banned_terms(text, cfg, where):
     """Sales language and the words the operation has put out of bounds."""
     terms = load_banned_terms(cfg)
     if terms is None:
         return check(f"{where}: banned terms file present", False, cfg["banned_terms_file"])
-    hits = [t for t in terms if re.search(r"\b" + re.escape(t) + r"\b", text, re.I)]
+    scanned = _strip_innocent_forms(text)
+    hits = [t for t in terms if re.search(r"\b" + re.escape(t) + r"\b", scanned, re.I)]
     return check(f"{where}: no banned term", not hits, ", ".join(sorted(set(hits))[:8]))
 
 
@@ -330,6 +353,8 @@ def run_driven(cfg, target):
         check("driven: Playwright available", False, "not installed")
         return "HARNESS"
 
+    cfg["_target"] = target
+
     dod = load_dod(cfg)
     if dod is None:
         check("driven: definition of done present", False, cfg["dod_file"])
@@ -385,17 +410,19 @@ def _sign_in(page, cfg, role, target):
     """Sign out if signed in, then sign in as the account for `role`."""
     email, password = _credentials(cfg, role)
     page.goto(target.rstrip("/") + "/login", wait_until="domcontentloaded")
-    page.wait_for_timeout(300)
-    if page.locator("input[type='email']").count() == 0:
+    try:
+        page.wait_for_selector("input[type='email']", timeout=6000)
+    except Exception:
         # Already signed in as somebody; sign out and come back.
         out = page.locator("button:has-text('Sign out'), button:has-text('Log out')")
         if out.count() > 0:
             out.first.click()
-            page.wait_for_timeout(600)
+            page.wait_for_timeout(800)
         page.goto(target.rstrip("/") + "/login", wait_until="domcontentloaded")
-        page.wait_for_timeout(300)
-    if page.locator("input[type='email']").count() == 0:
-        return False
+        try:
+            page.wait_for_selector("input[type='email']", timeout=6000)
+        except Exception:
+            return False
     page.fill("input[type='email']", email)
     page.fill("input[type='password']", password)
     page.click("button[type='submit']")
@@ -411,6 +438,15 @@ def _ensure_role(page, cfg, role, target):
     if page.locator(probe).count() > 0:
         return True
     return _sign_in(page, cfg, role, target)
+
+
+def _wait_for(page, selector, timeout_ms=8000):
+    """Wait for a selector to exist. Returns True if it appeared."""
+    try:
+        page.wait_for_selector(selector, timeout=timeout_ms, state="attached")
+        return True
+    except Exception:
+        return False
 
 
 def _enter_view(page, view_id, admin_entry_selector, settle_ms, cfg=None, role=None):
@@ -447,7 +483,10 @@ def drv_sign_in_lands_on_portal(page, cfg, line, res, errors):
     submit_sel = line.get("submit_selector", "button[type='submit']")
     success_sel = line.get("success_selector", "[data-view='overview']")
 
-    if page.locator(email_sel).count() == 0:
+    page.goto(cfg["_target"].rstrip("/") + "/login", wait_until="domcontentloaded")
+    try:
+        page.wait_for_selector(email_sel, timeout=line.get("timeout_ms", 5000))
+    except Exception:
         return False, f"sign-in email field not found: {email_sel}"
     page.fill(email_sel, email)
     page.fill(password_sel, password)
@@ -473,6 +512,7 @@ def drv_views_render(page, cfg, line, res, errors):
         if not _enter_view(page, v, admin_entry, settle_ms, cfg, role):
             failed.append(f"{v}:nav-missing")
             continue
+        _wait_for(page, heading_sel, 6000)
         heading = page.locator(heading_sel).first
         text = heading.inner_text().strip() if heading.count() > 0 else ""
         if not text:
@@ -487,6 +527,7 @@ def drv_record_table_has_rows(page, cfg, line, res, errors):
     _enter_view(page, line.get("view", "value"), line.get("admin_entry_selector"),
                 line.get("settle_ms", 400), cfg, line.get("role"))
     table_sel = line.get("table_selector", "[data-testid='record-table']")
+    _wait_for(page, table_sel)
     row_sel = line.get("row_selector", "tbody tr")
     rows = page.locator(f"{table_sel} {row_sel}")
     n = rows.count()
@@ -498,6 +539,7 @@ def drv_statement_contains(page, cfg, line, res, errors):
     _enter_view(page, line.get("view", "value"), line.get("admin_entry_selector"),
                 line.get("settle_ms", 400), cfg, line.get("role"))
     stmt_sel = line.get("statement_selector", "[data-testid='statement']")
+    _wait_for(page, stmt_sel)
     must = line.get("must_contain", "")
     loc = page.locator(stmt_sel)
     if loc.count() == 0:
@@ -520,20 +562,28 @@ def drv_statement_excludes_illustrative_when_off(page, cfg, line, res, errors):
     if not _enter_view(page, line.get("settings_view", "settings"), None, settle_ms, cfg, "admin"):
         return False, "the operator's settings view was not reachable"
 
-    toggle = page.locator(toggle_sel)
-    if toggle.count() == 0:
+    # The switch renders before the operator's settings have arrived, so its
+    # checked state is not meaningful until the page has its data. Wait for it
+    # to be visible, then set it to off explicitly rather than reading it first
+    # and deciding: uncheck() is a no-op when it is already off.
+    if not _wait_for(page, toggle_sel):
         return False, f"{toggle_sel} not found in the operator's settings"
-    is_on = False
+    toggle = page.locator(toggle_sel).first
     try:
-        is_on = toggle.first.is_checked()
+        toggle.wait_for(state="visible", timeout=6000)
+        page.wait_for_timeout(600)
+        toggle.uncheck(timeout=6000)
+    except Exception as exc:
+        return False, f"could not switch the demo setting off: {type(exc).__name__}"
+    # The switch saves itself over the network. Signing out before that request
+    # has finished would abort it and leave the setting unchanged, so wait for
+    # the page to go quiet rather than guessing at a delay.
+    try:
+        page.wait_for_load_state("networkidle", timeout=10000)
     except Exception:
-        is_on = (
-            toggle.first.get_attribute("aria-pressed") == "true"
-            or toggle.first.get_attribute("data-state") == "on"
-        )
-    if is_on:
-        toggle.first.click()
-        page.wait_for_timeout(settle_ms * 2)
+        page.wait_for_timeout(settle_ms * 5)
+    if toggle.is_checked():
+        return False, "the demo switch did not stay off"
 
     if not _sign_in(page, cfg, "client", cfg["_target"]):
         return False, "could not sign back in as the Information Officer"
@@ -541,12 +591,37 @@ def drv_statement_excludes_illustrative_when_off(page, cfg, line, res, errors):
         return False, "the client statement view was not reachable"
 
     stmt_sel = line.get("statement_selector", "[data-testid='statement']")
+    _wait_for(page, stmt_sel)
     loc = page.locator(stmt_sel)
     if loc.count() == 0:
         return False, f"{stmt_sel} not found"
     text = loc.first.inner_text()
     forbidden = line.get("forbidden_text", "illustrative")
     hit = forbidden.lower() in text.lower()
+
+    restored = False
+    # Put the demo switch back as it was. The store is shared across the whole
+    # run, and the seeded record is entirely illustrative, so leaving the switch
+    # off would empty the Record for every later line and resolution.
+    if _ensure_role(page, cfg, "admin", cfg["_target"]) and _enter_view(
+        page, line.get("settings_view", "settings"), None, settle_ms, cfg, "admin"
+    ):
+        if _wait_for(page, toggle_sel):
+            restore = page.locator(toggle_sel).first
+            try:
+                restore.wait_for(state="visible", timeout=6000)
+                page.wait_for_timeout(600)
+                restore.check(timeout=6000)
+                try:
+                    page.wait_for_load_state("networkidle", timeout=10000)
+                except Exception:
+                    page.wait_for_timeout(settle_ms * 5)
+                restored = restore.is_checked()
+            except Exception:
+                restored = False
+
+    if not restored:
+        return False, "the demo switch could not be put back on after the check"
     return not hit, f"'{forbidden}' in the client statement with the switch off: {hit}"
 
 
@@ -557,6 +632,7 @@ def drv_print_hides_chrome_shows_statement(page, cfg, line, res, errors):
                 line.get("settle_ms", 400), cfg, line.get("role"))
     chrome_sel = line.get("chrome_selector", "header, nav")
     stmt_sel = line.get("statement_selector", "[data-testid='statement']")
+    _wait_for(page, stmt_sel)
     try:
         page.emulate_media(media="print")
         page.wait_for_timeout(200)

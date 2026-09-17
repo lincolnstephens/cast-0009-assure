@@ -53,6 +53,33 @@ authRoutes.post("/login", async (c) => {
   return c.json({ user: await toSessionUser(user) });
 });
 
+/**
+ * Who is signed in, if anyone. Unlike /me this does not require a session: a
+ * first page load by a signed-out visitor is a normal event, and answering it
+ * with 401 makes the browser log a console error on every cold open.
+ */
+authRoutes.get("/session", async (c) => {
+  const raw = getCookie(c, SESSION_COOKIE);
+  const sessionId = raw ? decodeSessionCookie(raw) : null;
+  if (!sessionId) return c.json({ user: null, officer: null, branding: null });
+
+  const { getUserForSession } = await import("../lib/sessions.ts");
+  const authed = await getUserForSession(sessionId);
+  if (!authed) return c.json({ user: null, officer: null, branding: null });
+
+  const usersDoc = await readUsers();
+  const user = usersDoc.users.find((u) => u.id === authed.id);
+  if (!user) return c.json({ user: null, officer: null, branding: null });
+
+  const org = user.orgId ? await readOrg(user.orgId) : null;
+  const officer = usersDoc.users.find((u) => u.role === "mitmark_admin");
+  return c.json({
+    user: await toSessionUser(user),
+    officer: officer ? { displayName: officer.displayName } : null,
+    branding: org ? toClientBranding(org) : null,
+  });
+});
+
 authRoutes.post("/logout", requireAuth, async (c) => {
   const user = c.get("user");
   const raw = getCookie(c, SESSION_COOKIE);

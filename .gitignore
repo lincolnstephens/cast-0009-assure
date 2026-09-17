@@ -9,9 +9,12 @@ material/restricted/
 # Build artefacts
 06_EXECUTION/build/app/node_modules/
 06_EXECUTION/build/app/**/node_modules/
-06_EXECUTION/build/dist/
+
 06_EXECUTION/build/maximus-src/node_modules/
 06_EXECUTION/build/maximus-src/**/node_modules/
 06_EXECUTION/build/maximus-src/.netlify/
 06_EXECUTION/build/maximus-src/.data/
 06_EXECUTION/build/maximus-src/apps/web/dist/
+
+# Generated function bundle
+06_EXECUTION/build/maximus-src/netlify/functions/_api-bundle.mjs
