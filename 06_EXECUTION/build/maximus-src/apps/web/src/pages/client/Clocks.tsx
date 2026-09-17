@@ -254,8 +254,8 @@ function ClockDrawer({
           {clock.events.map((event) => (
             <li key={event.id} className="border-l-2 border-client-accent/60 pl-3">
               <div className="text-xs uppercase tracking-wider text-client-muted">
-                {event.event} — {formatLondon(event.createdAt)}
-                {event.actorName ? ` — ${event.actorName}` : ""}
+                {event.event} - {formatLondon(event.createdAt)}
+                {event.actorName ? ` - ${event.actorName}` : ""}
               </div>
               {event.note && <p className="mt-0.5 text-sm">{event.note}</p>}
             </li>

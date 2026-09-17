@@ -49,7 +49,7 @@ export function PosturePage() {
     <div className="max-w-4xl">
       <h1 className="text-lg font-semibold">Posture</h1>
       <p className="mt-0.5 text-sm text-client-muted">
-        How your organisation is doing across five compliance domains — set and verified
+        How your organisation is doing across five compliance domains - set and verified
         by your compliance officer.
       </p>
       <div className="mt-1.5 h-px w-12 bg-client-line" />

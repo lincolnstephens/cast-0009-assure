@@ -126,7 +126,7 @@ body {
   font-family: var(--font-mono);
 }
 
-/* Policy markdown — client portal */
+/* Policy markdown - client portal */
 .client-portal .markdown-body p {
   margin-bottom: 0.6em;
   line-height: 1.65;
@@ -164,7 +164,7 @@ body {
   color: var(--color-client-accent);
 }
 
-/* Policy markdown — admin HUD */
+/* Policy markdown - admin HUD */
 .markdown-body p {
   margin-bottom: 0.6em;
   line-height: 1.65;

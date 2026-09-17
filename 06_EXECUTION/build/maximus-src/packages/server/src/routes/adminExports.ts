@@ -1,7 +1,5 @@
-import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { getDb } from "../db/index.ts";
-import { exports as exportsTable } from "../db/schema.ts";
+import { readOrg } from "../db/store.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
 
 export const adminExportRoutes = new Hono<AppEnv>();
@@ -11,22 +9,15 @@ adminExportRoutes.get("/exports", async (c) => {
   const accountId = c.req.query("accountId");
   if (!accountId) return c.json({ error: "accountId is required" }, 400);
 
-  const rows = await dbExports(getDb(), accountId);
-  return c.json({ exports: rows });
+  const doc = await readOrg(accountId);
+  if (!doc) return c.json({ error: "Organisation not found" }, 404);
+
+  return c.json({
+    exports: doc.exports.map((r) => ({
+      id: r.id,
+      state: r.state,
+      generatedAt: r.generatedAt,
+      downloadable: r.state === "generated",
+    })),
+  });
 });
-
-async function dbExports(db: ReturnType<typeof getDb>, accountId: string) {
-  const rows = await db
-    .select()
-    .from(exportsTable)
-    .where(eq(exportsTable.clientAccountId, accountId))
-    .orderBy(desc(exportsTable.createdAt));
-
-  return rows.map((r) => ({
-    id: r.id,
-    state: r.state,
-    createdAt: r.createdAt.toISOString(),
-    generatedAt: r.generatedAt?.toISOString() ?? null,
-    downloadable: r.state === "generated",
-  }));
-}

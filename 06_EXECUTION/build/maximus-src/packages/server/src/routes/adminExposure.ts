@@ -37,8 +37,10 @@ adminExposureRoutes.get("/exposure", async (c) => {
   return c.json({
     alerts: doc.alerts.slice().sort(byCreatedDesc).map((a) => ({
       id: a.id,
-      title: a.title,
-      detail: a.detail,
+      kind: a.kind,
+      severity: a.severity,
+      summary: a.summary,
+      officerNote: a.officerNote,
       state: a.state,
       isDemo: a.demo,
       createdAt: a.createdAt,
@@ -49,15 +51,9 @@ adminExposureRoutes.get("/exposure", async (c) => {
 /**
  * Create a demo alert — `demo` is always true and cannot be overridden.
  *
- * The store's `ExposureAlertRecord` (db/model.ts) carries only `title` and a
- * single free-text `detail`; it has no separate `kind`, `severity` or
- * `officerNote` columns the way the pre-port schema did. The input contract
- * here (packages/shared/src/alerts.ts) still asks for `kind` and `severity`
- * — it has not been updated for the simplified model. Rather than invent
- * fields the store cannot hold, `kind` and `severity` are folded, verbatim,
- * into the stored `detail` narrative; nothing about them is fabricated, only
- * where they live changes. See this lane's final report for the cross-lane
- * flag on packages/shared/src/alerts.ts.
+ * The store carries kind, severity, summary and the officer's note as
+ * their own fields, so nothing is folded into a narrative string. The
+ * officer's note is the product surface and reaches the client as written.
  */
 adminExposureRoutes.post("/exposure", async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -73,16 +69,15 @@ adminExposureRoutes.post("/exposure", async (c) => {
   const user = c.get("user");
   const orgId = parsed.data.clientAccountId;
   const kindLabel = parsed.data.kind.replace(/_/g, " ");
-  const detail = parsed.data.detail
-    ? `${kindLabel} — ${parsed.data.severity} severity — ${JSON.stringify(parsed.data.detail)}`
-    : `${kindLabel} — ${parsed.data.severity} severity.`;
 
   const alertId = await mutateOrg(orgId, (doc) => {
     const alert: ExposureAlertRecord = {
       id: newId(),
       orgId,
-      title: parsed.data.summary,
-      detail,
+      kind: parsed.data.kind,
+      severity: parsed.data.severity,
+      summary: parsed.data.summary,
+      officerNote: null,
       state: "new",
       demo: true,
       createdAt: new Date().toISOString(),
@@ -93,7 +88,7 @@ adminExposureRoutes.post("/exposure", async (c) => {
       orgId,
       type: "alert",
       refId: alert.id,
-      summary: alert.title,
+      summary: alert.summary,
       state: "pending",
       decidedBy: null,
       decidedAt: null,
@@ -102,12 +97,13 @@ adminExposureRoutes.post("/exposure", async (c) => {
     return alert.id;
   });
 
-  await writeAudit(
-    orgId,
-    user,
-    "exposure.create_demo",
-    `Demo alert created: ${kindLabel} (${parsed.data.severity}).`,
-  );
+  await writeAudit({
+    orgId: orgId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "exposure.create_demo",
+    detail: `Demo alert created: ${kindLabel} (${parsed.data.severity}).`,
+  });
 
   return c.json({ id: alertId }, 201);
 });
@@ -135,7 +131,7 @@ adminExposureRoutes.put("/exposure/:id/state", async (c) => {
     const alert = doc.alerts.find((a) => a.id === found.alert.id);
     if (!alert) return false;
     alert.state = parsed.data.state;
-    alert.detail = `${alert.detail}\n\n${stateLabel(parsed.data.state)} by ${user.displayName}: ${parsed.data.officerNote}`;
+    alert.officerNote = parsed.data.officerNote;
 
     const reviewItem = doc.review.find(
       (r) => r.type === "alert" && r.refId === alert.id && r.state === "pending",
@@ -149,12 +145,13 @@ adminExposureRoutes.put("/exposure/:id/state", async (c) => {
   });
   if (!ok) return c.json({ error: "Not found" }, 404);
 
-  await writeAudit(
-    orgId,
-    user,
-    "exposure.state_change",
-    `Alert ${found.alert.id} moved from ${fromState} to ${parsed.data.state}.`,
-  );
+  await writeAudit({
+    orgId: orgId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "exposure.state_change",
+    detail: `Alert ${found.alert.id} moved from ${fromState} to ${parsed.data.state}.`,
+  });
 
   return c.json({ ok: true });
 });

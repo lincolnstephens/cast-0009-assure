@@ -1,80 +1,54 @@
-import { and, eq } from "drizzle-orm";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { policyPack } from "../scripts/policyPack";
-import { app } from "../src/app";
-import { getDb } from "../src/db";
+import { Hono } from "hono";
+import { beforeEach, describe, expect, it } from "vitest";
+import { seedPolicyPack } from "../scripts/policyPack.ts";
+import { mutateOrg, newId, readOrg } from "../src/db/store.ts";
+import type { AppEnv } from "../src/lib/middleware.ts";
+import { adminEscalationRoutes } from "../src/routes/adminEscalations.ts";
+import { authRoutes } from "../src/routes/auth.ts";
+import { chatRoutes } from "../src/routes/chat.ts";
+import { policyRoutes } from "../src/routes/policies.ts";
 import {
-  auditLog,
-  chatMessages,
-  chatThreads,
-  clocks,
-  escalations,
-  intakes,
-  policies,
-  policySections,
-  reviewItems,
-} from "../src/db/schema";
-import {
-  prepareTestDatabase,
-  resetTables,
+  freshStore,
   seedTestUsers,
   sessionCookieOf,
+  TEST_ADMIN_EMAIL,
+  TEST_CLIENT_EMAIL,
+  TEST_PASSWORD,
   type TestFixtures,
-} from "./helpers";
+} from "./helpers.ts";
+
+// A minimal app carrying only the routes this lane owns, so this suite never
+// depends on whether another lane's route files have finished porting.
+const app = new Hono<AppEnv>()
+  .basePath("/api")
+  .route("/auth", authRoutes)
+  .route("/chat", chatRoutes)
+  .route("/policies", policyRoutes)
+  .route("/admin", adminEscalationRoutes);
 
 let fixtures: TestFixtures;
 let clientCookie: string;
 let adminCookie: string;
 
-beforeAll(async () => {
-  await prepareTestDatabase();
-});
-
 beforeEach(async () => {
   // Stub mode is the test-mode contract; the suite must fail loudly if a key
   // leaks into the test environment.
   delete process.env.ANTHROPIC_API_KEY;
-  await resetTables();
+  freshStore();
   fixtures = await seedTestUsers();
-  await seedApprovedCorpus();
-  clientCookie = sessionCookieOf(await login("ea@pemberton.example"));
-  adminCookie = sessionCookieOf(await login("officer@mitmark.example"));
+  await mutateOrg(fixtures.accountId, (doc) => {
+    seedPolicyPack(doc, fixtures.adminUserId);
+  });
+  clientCookie = sessionCookieOf(await login(TEST_CLIENT_EMAIL));
+  adminCookie = sessionCookieOf(await login(TEST_ADMIN_EMAIL));
 });
 
 async function login(email: string) {
   return app.request("/api/auth/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password: "correct-horse" }),
+    body: JSON.stringify({ email, password: TEST_PASSWORD }),
   });
-}
-
-/** The real six-policy pack, approved, so the stub answers from real text. */
-async function seedApprovedCorpus() {
-  const db = getDb();
-  for (const seedPolicy of policyPack) {
-    const [policy] = await db
-      .insert(policies)
-      .values({
-        clientAccountId: fixtures.accountId,
-        code: seedPolicy.code,
-        title: seedPolicy.title,
-        bodyMarkdown: seedPolicy.bodyMarkdown,
-        version: 1,
-        status: "approved",
-        approvedBy: fixtures.adminUserId,
-        approvedAt: new Date(),
-      })
-      .returning();
-    for (const section of seedPolicy.sections) {
-      await db.insert(policySections).values({
-        policyId: policy.id,
-        sectionRef: section.sectionRef,
-        heading: section.heading,
-        bodyMarkdown: section.bodyMarkdown,
-      });
-    }
-  }
 }
 
 async function ask(body: string) {
@@ -108,10 +82,10 @@ describe("Policy Guide chat (stub mode)", () => {
     expect(panel.status).toBe(200);
 
     // State-changing chat route wrote an audit row (metadata only).
-    const db = getDb();
-    const audits = await db.select().from(auditLog).where(eq(auditLog.action, "chat.message"));
+    const org = await readOrg(fixtures.accountId);
+    const audits = org!.audit.filter((a) => a.action === "chat.message");
     expect(audits).toHaveLength(1);
-    expect(JSON.stringify(audits[0].detail)).not.toContain("tenant contact list");
+    expect(audits[0].detail).not.toContain("tenant contact list");
   });
 
   it("demo question 2 → amber with escalation + pending review item", async () => {
@@ -122,17 +96,13 @@ describe("Policy Guide chat (stub mode)", () => {
     const guide = messages[1];
     expect(guide.status).toBe("amber");
     expect(guide.body).toContain("judgement call");
-    expect(guide.body).toContain("Marcus Holt");
+    expect(guide.body).toContain("Test Admin User");
     expect(guide.citations).toHaveLength(0);
 
-    const db = getDb();
-    const escs = await db.select().from(escalations);
-    expect(escs).toHaveLength(1);
-    expect(escs[0].state).toBe("open");
-    const items = await db
-      .select()
-      .from(reviewItems)
-      .where(and(eq(reviewItems.type, "chat_amber"), eq(reviewItems.state, "pending")));
+    const org = await readOrg(fixtures.accountId);
+    expect(org!.escalations).toHaveLength(1);
+    expect(org!.escalations[0].state).toBe("open");
+    const items = org!.review.filter((r) => r.type === "chat_amber" && r.state === "pending");
     expect(items).toHaveLength(1);
   });
 
@@ -144,18 +114,12 @@ describe("Policy Guide chat (stub mode)", () => {
     expect(guide.body).toContain("formal data request");
     expect(guide.body).toContain("statutory process");
 
-    const db = getDb();
-    const [intake] = await db.select().from(intakes);
-    expect(intake.type).toBe("sar");
-    expect(intake.source).toBe("chat");
-    const [clock] = await db.select().from(clocks);
-    expect(clock.kind).toBe("sar_1_month");
-
-    // The clock appears on the client's Clocks page immediately.
-    const clocksRes = await app.request("/api/clocks", { headers: { cookie: clientCookie } });
-    const { active } = await clocksRes.json();
-    expect(active).toHaveLength(1);
-    expect(active[0].kind).toBe("sar_1_month");
+    const org = await readOrg(fixtures.accountId);
+    expect(org!.intakes).toHaveLength(1);
+    expect(org!.intakes[0].type).toBe("sar");
+    expect(org!.intakes[0].source).toBe("chat");
+    expect(org!.clocks).toHaveLength(1);
+    expect(org!.clocks[0].kind).toBe("sar_1_month");
   });
 
   it("citation chips keep opening the cited version after a newer one is approved", async () => {
@@ -163,20 +127,22 @@ describe("Policy Guide chat (stub mode)", () => {
     const { messages } = await res.json();
     const citation = messages[1].citations[0];
 
-    // Officer snapshots DP-01 to v2 and approves it.
-    const draftRes = await app.request(`/api/admin/policies/${citation.policyId}/draft`, {
-      method: "POST",
-      headers: { cookie: adminCookie, "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    const { id: v2 } = await draftRes.json();
-    await app.request(`/api/admin/policies/${v2}/approve`, {
-      method: "POST",
-      headers: { cookie: adminCookie, "content-type": "application/json" },
-      body: JSON.stringify({}),
+    // Officer snapshots DP-01 to v2 and approves it directly on the store
+    // (this suite does not mount the admin policy routes — another lane's).
+    const v2Id = await mutateOrg(fixtures.accountId, (doc) => {
+      const v1 = doc.policies.find((p) => p.id === citation.policyId)!;
+      const v2 = {
+        ...v1,
+        id: newId(),
+        version: 2,
+        status: "approved" as const,
+        approvedBy: fixtures.adminUserId,
+        approvedAt: new Date().toISOString(),
+      };
+      doc.policies.push(v2);
+      return v2.id;
     });
 
-    // The pack lists v2, but the stored citation still opens v1.
     const list = await (
       await app.request("/api/policies", { headers: { cookie: clientCookie } })
     ).json();
@@ -187,21 +153,29 @@ describe("Policy Guide chat (stub mode)", () => {
     });
     expect(pinned.status).toBe(200);
     expect((await pinned.json()).version).toBe(1);
+
+    const newVersion = await app.request(`/api/policies/${v2Id}`, {
+      headers: { cookie: clientCookie },
+    });
+    expect((await newVersion.json()).version).toBe(2);
   });
 
   it("rate limits at 10 messages per minute per user", async () => {
-    const db = getDb();
-    const [thread] = await db
-      .insert(chatThreads)
-      .values({ userId: fixtures.clientUserId, clientAccountId: fixtures.accountId })
-      .returning();
-    for (let i = 0; i < 10; i++) {
-      await db.insert(chatMessages).values({
-        threadId: thread.id,
-        sender: "client",
-        body: `q${i}`,
-      });
-    }
+    await mutateOrg(fixtures.accountId, (doc) => {
+      const thread = { id: newId(), orgId: doc.id, userId: fixtures.clientUserId, title: "Policy questions", createdAt: new Date().toISOString() };
+      doc.threads.push(thread);
+      for (let i = 0; i < 10; i++) {
+        doc.messages.push({
+          id: newId(),
+          threadId: thread.id,
+          sender: "user",
+          body: `q${i}`,
+          citations: [],
+          escalated: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    });
     const res = await ask("One more question?");
     expect(res.status).toBe(429);
     const body = await res.json();
@@ -236,17 +210,19 @@ describe("Policy Guide chat (stub mode)", () => {
     expect(officerMsg.sender).toBe("officer");
     expect(officerMsg.body).toContain("not permitted");
 
-    const db = getDb();
-    const [esc] = await db.select().from(escalations);
-    expect(esc.state).toBe("answered");
-    expect(esc.officerId).toBe(fixtures.adminUserId);
-    const items = await db.select().from(reviewItems);
-    expect(items[0].state).toBe("approved");
-    const audits = await db
-      .select()
-      .from(auditLog)
-      .where(eq(auditLog.action, "escalation.answer"));
-    expect(audits).toHaveLength(1);
+    const org = await readOrg(fixtures.accountId);
+    expect(org!.escalations[0].state).toBe("answered");
+    expect(org!.escalations[0].answeredBy).toBe(fixtures.adminUserId);
+    expect(org!.review[0].state).toBe("approved");
+    expect(org!.audit.filter((a) => a.action === "escalation.answer")).toHaveLength(1);
+
+    // The answer raised a Record entry (line 12), reviewed by the officer.
+    const guideEntries = org!.entries.filter((e) => e.source === "guide");
+    expect(guideEntries).toHaveLength(1);
+    expect(guideEntries[0].line).toBe(12);
+    expect(guideEntries[0].reviewer).toBe("Test Admin User");
+    expect(guideEntries[0].reviewed).toBe(true);
+    expect(guideEntries[0].ill).toBe(false);
 
     // Double answer → 409.
     const again = await app.request(`/api/admin/escalations/${list[0].id}/answer`, {
@@ -258,9 +234,9 @@ describe("Policy Guide chat (stub mode)", () => {
   });
 
   it("empty approved corpus → amber fixed copy, no escalation", async () => {
-    const db = getDb();
-    await db.delete(policySections);
-    await db.delete(policies);
+    await mutateOrg(fixtures.accountId, (doc) => {
+      doc.policies = [];
+    });
 
     const res = await ask("Can I share the tenant contact list with our letting agent?");
     expect(res.status).toBe(200);
@@ -270,10 +246,9 @@ describe("Policy Guide chat (stub mode)", () => {
     expect(guide.body).toContain("policy pack is being prepared");
     expect(guide.citations).toHaveLength(0);
 
-    const escs = await db.select().from(escalations);
-    expect(escs).toHaveLength(0);
-    const items = await db.select().from(reviewItems);
-    expect(items.filter((i) => i.type === "chat_amber")).toHaveLength(0);
+    const org = await readOrg(fixtures.accountId);
+    expect(org!.escalations).toHaveLength(0);
+    expect(org!.review.filter((r) => r.type === "chat_amber")).toHaveLength(0);
   });
 
   it("chat routes reject admins and unauthenticated users", async () => {

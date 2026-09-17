@@ -53,12 +53,13 @@ adminPostureRoutes.put("/posture/:id", async (c) => {
   });
   if (!ok) return c.json({ error: "Not found" }, 404);
 
-  await writeAudit(
-    orgId,
-    user,
-    "posture.update",
-    `Posture domain ${found.domain.domain} set to ${parsed.data.status}.`,
-  );
+  await writeAudit({
+    orgId: orgId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "posture.update",
+    detail: `Posture domain ${found.domain.domain} set to ${parsed.data.status}.`,
+  });
 
   return c.json({ ok: true });
 });

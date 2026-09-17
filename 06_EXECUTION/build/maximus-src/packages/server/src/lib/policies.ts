@@ -15,7 +15,7 @@
  */
 
 import type { OrgDoc, PolicyRecord } from "../db/model.ts";
-import { newId } from "../db/store.ts";
+import { listOrgIds, newId, readOrg } from "../db/store.ts";
 
 export interface PolicySection {
   /** Synthetic — derived from the policy id and the section ref, not stored. */
@@ -121,4 +121,21 @@ export function createDraftFrom(doc: OrgDoc, source: PolicyRecord): PolicyRecord
   };
   doc.policies.push(draft);
   return draft;
+}
+
+/**
+ * Find a policy by id without knowing its organisation up front. Policies
+ * live inside a per-org document (no global table any more), so this scans
+ * the (small, beta-scale) set of organisations. Used to tell "not found"
+ * (404) apart from "belongs to a different tenant" (403).
+ */
+export async function findPolicyAnywhere(
+  id: string,
+): Promise<{ orgId: string; policy: PolicyRecord } | null> {
+  for (const orgId of await listOrgIds()) {
+    const doc = await readOrg(orgId);
+    const policy = doc?.policies.find((p) => p.id === id);
+    if (policy) return { orgId, policy };
+  }
+  return null;
 }

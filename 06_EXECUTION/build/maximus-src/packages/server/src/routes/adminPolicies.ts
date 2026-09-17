@@ -1,31 +1,44 @@
-import {
-  createPolicySchema,
-  updatePolicySchema,
-  upsertSectionSchema,
-} from "@maximus/shared";
-import { and, desc, eq } from "drizzle-orm";
+import { createPolicySchema, updatePolicySchema } from "@maximus/shared";
 import { Hono } from "hono";
-import { getDb } from "../db/index.ts";
-import { policies, policySections } from "../db/schema.ts";
+import type { PolicyRecord } from "../db/model.ts";
+import { mutateOrg, newId, readOrg } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
-import { createDraftFrom, sectionsFor } from "../lib/policies.ts";
+import { createDraftFrom, findPolicyAnywhere, parsePolicyDocument } from "../lib/policies.ts";
+import { raisePolicyEntry } from "../lib/raiseEntry.ts";
 
 export const adminPolicyRoutes = new Hono<AppEnv>();
 adminPolicyRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
 
+function detailOf(policy: PolicyRecord) {
+  const { preamble, sections } = parsePolicyDocument(policy.id, policy.bodyMarkdown);
+  return {
+    id: policy.id,
+    code: policy.code,
+    title: policy.title,
+    version: policy.version,
+    status: policy.status,
+    bodyMarkdown: preamble,
+    approvedAt: policy.approvedAt,
+    sections: sections.map((s) => ({
+      id: s.id,
+      sectionRef: s.sectionRef,
+      heading: s.heading,
+      bodyMarkdown: s.bodyMarkdown,
+    })),
+  };
+}
+
 /** All policy versions for an account, newest version first per code. */
 adminPolicyRoutes.get("/policies", async (c) => {
-  const db = getDb();
   const accountId = c.req.query("accountId");
   if (!accountId) return c.json({ error: "accountId is required" }, 400);
+  const doc = await readOrg(accountId);
+  if (!doc) return c.json({ error: "Organisation not found" }, 404);
 
-  const rows = await db
-    .select()
-    .from(policies)
-    .where(eq(policies.clientAccountId, accountId))
-    .orderBy(policies.code, desc(policies.version));
-
+  const rows = [...doc.policies].sort(
+    (a, b) => a.code.localeCompare(b.code) || b.version - a.version,
+  );
   return c.json({
     policies: rows.map((p) => ({
       id: p.id,
@@ -33,37 +46,16 @@ adminPolicyRoutes.get("/policies", async (c) => {
       title: p.title,
       version: p.version,
       status: p.status,
-      approvedAt: p.approvedAt?.toISOString() ?? null,
+      approvedAt: p.approvedAt,
     })),
   });
 });
 
 /** One policy version with sections (any status — this is the admin view). */
 adminPolicyRoutes.get("/policies/:id", async (c) => {
-  const db = getDb();
-  const [policy] = await db
-    .select()
-    .from(policies)
-    .where(eq(policies.id, c.req.param("id")))
-    .limit(1);
-  if (!policy) return c.json({ error: "Not found" }, 404);
-
-  const sections = await sectionsFor(db, [policy.id]);
-  return c.json({
-    id: policy.id,
-    code: policy.code,
-    title: policy.title,
-    version: policy.version,
-    status: policy.status,
-    bodyMarkdown: policy.bodyMarkdown,
-    approvedAt: policy.approvedAt?.toISOString() ?? null,
-    sections: sections.map((s) => ({
-      id: s.id,
-      sectionRef: s.sectionRef,
-      heading: s.heading,
-      bodyMarkdown: s.bodyMarkdown,
-    })),
-  });
+  const found = await findPolicyAnywhere(c.req.param("id"));
+  if (!found) return c.json({ error: "Not found" }, 404);
+  return c.json(detailOf(found.policy));
 });
 
 /** Create a new policy (version 1, draft). */
@@ -72,42 +64,44 @@ adminPolicyRoutes.post("/policies", async (c) => {
   if (!parsed.success) {
     return c.json({ error: "Enter a code like DP-01 and a title." }, 400);
   }
-  const db = getDb();
   const user = c.get("user");
+  const { clientAccountId, code, title, bodyMarkdown } = parsed.data;
 
-  const [existing] = await db
-    .select({ id: policies.id })
-    .from(policies)
-    .where(
-      and(
-        eq(policies.clientAccountId, parsed.data.clientAccountId),
-        eq(policies.code, parsed.data.code),
-      ),
-    )
-    .limit(1);
-  if (existing) {
+  const doc = await readOrg(clientAccountId);
+  if (!doc) return c.json({ error: "Organisation not found" }, 404);
+
+  let conflict = false;
+  const policy = await mutateOrg(clientAccountId, (d) => {
+    if (d.policies.some((p) => p.code === code)) {
+      conflict = true;
+      return null;
+    }
+    const created: PolicyRecord = {
+      id: newId(),
+      orgId: clientAccountId,
+      code,
+      title,
+      version: 1,
+      status: "draft",
+      bodyMarkdown: bodyMarkdown ?? "",
+      approvedBy: null,
+      approvedAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    d.policies.push(created);
+    return created;
+  });
+
+  if (conflict || !policy) {
     return c.json({ error: "That code already exists for this account." }, 409);
   }
 
-  const [policy] = await db
-    .insert(policies)
-    .values({
-      clientAccountId: parsed.data.clientAccountId,
-      code: parsed.data.code,
-      title: parsed.data.title,
-      bodyMarkdown: parsed.data.bodyMarkdown,
-      version: 1,
-      status: "draft",
-    })
-    .returning();
-
-  await writeAudit(db, {
-    clientAccountId: policy.clientAccountId,
+  await writeAudit({
+    orgId: clientAccountId,
     actorId: user.id,
+    actorName: user.displayName,
     action: "policy.create",
-    entity: "policy",
-    entityId: policy.id,
-    detail: { code: policy.code, version: 1 },
+    detail: `code=${code} version=1`,
   });
 
   return c.json({ id: policy.id }, 201);
@@ -115,14 +109,26 @@ adminPolicyRoutes.post("/policies", async (c) => {
 
 /** Explicitly snapshot an approved policy into a new draft version. */
 adminPolicyRoutes.post("/policies/:id/draft", async (c) => {
-  const db = getDb();
   const user = c.get("user");
-  const policy = await findPolicy(db, c.req.param("id"));
-  if (!policy) return c.json({ error: "Not found" }, 404);
-  if (policy.status !== "approved") {
+  const found = await findPolicyAnywhere(c.req.param("id"));
+  if (!found) return c.json({ error: "Not found" }, 404);
+  if (found.policy.status !== "approved") {
     return c.json({ error: "Only approved policies can be drafted from." }, 409);
   }
-  const draft = await createDraftFrom(db, policy, user.id);
+
+  const draft = await mutateOrg(found.orgId, (doc) => {
+    const source = doc.policies.find((p) => p.id === found.policy.id)!;
+    return createDraftFrom(doc, source);
+  });
+
+  await writeAudit({
+    orgId: found.orgId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "policy.draft_create",
+    detail: `code=${found.policy.code} fromVersion=${found.policy.version} version=${draft.version}`,
+  });
+
   return c.json({ id: draft.id, version: draft.version }, 201);
 });
 
@@ -131,34 +137,28 @@ adminPolicyRoutes.put("/policies/:id", async (c) => {
   const parsed = updatePolicySchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Nothing valid to update." }, 400);
 
-  const db = getDb();
   const user = c.get("user");
-  const policy = await findPolicy(db, c.req.param("id"));
-  if (!policy) return c.json({ error: "Not found" }, 404);
-  if (policy.status !== "draft") {
+  const found = await findPolicyAnywhere(c.req.param("id"));
+  if (!found) return c.json({ error: "Not found" }, 404);
+  if (found.policy.status !== "draft") {
     return c.json(
       { error: "Approved versions are immutable. Create a new draft first." },
       409,
     );
   }
 
-  await db
-    .update(policies)
-    .set({
-      ...(parsed.data.title !== undefined ? { title: parsed.data.title } : {}),
-      ...(parsed.data.bodyMarkdown !== undefined
-        ? { bodyMarkdown: parsed.data.bodyMarkdown }
-        : {}),
-    })
-    .where(eq(policies.id, policy.id));
+  await mutateOrg(found.orgId, (doc) => {
+    const policy = doc.policies.find((p) => p.id === found.policy.id)!;
+    if (parsed.data.title !== undefined) policy.title = parsed.data.title;
+    if (parsed.data.bodyMarkdown !== undefined) policy.bodyMarkdown = parsed.data.bodyMarkdown;
+  });
 
-  await writeAudit(db, {
-    clientAccountId: policy.clientAccountId,
+  await writeAudit({
+    orgId: found.orgId,
     actorId: user.id,
+    actorName: user.displayName,
     action: "policy.update",
-    entity: "policy",
-    entityId: policy.id,
-    detail: { code: policy.code, version: policy.version },
+    detail: `code=${found.policy.code} version=${found.policy.version}`,
   });
 
   return c.json({ ok: true });
@@ -166,178 +166,63 @@ adminPolicyRoutes.put("/policies/:id", async (c) => {
 
 /** Delete a DRAFT version. Approved versions are retained forever. */
 adminPolicyRoutes.delete("/policies/:id", async (c) => {
-  const db = getDb();
   const user = c.get("user");
-  const policy = await findPolicy(db, c.req.param("id"));
-  if (!policy) return c.json({ error: "Not found" }, 404);
-  if (policy.status !== "draft") {
+  const found = await findPolicyAnywhere(c.req.param("id"));
+  if (!found) return c.json({ error: "Not found" }, 404);
+  if (found.policy.status !== "draft") {
     return c.json({ error: "Approved versions cannot be deleted." }, 409);
   }
 
-  await db.delete(policySections).where(eq(policySections.policyId, policy.id));
-  await db.delete(policies).where(eq(policies.id, policy.id));
+  await mutateOrg(found.orgId, (doc) => {
+    const i = doc.policies.findIndex((p) => p.id === found.policy.id);
+    if (i !== -1) doc.policies.splice(i, 1);
+  });
 
-  await writeAudit(db, {
-    clientAccountId: policy.clientAccountId,
+  await writeAudit({
+    orgId: found.orgId,
     actorId: user.id,
+    actorName: user.displayName,
     action: "policy.delete_draft",
-    entity: "policy",
-    entityId: policy.id,
-    detail: { code: policy.code, version: policy.version },
+    detail: `code=${found.policy.code} version=${found.policy.version}`,
   });
 
   return c.json({ ok: true });
 });
 
-/** Approve a draft: records approver + timestamp; it becomes the live version. */
+/**
+ * Approve a draft: records approver + timestamp; it becomes the live
+ * version, and raises a Record entry (line 3) for the approving admin.
+ */
 adminPolicyRoutes.post("/policies/:id/approve", async (c) => {
-  const db = getDb();
   const user = c.get("user");
-  const policy = await findPolicy(db, c.req.param("id"));
-  if (!policy) return c.json({ error: "Not found" }, 404);
-  if (policy.status !== "draft") {
+  const found = await findPolicyAnywhere(c.req.param("id"));
+  if (!found) return c.json({ error: "Not found" }, 404);
+  if (found.policy.status !== "draft") {
     return c.json({ error: "Only drafts can be approved." }, 409);
   }
 
-  const approvedAt = new Date();
-  await db
-    .update(policies)
-    .set({ status: "approved", approvedBy: user.id, approvedAt })
-    .where(eq(policies.id, policy.id));
+  await mutateOrg(found.orgId, (doc) => {
+    const policy = doc.policies.find((p) => p.id === found.policy.id)!;
+    const approvedAt = new Date().toISOString();
+    policy.status = "approved";
+    policy.approvedBy = user.id;
+    policy.approvedAt = approvedAt;
 
-  await writeAudit(db, {
-    clientAccountId: policy.clientAccountId,
-    actorId: user.id,
-    action: "policy.approve",
-    entity: "policy",
-    entityId: policy.id,
-    detail: { code: policy.code, version: policy.version },
-  });
-
-  return c.json({ ok: true });
-});
-
-/** Add a section to a draft. */
-adminPolicyRoutes.post("/policies/:id/sections", async (c) => {
-  const parsed = upsertSectionSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json({ error: "Enter a section ref (e.g. 4.2), heading and body." }, 400);
-  }
-  const db = getDb();
-  const user = c.get("user");
-  const policy = await findPolicy(db, c.req.param("id"));
-  if (!policy) return c.json({ error: "Not found" }, 404);
-  if (policy.status !== "draft") {
-    return c.json(
-      { error: "Approved versions are immutable. Create a new draft first." },
-      409,
-    );
-  }
-
-  const [section] = await db
-    .insert(policySections)
-    .values({
+    raisePolicyEntry(doc, {
       policyId: policy.id,
-      sectionRef: parsed.data.sectionRef,
-      heading: parsed.data.heading,
-      bodyMarkdown: parsed.data.bodyMarkdown,
-    })
-    .returning();
-
-  await writeAudit(db, {
-    clientAccountId: policy.clientAccountId,
-    actorId: user.id,
-    action: "policy.section_add",
-    entity: "policy_section",
-    entityId: section.id,
-    detail: { code: policy.code, version: policy.version, sectionRef: section.sectionRef },
+      title: policy.title,
+      version: policy.version,
+      reviewer: user.displayName,
+    });
   });
 
-  return c.json({ id: section.id }, 201);
-});
-
-/** Edit a section of a draft. */
-adminPolicyRoutes.put("/sections/:id", async (c) => {
-  const parsed = upsertSectionSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json({ error: "Enter a section ref (e.g. 4.2), heading and body." }, 400);
-  }
-  const db = getDb();
-  const user = c.get("user");
-  const found = await findSection(db, c.req.param("id"));
-  if (!found) return c.json({ error: "Not found" }, 404);
-  if (found.policy.status !== "draft") {
-    return c.json(
-      { error: "Approved versions are immutable. Create a new draft first." },
-      409,
-    );
-  }
-
-  await db
-    .update(policySections)
-    .set(parsed.data)
-    .where(eq(policySections.id, found.section.id));
-
-  await writeAudit(db, {
-    clientAccountId: found.policy.clientAccountId,
+  await writeAudit({
+    orgId: found.orgId,
     actorId: user.id,
-    action: "policy.section_update",
-    entity: "policy_section",
-    entityId: found.section.id,
-    detail: {
-      code: found.policy.code,
-      version: found.policy.version,
-      sectionRef: parsed.data.sectionRef,
-    },
+    actorName: user.displayName,
+    action: "policy.approve",
+    detail: `code=${found.policy.code} version=${found.policy.version}`,
   });
 
   return c.json({ ok: true });
 });
-
-/** Remove a section from a draft. */
-adminPolicyRoutes.delete("/sections/:id", async (c) => {
-  const db = getDb();
-  const user = c.get("user");
-  const found = await findSection(db, c.req.param("id"));
-  if (!found) return c.json({ error: "Not found" }, 404);
-  if (found.policy.status !== "draft") {
-    return c.json(
-      { error: "Approved versions are immutable. Create a new draft first." },
-      409,
-    );
-  }
-
-  await db.delete(policySections).where(eq(policySections.id, found.section.id));
-
-  await writeAudit(db, {
-    clientAccountId: found.policy.clientAccountId,
-    actorId: user.id,
-    action: "policy.section_delete",
-    entity: "policy_section",
-    entityId: found.section.id,
-    detail: {
-      code: found.policy.code,
-      version: found.policy.version,
-      sectionRef: found.section.sectionRef,
-    },
-  });
-
-  return c.json({ ok: true });
-});
-
-async function findPolicy(db: ReturnType<typeof getDb>, id: string) {
-  const [policy] = await db.select().from(policies).where(eq(policies.id, id)).limit(1);
-  return policy ?? null;
-}
-
-async function findSection(db: ReturnType<typeof getDb>, id: string) {
-  const [section] = await db
-    .select()
-    .from(policySections)
-    .where(eq(policySections.id, id))
-    .limit(1);
-  if (!section) return null;
-  const policy = await findPolicy(db, section.policyId);
-  if (!policy) return null;
-  return { section, policy };
-}

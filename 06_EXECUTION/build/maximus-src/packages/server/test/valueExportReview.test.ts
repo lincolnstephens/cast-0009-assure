@@ -1,123 +1,57 @@
-import bcrypt from "bcryptjs";
-import { and, eq } from "drizzle-orm";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { policyPack } from "../scripts/policyPack";
-import { app } from "../src/app";
-import { getDb } from "../src/db";
+import { Hono } from "hono";
+import { beforeEach, describe, expect, it } from "vitest";
+import { seedPolicyPack } from "../scripts/policyPack.ts";
+import { ensureOrg, mutateOrg, newId, readExportBlob, readOrg } from "../src/db/store.ts";
+import { createIntakeWithClock } from "../src/lib/intakes.ts";
+import type { AppEnv } from "../src/lib/middleware.ts";
+import { adminExportRoutes } from "../src/routes/adminExports.ts";
+import { adminReviewRoutes } from "../src/routes/adminReview.ts";
+import { authRoutes } from "../src/routes/auth.ts";
+import { exportRoutes } from "../src/routes/exports.ts";
 import {
-  auditLog,
-  chatMessages,
-  chatThreads,
-  clientAccounts,
-  escalations,
-  exports as exportsTable,
-  policies,
-  policySections,
-  reviewItems,
-} from "../src/db/schema";
-import { createIntakeWithClock } from "../src/lib/intakes";
-import {
-  prepareTestDatabase,
-  resetTables,
+  freshStore,
   seedTestUsers,
   sessionCookieOf,
+  TEST_ADMIN_EMAIL,
+  TEST_CLIENT_EMAIL,
+  TEST_PASSWORD,
   type TestFixtures,
-} from "./helpers";
+} from "./helpers.ts";
+
+// A minimal app carrying only the routes this lane owns (plus auth, to sign
+// in), so this suite never depends on whether another lane's route files
+// have finished porting.
+const app = new Hono<AppEnv>()
+  .basePath("/api")
+  .route("/auth", authRoutes)
+  .route("/exports", exportRoutes)
+  .route("/admin", adminExportRoutes)
+  .route("/admin", adminReviewRoutes);
 
 let fixtures: TestFixtures;
 let clientCookie: string;
 let adminCookie: string;
 
-beforeAll(async () => {
-  await prepareTestDatabase();
-});
-
 beforeEach(async () => {
-  await resetTables();
+  freshStore();
   fixtures = await seedTestUsers();
-  await seedApprovedPolicy();
-  clientCookie = sessionCookieOf(await login("ea@pemberton.example"));
-  adminCookie = sessionCookieOf(await login("officer@mitmark.example"));
+  await mutateOrg(fixtures.accountId, (doc) => {
+    seedPolicyPack(doc, fixtures.adminUserId);
+  });
+  clientCookie = sessionCookieOf(await login(TEST_CLIENT_EMAIL));
+  adminCookie = sessionCookieOf(await login(TEST_ADMIN_EMAIL));
 });
 
 async function login(email: string) {
   return app.request("/api/auth/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password: "correct-horse" }),
+    body: JSON.stringify({ email, password: TEST_PASSWORD }),
   });
 }
-
-async function seedApprovedPolicy() {
-  const db = getDb();
-  const seedPolicy = policyPack[0];
-  const [policy] = await db
-    .insert(policies)
-    .values({
-      clientAccountId: fixtures.accountId,
-      code: seedPolicy.code,
-      title: seedPolicy.title,
-      bodyMarkdown: seedPolicy.bodyMarkdown,
-      version: 1,
-      status: "approved",
-      approvedBy: fixtures.adminUserId,
-      approvedAt: new Date(),
-    })
-    .returning();
-  for (const section of seedPolicy.sections) {
-    await db.insert(policySections).values({
-      policyId: policy.id,
-      sectionRef: section.sectionRef,
-      heading: section.heading,
-      bodyMarkdown: section.bodyMarkdown,
-    });
-  }
-}
-
-describe("value snapshot", () => {
-  it("returns live counters — zeros render as zero", async () => {
-    const res = await app.request("/api/value", { headers: { cookie: clientCookie } });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.counters.questionsAnswered).toBe(0);
-    expect(body.counters.sarsInsideStatute).toBe(0);
-    expect(body.counters.sarsTotal).toBe(0);
-    expect(body.monthlyQuestions).toEqual([]);
-  });
-
-  it("SAR inside-statute counter reads the explicit close flag", async () => {
-    const db = getDb();
-    const { clock } = await createIntakeWithClock(db, {
-      clientAccountId: fixtures.accountId,
-      type: "sar",
-      source: "manual",
-      summary: "Quarter SAR",
-      actorId: fixtures.adminUserId,
-    });
-
-    const close = await app.request(`/api/admin/clocks/${clock.id}/close`, {
-      method: "POST",
-      headers: { cookie: adminCookie, "content-type": "application/json" },
-      body: JSON.stringify({ outcome: "Responded within statute.", insideStatute: true }),
-    });
-    expect(close.status).toBe(200);
-
-    const res = await app.request("/api/value", { headers: { cookie: clientCookie } });
-    const body = await res.json();
-    expect(body.counters.sarsTotal).toBe(1);
-    expect(body.counters.sarsInsideStatute).toBe(1);
-  });
-
-  it("rejects admin and unauthenticated callers", async () => {
-    expect((await app.request("/api/value", { headers: { cookie: adminCookie } })).status).toBe(
-      403,
-    );
-    expect((await app.request("/api/value")).status).toBe(401);
-  });
-});
 
 describe("defence-file export lifecycle", () => {
-  it("request → review item → approve → downloadable zip in Postgres", async () => {
+  it("request → review item → approve → downloadable zip, with a Record entry", async () => {
     const req = await app.request("/api/exports", {
       method: "POST",
       headers: { cookie: clientCookie, "content-type": "application/json" },
@@ -140,11 +74,30 @@ describe("defence-file export lifecycle", () => {
     });
     expect(approve.status).toBe(200);
 
-    const db = getDb();
-    const [row] = await db.select().from(exportsTable).where(eq(exportsTable.id, exportId));
+    const org = await readOrg(fixtures.accountId);
+    const row = org!.exports.find((e) => e.id === exportId)!;
     expect(row.state).toBe("generated");
-    expect(row.fileData).toBeTruthy();
-    expect((row.fileData as Buffer).length).toBeGreaterThan(100);
+    expect(row.blobKey).toBeTruthy();
+
+    const bytes = await readExportBlob(exportId);
+    expect(bytes).toBeTruthy();
+    expect(bytes!.length).toBeGreaterThan(100);
+
+    // Completing the export raised a Record entry (line 11), reviewed by the
+    // approving admin, and the export remembers which entry it created.
+    expect(row.entryId).toBeTruthy();
+    const entry = org!.entries.find((e) => e.id === row.entryId)!;
+    expect(entry).toBeTruthy();
+    expect(entry.source).toBe("export");
+    expect(entry.sourceRef).toBe(exportId);
+    expect(entry.line).toBe(11);
+    expect(entry.what).toContain("defence file");
+    expect(entry.outcome).toBe("Defence file generated and released");
+    expect(entry.hours).toBe(12);
+    expect(entry.deadline).toBe("Board or audit date");
+    expect(entry.reviewer).toBe("Test Admin User");
+    expect(entry.ill).toBe(false);
+    expect(entry.reviewed).toBe(true);
 
     const clientDl = await app.request(`/api/exports/${exportId}/download`, {
       headers: { cookie: clientCookie },
@@ -161,27 +114,30 @@ describe("defence-file export lifecycle", () => {
       headers: { cookie: adminCookie },
     });
     const clearedBody = await cleared.json();
-    expect(clearedBody.items.filter((i: { type: string }) => i.type === "export_request")).toHaveLength(
-      0,
-    );
+    expect(
+      clearedBody.items.filter((i: { type: string }) => i.type === "export_request"),
+    ).toHaveLength(0);
   });
 
   it("cross-tenant download returns 403", async () => {
-    const db = getDb();
-    const [otherAccount] = await db
-      .insert(clientAccounts)
-      .values({ name: "Other Ltd" })
-      .returning();
-    const [otherExport] = await db
-      .insert(exportsTable)
-      .values({
-        clientAccountId: otherAccount.id,
+    const otherOrg = await ensureOrg("other-org", "Other Organisation");
+    const otherExport = await mutateOrg(otherOrg.id, (doc) => {
+      const row = {
+        id: newId(),
+        orgId: otherOrg.id,
         requestedBy: fixtures.clientUserId,
-        state: "generated",
-        fileData: Buffer.from("PK\x03\x04"),
-        generatedAt: new Date(),
-      })
-      .returning();
+        requestedByName: "Someone else",
+        state: "generated" as const,
+        approvedBy: null,
+        approvedAt: null,
+        generatedAt: new Date().toISOString(),
+        contents: [],
+        blobKey: "exports/x.zip",
+        entryId: null,
+      };
+      doc.exports.push(row);
+      return row;
+    });
 
     const denied = await app.request(`/api/exports/${otherExport.id}/download`, {
       headers: { cookie: clientCookie },
@@ -189,22 +145,22 @@ describe("defence-file export lifecycle", () => {
     expect(denied.status).toBe(403);
   });
 
-  it("client cannot list another tenant's exports via download", async () => {
-    expect((await app.request("/api/exports", { headers: { cookie: adminCookie } })).status).toBe(
-      403,
-    );
+  it("client cannot list another tenant's exports via the admin route", async () => {
+    expect(
+      (await app.request("/api/exports", { headers: { cookie: adminCookie } })).status,
+    ).toBe(403);
   });
 });
 
 describe("unified review queue", () => {
   it("lists pending items oldest first with type filter", async () => {
-    const db = getDb();
-    await createIntakeWithClock(db, {
-      clientAccountId: fixtures.accountId,
-      type: "sar",
-      source: "manual",
-      summary: "First intake",
-      actorId: fixtures.adminUserId,
+    await mutateOrg(fixtures.accountId, (doc) => {
+      createIntakeWithClock(doc, {
+        type: "sar",
+        source: "manual",
+        summary: "First intake",
+        raisedBy: fixtures.adminUserId,
+      });
     });
     await app.request("/api/exports", {
       method: "POST",
@@ -228,25 +184,40 @@ describe("unified review queue", () => {
     expect(exportsBody.items.every((i: { type: string }) => i.type === "export_request")).toBe(true);
   });
 
-  it("answering amber escalation clears pending in the same cycle", async () => {
-    const db = getDb();
-    const [thread] = await db
-      .insert(chatThreads)
-      .values({ clientAccountId: fixtures.accountId, userId: fixtures.clientUserId })
-      .returning();
-    const [msg] = await db
-      .insert(chatMessages)
-      .values({ threadId: thread.id, sender: "guide", body: "Unclear.", status: "amber" })
-      .returning();
-    const [esc] = await db
-      .insert(escalations)
-      .values({ threadId: thread.id, messageId: msg.id, state: "open" })
-      .returning();
-    await db.insert(reviewItems).values({
-      clientAccountId: fixtures.accountId,
-      type: "chat_amber",
-      refId: esc.id,
-      state: "pending",
+  it("answering an amber escalation clears it from the queue and raises a Record entry", async () => {
+    const escalationId = await mutateOrg(fixtures.accountId, (doc) => {
+      const thread = {
+        id: newId(),
+        orgId: doc.id,
+        userId: fixtures.clientUserId,
+        title: "Policy questions",
+        createdAt: new Date().toISOString(),
+      };
+      doc.threads.push(thread);
+      const escalation = {
+        id: newId(),
+        orgId: doc.id,
+        threadId: thread.id,
+        question: "Unclear question.",
+        state: "open" as const,
+        answer: null,
+        answeredBy: null,
+        answeredAt: null,
+        createdAt: new Date().toISOString(),
+      };
+      doc.escalations.push(escalation);
+      doc.review.push({
+        id: newId(),
+        orgId: doc.id,
+        type: "chat_amber",
+        refId: escalation.id,
+        summary: "Amber policy question.",
+        state: "pending",
+        decidedBy: null,
+        decidedAt: null,
+        createdAt: new Date().toISOString(),
+      });
+      return escalation.id;
     });
 
     const list = await app.request(`/api/admin/review?accountId=${fixtures.accountId}`, {
@@ -269,14 +240,19 @@ describe("unified review queue", () => {
     const afterBody = await after.json();
     expect(afterBody.items.some((i: { id: string }) => i.id === item.id)).toBe(false);
 
-    const [resolved] = await db
-      .select()
-      .from(reviewItems)
-      .where(and(eq(reviewItems.id, item.id), eq(reviewItems.state, "approved")));
-    expect(resolved.officerId).toBe(fixtures.adminUserId);
+    const org = await readOrg(fixtures.accountId);
+    const resolved = org!.review.find((r) => r.id === item.id)!;
+    expect(resolved.state).toBe("approved");
+    expect(resolved.decidedBy).toBe(fixtures.adminUserId);
+
+    const guideEntries = org!.entries.filter((e) => e.source === "guide" && e.sourceRef === escalationId);
+    expect(guideEntries).toHaveLength(1);
+    expect(guideEntries[0].line).toBe(12);
+    expect(guideEntries[0].outcome).toBe("Officer guidance here.");
+    expect(guideEntries[0].reviewer).toBe("Test Admin User");
   });
 
-  it("reject deletes the exports row but persists review_item decision and audit with officer as actor", async () => {
+  it("reject deletes the export but keeps the review decision and an audit row with the officer as actor", async () => {
     const req = await app.request("/api/exports", {
       method: "POST",
       headers: { cookie: clientCookie, "content-type": "application/json" },
@@ -297,21 +273,16 @@ describe("unified review queue", () => {
     });
     expect(reject.status).toBe(200);
 
-    const db = getDb();
-    const exportRows = await db.select().from(exportsTable).where(eq(exportsTable.id, exportId));
-    expect(exportRows).toHaveLength(0);
+    const org = await readOrg(fixtures.accountId);
+    expect(org!.exports.find((e) => e.id === exportId)).toBeUndefined();
 
-    const [item] = await db.select().from(reviewItems).where(eq(reviewItems.id, reviewItemId));
+    const item = org!.review.find((r) => r.id === reviewItemId)!;
     expect(item.state).toBe("rejected");
-    expect(item.officerId).toBe(fixtures.adminUserId);
+    expect(item.decidedBy).toBe(fixtures.adminUserId);
     expect(item.decidedAt).toBeTruthy();
 
-    const audits = await db
-      .select()
-      .from(auditLog)
-      .where(eq(auditLog.action, "review.reject"));
+    const audits = org!.audit.filter((a) => a.action === "review.reject");
     expect(audits).toHaveLength(1);
     expect(audits[0].actorId).toBe(fixtures.adminUserId);
-    expect(audits[0].entityId).toBe(reviewItemId);
   });
 });

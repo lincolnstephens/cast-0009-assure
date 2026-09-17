@@ -21,7 +21,7 @@ interface ThreadResponse {
 }
 
 const PLACEHOLDER =
-  "Ask anything about how we handle data — e.g. 'Can I share the tenant list with our letting agent?'";
+  "Ask anything about how we handle data - e.g. 'Can I share the tenant list with our letting agent?'";
 
 export function GuidePage() {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
@@ -46,7 +46,7 @@ export function GuidePage() {
     void loadThread();
   }, [loadThread]);
 
-  // Officer replies arrive out of band — poll quietly while the tab is open.
+  // Officer replies arrive out of band - poll quietly while the tab is open.
   useEffect(() => {
     const timer = setInterval(() => {
       if (document.visibilityState === "visible" && !sending) void loadThread();
@@ -93,7 +93,7 @@ export function GuidePage() {
       <div>
         <h1 className="text-lg font-semibold">Policy Guide</h1>
         <p className="mt-0.5 text-sm text-client-muted">
-          Plain-English answers from your approved policies — anything unclear goes straight
+          Plain-English answers from your approved policies - anything unclear goes straight
           to {officerName}.
         </p>
         <div className="mt-1.5 h-px w-12 bg-client-line" />
@@ -199,7 +199,7 @@ function MessageBubble({
         <div className="flex items-center gap-3">
           {isOfficer ? (
             <span className="text-[11px] font-semibold uppercase tracking-wider text-client-muted">
-              {officerName} — your compliance officer
+              {officerName} - your compliance officer
             </span>
           ) : (
             <span className="text-[11px] uppercase tracking-wider text-client-muted">

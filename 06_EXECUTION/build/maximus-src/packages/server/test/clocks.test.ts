@@ -15,6 +15,7 @@
  *
  * Both are flagged in this lane's final report as cross-lane dependencies.
  */
+import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -45,22 +46,8 @@ vi.mock("../src/lib/middleware.ts", () => ({
   },
 }));
 
-vi.mock("../src/lib/audit.ts", () => ({
-  writeAudit: async (orgId: string, user: FakeUser, action: string, detail: string) => {
-    const { mutateOrg, newId } = await import("../src/db/store.ts");
-    await mutateOrg(orgId, (doc) => {
-      doc.audit.push({
-        id: newId(),
-        orgId,
-        actorId: user.id,
-        actorName: user.displayName,
-        action,
-        detail,
-        createdAt: new Date().toISOString(),
-      });
-    });
-  },
-}));
+// The audit module writes straight to the organisation document, so the real
+// one is used here rather than a stand-in.
 
 import { ensureOrg, mutateOrg, readOrg, resetDriver } from "../src/db/store.ts";
 import { adminRoutes } from "../src/routes/adminClocks.ts";
@@ -88,7 +75,7 @@ beforeEach(async () => {
   process.env.SESSION_SECRET = process.env.SESSION_SECRET ?? "test-secret";
   resetDriver();
 
-  const doc = await ensureOrg("pemberton", "Pemberton Estates Ltd");
+  const doc = await ensureOrg(randomUUID(), "Pemberton Estates Ltd");
   orgId = doc.id;
   clientUser = {
     sessionId: "s-client",
@@ -122,7 +109,7 @@ function asUser(user: FakeUser, method: string, body?: unknown): RequestInit {
 
 /** Second tenant with its own clock, for cross-tenant isolation tests. */
 async function seedOtherTenantClock() {
-  const other = await ensureOrg("halloway", "Halloway Logistics Ltd");
+  const other = await ensureOrg(randomUUID(), "Halloway Logistics Ltd");
   const result = await mutateOrg(other.id, (doc) =>
     createIntakeWithClock(doc, {
       type: "sar",

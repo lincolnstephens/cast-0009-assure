@@ -58,7 +58,7 @@ export function AdminReviewQueuePage() {
     <div className="max-w-4xl">
       <h1 className="text-lg font-semibold">Review queue</h1>
       <p className="mt-0.5 text-[13px] text-hud-muted">
-        Pending items oldest first — amber escalations, export requests, alerts, and intakes.
+        Pending items oldest first - amber escalations, export requests, alerts, and intakes.
         Every decision is audited under your name.
       </p>
       <div className="mt-1.5 h-px w-12 bg-hud-gold/60" />
@@ -183,7 +183,7 @@ function AnswerForm({ itemId, onDone }: { itemId: string; onDone: () => Promise<
         onChange={(e) => setReply(e.target.value)}
         required
         rows={3}
-        placeholder="Your answer — posts into the client's chat thread."
+        placeholder="Your answer - posts into the client's chat thread."
         className="w-full rounded border border-hud-line bg-hud-bg px-3 py-2 text-[13px] outline-none placeholder:text-hud-muted/70 focus:border-hud-accent"
       />
       {error && (

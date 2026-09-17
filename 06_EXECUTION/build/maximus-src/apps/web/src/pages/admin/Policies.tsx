@@ -177,7 +177,7 @@ function PolicyDetailView({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">
-            {detail.code} — {detail.title}
+            {detail.code} - {detail.title}
           </h2>
           <p className="mt-0.5 text-[13px] text-hud-muted">
             Version {detail.version} ·{" "}

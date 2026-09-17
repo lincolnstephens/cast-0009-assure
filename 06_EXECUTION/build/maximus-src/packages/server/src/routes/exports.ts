@@ -1,107 +1,132 @@
-import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { getDb } from "../db/index.ts";
-import { exports as exportsTable, reviewItems } from "../db/schema.ts";
+import type { ExportRecord } from "../db/model.ts";
+import { listOrgIds, mutateOrg, newId, readExportBlob, readOrg } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
 
 export const exportRoutes = new Hono<AppEnv>();
 exportRoutes.use("*", requireAuth);
 
-async function findExportForUser(
-  db: ReturnType<typeof getDb>,
-  id: string,
-  user: { role: string; clientAccountId: string | null },
-) {
-  const [row] = await db.select().from(exportsTable).where(eq(exportsTable.id, id)).limit(1);
-  if (!row) return { row: null, forbidden: false };
-  if (user.role === "client" && row.clientAccountId !== user.clientAccountId) {
-    return { row: null, forbidden: true };
+/**
+ * Find an export by id without knowing its organisation up front. Exports
+ * live inside a per-org document (no global table any more), so this scans
+ * the small, beta-scale set of organisations — used only for the download
+ * route, which (like the original API) carries no organisation id.
+ */
+async function findExportAnywhere(id: string): Promise<{ orgId: string; row: ExportRecord } | null> {
+  for (const orgId of await listOrgIds()) {
+    const doc = await readOrg(orgId);
+    const row = doc?.exports.find((e) => e.id === id);
+    if (row) return { orgId, row };
   }
-  return { row, forbidden: false };
+  return null;
 }
 
 /** Client's export requests for their account. */
 exportRoutes.get("/", requireRole("client"), async (c) => {
-  const db = getDb();
   const user = c.get("user");
-  const rows = await db
-    .select()
-    .from(exportsTable)
-    .where(eq(exportsTable.clientAccountId, user.clientAccountId!))
-    .orderBy(exportsTable.createdAt);
+  if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
+  const doc = await readOrg(user.clientAccountId);
+  if (!doc) return c.json({ error: "No organisation" }, 404);
 
   return c.json({
-    exports: rows.map((r) => ({
+    exports: doc.exports.map((r) => ({
       id: r.id,
       state: r.state,
-      createdAt: r.createdAt.toISOString(),
-      generatedAt: r.generatedAt?.toISOString() ?? null,
+      generatedAt: r.generatedAt,
       downloadable: r.state === "generated",
     })),
   });
 });
 
-/** Request a defence-file export — creates review item for officer approval. */
+/** Request a defence-file export — creates a review item for officer approval. */
 exportRoutes.post("/", requireRole("client"), async (c) => {
-  const db = getDb();
   const user = c.get("user");
+  if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
+  const orgId = user.clientAccountId;
 
-  const [existing] = await db
-    .select({ id: exportsTable.id })
-    .from(exportsTable)
-    .where(
-      and(
-        eq(exportsTable.clientAccountId, user.clientAccountId!),
-        eq(exportsTable.state, "requested"),
-      ),
-    )
-    .limit(1);
-  if (existing) {
+  let conflict = false;
+  const created = await mutateOrg(orgId, (doc) => {
+    if (doc.exports.some((e) => e.state === "requested")) {
+      conflict = true;
+      return null;
+    }
+    const row: ExportRecord = {
+      id: newId(),
+      orgId,
+      requestedBy: user.id,
+      requestedByName: user.displayName,
+      state: "requested",
+      approvedBy: null,
+      approvedAt: null,
+      generatedAt: null,
+      contents: [],
+      blobKey: null,
+      entryId: null,
+    };
+    doc.exports.push(row);
+    doc.review.push({
+      id: newId(),
+      orgId,
+      type: "export_request",
+      refId: row.id,
+      summary: "Defence-file export requested.",
+      state: "pending",
+      decidedBy: null,
+      decidedAt: null,
+      createdAt: new Date().toISOString(),
+    });
+    return row;
+  });
+
+  if (conflict || !created) {
     return c.json({ error: "You already have an export awaiting approval." }, 409);
   }
 
-  const [row] = await db
-    .insert(exportsTable)
-    .values({
-      clientAccountId: user.clientAccountId!,
-      requestedBy: user.id,
-      state: "requested",
-    })
-    .returning();
-
-  await db.insert(reviewItems).values({
-    clientAccountId: user.clientAccountId!,
-    type: "export_request",
-    refId: row.id,
-    state: "pending",
-  });
-
-  await writeAudit(db, {
-    clientAccountId: user.clientAccountId!,
+  await writeAudit({
+    orgId,
     actorId: user.id,
+    actorName: user.displayName,
     action: "export.request",
-    entity: "export",
-    entityId: row.id,
-    detail: {},
+    detail: `exportId=${created.id}`,
   });
 
-  return c.json({ id: row.id }, 201);
+  return c.json({ id: created.id }, 201);
 });
 
-/** Download a generated defence file — tenant-scoped, authenticated only. */
+/** Download a generated defence file — tenant-scoped for clients, either role signed in. */
 exportRoutes.get("/:id/download", async (c) => {
-  const db = getDb();
   const user = c.get("user");
-  const { row, forbidden } = await findExportForUser(db, c.req.param("id"), user);
-  if (forbidden) return c.json({ error: "Forbidden" }, 403);
-  if (!row) return c.json({ error: "Not found" }, 404);
-  if (row.state !== "generated" || !row.fileData) {
-    return c.json({ error: "This export is not ready to download yet." }, 404);
+  const id = c.req.param("id");
+
+  let found: { orgId: string; row: ExportRecord } | null = null;
+  if (user.role === "client") {
+    if (user.clientAccountId) {
+      const doc = await readOrg(user.clientAccountId);
+      const row = doc?.exports.find((e) => e.id === id);
+      if (row) found = { orgId: user.clientAccountId, row };
+    }
+    if (!found) {
+      const elsewhere = await findExportAnywhere(id);
+      return c.json({ error: elsewhere ? "Forbidden" : "Not found" }, elsewhere ? 403 : 404);
+    }
+  } else {
+    found = await findExportAnywhere(id);
+    if (!found) return c.json({ error: "Not found" }, 404);
   }
 
+  const { row } = found;
+  if (row.state !== "generated" || !row.blobKey) {
+    return c.json({ error: "This export is not ready to download yet." }, 404);
+  }
+  const bytes = await readExportBlob(row.id);
+  if (!bytes) return c.json({ error: "This export is not ready to download yet." }, 404);
+
   const filename = `defence-file-${row.id.slice(0, 8)}.zip`;
-  return new Response(row.fileData, {
+  // Cast: @types/node's Uint8Array<ArrayBufferLike> is not structurally
+  // assignable to lib.dom's BodyInit even though this is exactly the byte
+  // buffer a Response body accepts at runtime.
+  return new Response(bytes as unknown as BodyInit, {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${filename}"`,

@@ -1,43 +1,39 @@
-import { eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { getDb } from "../db/index.ts";
-import { policies } from "../db/schema.ts";
-import { latestApprovedPolicies, sectionsFor } from "../lib/policies.ts";
+import { readOrg } from "../db/store.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { findPolicyAnywhere, latestApprovedPolicies, parsePolicyDocument } from "../lib/policies.ts";
 
 export const policyRoutes = new Hono<AppEnv>();
 policyRoutes.use("*", requireAuth, requireRole("client"));
 
 /** Latest approved version of each policy — the client's whole policy pack. */
 policyRoutes.get("/", async (c) => {
-  const db = getDb();
   const user = c.get("user");
-  const latest = await latestApprovedPolicies(db, user.clientAccountId!);
+  if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
+  const doc = await readOrg(user.clientAccountId);
+  if (!doc) return c.json({ error: "No organisation" }, 404);
+
+  const latest = latestApprovedPolicies(doc);
   return c.json({
     policies: latest.map((p) => ({
       id: p.id,
       code: p.code,
       title: p.title,
       version: p.version,
-      approvedAt: p.approvedAt?.toISOString() ?? null,
+      approvedAt: p.approvedAt,
     })),
   });
 });
 
 /** One approved policy with its sections (side-panel view). */
 policyRoutes.get("/:id", async (c) => {
-  const db = getDb();
   const user = c.get("user");
-
-  const [policy] = await db
-    .select()
-    .from(policies)
-    .where(eq(policies.id, c.req.param("id")))
-    .limit(1);
-  if (!policy) return c.json({ error: "Not found" }, 404);
-  if (policy.clientAccountId !== user.clientAccountId) {
+  const found = await findPolicyAnywhere(c.req.param("id"));
+  if (!found) return c.json({ error: "Not found" }, 404);
+  if (found.orgId !== user.clientAccountId) {
     return c.json({ error: "Forbidden" }, 403);
   }
+  const { policy } = found;
   // Drafts are invisible to clients. Superseded APPROVED versions stay
   // openable by id: chat citation chips must resolve to the version that
   // served the answer, even after a newer version is approved.
@@ -45,14 +41,14 @@ policyRoutes.get("/:id", async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  const sections = await sectionsFor(db, [policy.id]);
+  const { preamble, sections } = parsePolicyDocument(policy.id, policy.bodyMarkdown);
   return c.json({
     id: policy.id,
     code: policy.code,
     title: policy.title,
     version: policy.version,
-    bodyMarkdown: policy.bodyMarkdown,
-    approvedAt: policy.approvedAt?.toISOString() ?? null,
+    bodyMarkdown: preamble,
+    approvedAt: policy.approvedAt,
     sections: sections.map((s) => ({
       id: s.id,
       sectionRef: s.sectionRef,

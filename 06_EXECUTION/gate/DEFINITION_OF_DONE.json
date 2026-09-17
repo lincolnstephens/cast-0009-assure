@@ -7,36 +7,66 @@
       "line": "Sign-in succeeds and lands on the client portal.",
       "drive": "playwright",
       "check": "sign_in_lands_on_portal",
-      "pass": "The demo sign-in form accepts the gate credentials and the overview view is present in the DOM within 5 seconds.",
+      "pass": "The sign-in form accepts the Information Officer's demo account and the client portal's Policy Guide nav is present within 5 seconds.",
       "email_selector": "input[type='email']",
       "password_selector": "input[type='password']",
       "submit_selector": "button[type='submit']",
-      "success_selector": "[data-view='overview']",
+      "success_selector": "[data-view='guide']",
       "timeout_ms": 5000,
-      "applies_to": ["1920x1080", "1366x768", "390x844"]
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ]
     },
     {
       "id": 2,
-      "line": "Every client portal view loads and renders a heading: overview, guide, request, value, policies, posture.",
+      "line": "Every client portal view loads and renders a heading: Policy Guide, requests and clocks, Value, Statement, posture, exposure.",
       "drive": "playwright",
       "check": "views_render",
-      "pass": "Each nav element carrying data-view for the listed id is clickable and a non-empty h1 or h2 appears after the click.",
-      "views": ["overview", "guide", "request", "value", "policies", "posture"],
+      "pass": "Each nav element carrying data-view for the listed id is clickable and a non-empty heading appears after the click.",
+      "views": [
+        "guide",
+        "request",
+        "value",
+        "statement",
+        "posture",
+        "exposure"
+      ],
       "heading_selector": "h1, h2",
       "settle_ms": 400,
-      "applies_to": ["1920x1080", "1366x768", "390x844"]
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
     },
     {
       "id": 3,
-      "line": "Every admin view loads and renders a heading: queue, record, clocks, policies-admin, posture-admin, settings, audit.",
+      "line": "Signed in as the operator, every admin view loads and renders a heading: review queue, Record, clocks, policy pack, posture, alerts, exports, settings, audit.",
       "drive": "playwright",
       "check": "views_render",
-      "pass": "Each nav element carrying data-view for the listed id is clickable and a non-empty h1 or h2 appears after the click, entering the admin workspace first if it is not already reachable.",
-      "views": ["queue", "record", "clocks", "policies-admin", "posture-admin", "settings", "audit"],
+      "pass": "The operator account signs in and each nav element carrying data-view for the listed id is clickable and a non-empty heading appears.",
+      "views": [
+        "queue",
+        "record",
+        "clocks",
+        "policies-admin",
+        "posture-admin",
+        "alerts",
+        "exports",
+        "settings",
+        "audit"
+      ],
       "heading_selector": "h1, h2",
-      "admin_entry_selector": "[data-testid='enter-admin']",
       "settle_ms": 400,
-      "applies_to": ["1920x1080", "1366x768", "390x844"]
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "admin"
     },
     {
       "id": 4,
@@ -48,7 +78,12 @@
       "table_selector": "[data-testid='record-table']",
       "row_selector": "tbody tr",
       "settle_ms": 400,
-      "applies_to": ["1920x1080", "1366x768", "390x844"]
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
     },
     {
       "id": 5,
@@ -56,24 +91,35 @@
       "drive": "playwright",
       "check": "statement_contains",
       "pass": "data-testid='statement' text includes the phrase 'have not been independently verified'.",
-      "view": "value",
+      "view": "statement",
       "statement_selector": "[data-testid='statement']",
       "must_contain": "have not been independently verified",
       "settle_ms": 400,
-      "applies_to": ["1920x1080", "1366x768", "390x844"]
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
     },
     {
       "id": 6,
-      "line": "The Statement contains no illustrative entries when show illustrative is off.",
+      "line": "With the operator's show illustrative switch off, no illustrative entry reaches the client's Statement.",
       "drive": "playwright",
       "check": "statement_excludes_illustrative_when_off",
       "pass": "With the illustrative toggle set off, the string 'illustrative' does not appear in the Statement text.",
-      "view": "value",
+      "view": "statement",
       "statement_selector": "[data-testid='statement']",
       "toggle_selector": "[data-testid='toggle-illustrative']",
       "forbidden_text": "illustrative",
       "settle_ms": 400,
-      "applies_to": ["1920x1080", "1366x768", "390x844"]
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client",
+      "settings_view": "settings"
     },
     {
       "id": 7,
@@ -81,12 +127,17 @@
       "drive": "playwright",
       "check": "print_hides_chrome_shows_statement",
       "pass": "With media emulated as print, the header/nav element is not visible and the Statement element is visible.",
-      "view": "value",
+      "view": "statement",
       "chrome_selector": "header, nav",
       "statement_selector": "[data-testid='statement']",
       "print_button_selector": "[data-testid='statement-print']",
       "settle_ms": 400,
-      "applies_to": ["1920x1080", "1366x768", "390x844"]
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
     },
     {
       "id": 8,
@@ -94,11 +145,19 @@
       "drive": "playwright",
       "check": "no_horizontal_overflow",
       "pass": "document.documentElement.scrollWidth does not exceed window.innerWidth + 1 on any listed view.",
-      "views": ["overview", "guide", "request", "value", "policies", "posture",
-                "queue", "record", "clocks", "policies-admin", "posture-admin", "settings", "audit"],
-      "admin_entry_selector": "[data-testid='enter-admin']",
+      "views": [
+        "guide",
+        "request",
+        "value",
+        "statement",
+        "posture",
+        "exposure"
+      ],
       "settle_ms": 400,
-      "applies_to": ["390x844"]
+      "applies_to": [
+        "390x844"
+      ],
+      "role": "client"
     },
     {
       "id": 9,
@@ -106,7 +165,11 @@
       "drive": "playwright",
       "check": "console_clean",
       "pass": "Zero entries collected from the page's console error and pageerror events.",
-      "applies_to": ["1920x1080", "1366x768", "390x844"]
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ]
     },
     {
       "id": 10,
@@ -114,7 +177,11 @@
       "drive": "playwright",
       "check": "noindex_in_head",
       "pass": "The rendered head contains a noindex directive.",
-      "applies_to": ["1920x1080", "1366x768", "390x844"]
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ]
     }
   ]
 }

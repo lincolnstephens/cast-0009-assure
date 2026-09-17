@@ -4,29 +4,16 @@ import { mutateOrg, readOrg } from "../db/store.ts";
 import type { ClockEventRecord, ClockRecord } from "../db/model.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { clockStatus } from "../lib/deadlines.ts";
-import { clockReference, createIntakeWithClock, findClockGlobally } from "../lib/intakes.ts";
+import {
+  clockEventLabel,
+  clockReference,
+  createIntakeWithClock,
+  findClockGlobally,
+} from "../lib/intakes.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
 
 export const clockRoutes = new Hono<AppEnv>();
 clockRoutes.use("*", requireAuth, requireRole("client"));
-
-/** The two fixed notes `createIntakeWithClock` writes when a clock starts. */
-const STARTED_NOTES = new Set([
-  "Statutory one-month SAR clock started.",
-  "72-hour breach assessment clock started.",
-]);
-
-/**
- * The event's kind, derived rather than stored — the store's `ClockEventRecord`
- * carries only a note (db/model.ts), not an event-type column. The opening
- * note is one of two fixed strings this codebase alone writes; the closing
- * note is always exactly the clock's outcome. Anything else is a plain note.
- */
-function eventLabel(event: ClockEventRecord, clock: ClockRecord): string {
-  if (STARTED_NOTES.has(event.note)) return "started";
-  if (clock.closedAt && event.note === clock.outcome) return "closed";
-  return "note";
-}
 
 /** Newest-started first, mirroring the previous `orderBy(desc(startsAt))`. */
 function byStartedDesc(a: ClockRecord, b: ClockRecord): number {
@@ -101,7 +88,7 @@ clockRoutes.get("/:id", async (c) => {
       : clockStatus(new Date(found.clock.startedAt), new Date(found.clock.dueAt), new Date()),
     events: events.map((e) => ({
       id: e.id,
-      event: eventLabel(e, found.clock),
+      event: clockEventLabel(e, found.clock),
       note: e.note,
       createdAt: e.createdAt,
       // No per-event actor display-name lookup against the separate users
@@ -136,12 +123,13 @@ requestRoutes.post("/", async (c) => {
     }),
   );
 
-  await writeAudit(
-    user.clientAccountId,
-    user,
-    "intake.create",
-    `${parsed.data.type === "data_request" ? "SAR" : "Breach"} intake raised by the client (${result.intake.id}).`,
-  );
+  await writeAudit({
+    orgId: user.clientAccountId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "intake.create",
+    detail: `${parsed.data.type === "data_request" ? "SAR" : "Breach"} intake raised by the client (${result.intake.id}).`,
+  });
 
   return c.json(
     {

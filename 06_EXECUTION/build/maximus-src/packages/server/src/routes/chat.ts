@@ -1,15 +1,7 @@
 import { sendChatMessageSchema, type StoredCitation } from "@maximus/shared";
-import { and, eq, gte, sql } from "drizzle-orm";
 import { Hono } from "hono";
-import { getDb, type Db } from "../db/index.ts";
-import {
-  chatMessages,
-  chatThreads,
-  clientAccounts,
-  escalations,
-  reviewItems,
-  users,
-} from "../db/schema.ts";
+import type { ChatMessageRecord, ChatThreadRecord, EscalationRecord, OrgDoc } from "../db/model.ts";
+import { mutateOrg, newId, readUsers } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { buildCorpus } from "../lib/guide/corpus.ts";
 import { enforce, parseRawResult, type EnforcedReply } from "../lib/guide/enforce.ts";
@@ -28,24 +20,30 @@ chatRoutes.use("*", requireAuth, requireRole("client"));
 
 /** The user's thread (created on first visit) with full message history. */
 chatRoutes.get("/thread", async (c) => {
-  const db = getDb();
   const user = c.get("user");
-  const thread = await getOrCreateThread(db, user.id, user.clientAccountId!);
+  if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
+  const orgId = user.clientAccountId;
 
-  const messages = await db
-    .select()
-    .from(chatMessages)
-    .where(eq(chatMessages.threadId, thread.id))
-    .orderBy(chatMessages.createdAt);
-
-  const officerName = await officerDisplayName(db);
+  const officerName = await officerDisplayName();
+  const result = await mutateOrg(orgId, (doc) => {
+    const thread = getOrCreateThread(doc, user.id);
+    const messages = doc.messages
+      .filter((m) => m.threadId === thread.id)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+    return { threadId: thread.id, messages };
+  });
 
   return c.json({
-    threadId: thread.id,
+    threadId: result.threadId,
     officerName,
-    messages: messages.map(serialiseMessage),
+    messages: result.messages.map(serialiseMessage),
   });
 });
+
+type PostResult =
+  | { kind: "rate_limited" }
+  | { kind: "busy" }
+  | { kind: "ok"; userMessage: ChatMessageRecord; guideMessage: ChatMessageRecord; reply: EnforcedReply };
 
 /** One guide round-trip: user message in, enforced guide reply out. */
 chatRoutes.post("/messages", async (c) => {
@@ -54,198 +52,221 @@ chatRoutes.post("/messages", async (c) => {
     return c.json({ error: "Type a question first." }, 400);
   }
 
-  const db = getDb();
   const user = c.get("user");
-  const thread = await getOrCreateThread(db, user.id, user.clientAccountId!);
-
-  // Spec §8: 10 messages/min/user. Counted from the DB so it holds across
-  // stateless function instances.
-  const oneMinuteAgo = new Date(Date.now() - 60_000);
-  const [{ recent }] = await db
-    .select({ recent: sql<number>`count(*)::int` })
-    .from(chatMessages)
-    .where(
-      and(
-        eq(chatMessages.threadId, thread.id),
-        eq(chatMessages.sender, "client"),
-        gte(chatMessages.createdAt, oneMinuteAgo),
-      ),
-    );
-  if (recent >= RATE_LIMIT_PER_MINUTE) {
-    return c.json({ error: "That's a lot of questions at once — give me a minute, then ask again." }, 429);
-  }
-
+  if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
+  const orgId = user.clientAccountId;
   const question = parsed.data.body;
-  const corpus = await buildCorpus(db, user.clientAccountId!);
-  const officerName = await officerDisplayName(db);
+  const officerName = await officerDisplayName();
 
-  let reply: EnforcedReply;
-  if (corpus.length === 0) {
-    reply = { status: "amber", answer: EMPTY_CORPUS_COPY, citations: [] };
-  } else {
-    // Ask the model (or the deterministic stub when no key is configured),
-    // BEFORE writing the user message, so a busy model leaves no half-state.
-    try {
-      if (isLlmConfigured()) {
-        const { text } = await askLlm(thread.clientName, corpus, question);
-        reply = enforce(parseRawResult(text), corpus);
-      } else {
-        reply = enforce(askStub(corpus, question), corpus);
+  const result: PostResult = await mutateOrg(orgId, async (doc): Promise<PostResult> => {
+    const thread = getOrCreateThread(doc, user.id);
+
+    // Spec §8: 10 messages/min/user.
+    const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+    const recent = doc.messages.filter(
+      (m) => m.threadId === thread.id && m.sender === "user" && m.createdAt >= oneMinuteAgo,
+    ).length;
+    if (recent >= RATE_LIMIT_PER_MINUTE) return { kind: "rate_limited" };
+
+    const corpus = buildCorpus(doc);
+    let reply: EnforcedReply;
+    if (corpus.length === 0) {
+      reply = { status: "amber", answer: EMPTY_CORPUS_COPY, citations: [], intake: null };
+    } else {
+      // Ask the model (or the deterministic stub when no key is configured),
+      // BEFORE writing the user message, so a busy model leaves no half-state.
+      try {
+        if (isLlmConfigured()) {
+          const { text } = await askLlm(doc.branding.displayName || doc.name, corpus, question);
+          reply = enforce(parseRawResult(text), corpus);
+        } else {
+          reply = enforce(askStub(corpus, question), corpus);
+        }
+      } catch (err) {
+        if (err instanceof GuideBusyError) return { kind: "busy" };
+        throw err;
       }
-    } catch (err) {
-      if (err instanceof GuideBusyError) {
-        return c.json({ error: BUSY_COPY, retryable: true }, 503);
-      }
-      throw err;
     }
-  }
 
-  const [userMessage] = await db
-    .insert(chatMessages)
-    .values({ threadId: thread.id, sender: "client", body: question })
-    .returning();
+    const now = new Date().toISOString();
+    const userMessage: ChatMessageRecord = {
+      id: newId(),
+      threadId: thread.id,
+      sender: "user",
+      body: question,
+      citations: [],
+      escalated: false,
+      createdAt: now,
+    };
+    doc.messages.push(userMessage);
 
-  const guideBody = await applySideEffects(db, {
-    reply,
-    threadId: thread.id,
-    clientAccountId: user.clientAccountId!,
-    actorId: user.id,
-    officerName,
-  });
-
-  const [guideMessage] = await db
-    .insert(chatMessages)
-    .values({
+    const guideBody = applyReplyCopy(reply, officerName);
+    // A real escalation is raised only for amber with a real corpus (the
+    // empty-corpus amber has nothing to escalate to). ChatMessageRecord has
+    // no persisted "status" column, so the citations array also carries a
+    // status marker for amber/red replies (see encodeStatusCitations) — the
+    // only reliable way to recover green/amber/red on a later read.
+    const escalated = reply.status === "amber" && corpus.length > 0;
+    const guideMessage: ChatMessageRecord = {
+      id: newId(),
       threadId: thread.id,
       sender: "guide",
       body: guideBody,
-      status: reply.status,
-      citations: reply.citations,
-    })
-    .returning();
+      citations: encodeStatusCitations(reply),
+      escalated,
+      createdAt: now,
+    };
+    doc.messages.push(guideMessage);
 
-  // Amber: link the escalation to the guide message it flagged (not for empty corpus).
-  if (reply.status === "amber" && corpus.length > 0) {
-    await createEscalation(db, {
-      threadId: thread.id,
-      messageId: guideMessage.id,
-      clientAccountId: user.clientAccountId!,
-      actorId: user.id,
-    });
+    // Amber (with a real corpus): raise an escalation + review item.
+    if (escalated) {
+      createEscalation(doc, { threadId: thread.id, question });
+    }
+
+    // Red: same plumbing as "raise a request" — not a parallel path.
+    if (reply.status === "red" && reply.intake) {
+      createIntakeWithClock(doc, {
+        type: reply.intake.type,
+        source: "chat",
+        summary: reply.intake.summary,
+        raisedBy: user.id,
+      });
+    }
+
+    return { kind: "ok", userMessage, guideMessage, reply };
+  });
+
+  if (result.kind === "rate_limited") {
+    return c.json(
+      { error: "That's a lot of questions at once — give me a minute, then ask again." },
+      429,
+    );
+  }
+  if (result.kind === "busy") {
+    return c.json({ error: BUSY_COPY, retryable: true }, 503);
   }
 
-  await writeAudit(db, {
-    clientAccountId: user.clientAccountId!,
+  await writeAudit({
+    orgId,
     actorId: user.id,
+    actorName: user.displayName,
     action: "chat.message",
-    entity: "chat_message",
-    entityId: guideMessage.id,
-    detail: { status: reply.status, citations: reply.citations.length },
+    detail: `status=${result.reply.status} citations=${result.reply.citations.length}`,
   });
 
   return c.json({
-    messages: [serialiseMessage(userMessage), serialiseMessage(guideMessage)],
+    messages: [serialiseMessage(result.userMessage), serialiseMessage(result.guideMessage)],
   });
 });
 
-/** Amber/red side effects; returns the fixed copy to store as the reply body. */
-async function applySideEffects(
-  db: Db,
-  input: {
-    reply: EnforcedReply;
-    threadId: string;
-    clientAccountId: string;
-    actorId: string;
-    officerName: string;
-  },
-): Promise<string> {
-  const { reply, officerName } = input;
-
+/** The fixed copy stored as the guide reply body for amber/red states. */
+function applyReplyCopy(reply: EnforcedReply, officerName: string): string {
   if (reply.status === "red" && reply.intake) {
-    // Same plumbing as POST /api/requests (Phase 2) — not a parallel path.
-    await createIntakeWithClock(db, {
-      clientAccountId: input.clientAccountId,
-      type: reply.intake.type,
-      source: "chat",
-      summary: reply.intake.summary,
-      actorId: input.actorId,
-    });
     const noun = reply.intake.type === "sar" ? "data request" : "potential incident";
     return `What you've described is a formal ${noun}. I've started the statutory process and alerted ${officerName}.`;
   }
-
   if (reply.status === "amber") {
     if (reply.answer === EMPTY_CORPUS_COPY) return reply.answer;
     return `This needs a judgement call from your compliance officer. I've flagged it to ${officerName} — meanwhile, here's what's useful to gather: dates, names, and any documents or messages involved.`;
   }
-
   return reply.answer;
 }
 
-async function createEscalation(
-  db: Db,
-  input: { threadId: string; messageId: string; clientAccountId: string; actorId: string },
-) {
-  const [escalation] = await db
-    .insert(escalations)
-    .values({ threadId: input.threadId, messageId: input.messageId, state: "open" })
-    .returning();
+function createEscalation(doc: OrgDoc, input: { threadId: string; question: string }): EscalationRecord {
+  const now = new Date().toISOString();
+  const escalation: EscalationRecord = {
+    id: newId(),
+    orgId: doc.id,
+    threadId: input.threadId,
+    question: input.question,
+    state: "open",
+    answer: null,
+    answeredBy: null,
+    answeredAt: null,
+    createdAt: now,
+  };
+  doc.escalations.push(escalation);
 
-  await db.insert(reviewItems).values({
-    clientAccountId: input.clientAccountId,
+  doc.review.push({
+    id: newId(),
+    orgId: doc.id,
     type: "chat_amber",
     refId: escalation.id,
+    summary: `Amber policy question: "${trim(input.question, 140)}"`,
     state: "pending",
-  });
-
-  await writeAudit(db, {
-    clientAccountId: input.clientAccountId,
-    actorId: input.actorId,
-    action: "escalation.create",
-    entity: "escalation",
-    entityId: escalation.id,
-    detail: { threadId: input.threadId },
+    decidedBy: null,
+    decidedAt: null,
+    createdAt: now,
   });
 
   return escalation;
 }
 
-async function getOrCreateThread(db: Db, userId: string, clientAccountId: string) {
-  const [{ clientName }] = await db
-    .select({ clientName: clientAccounts.name })
-    .from(clientAccounts)
-    .where(eq(clientAccounts.id, clientAccountId));
-
-  const [existing] = await db
-    .select({ id: chatThreads.id })
-    .from(chatThreads)
-    .where(and(eq(chatThreads.userId, userId), eq(chatThreads.clientAccountId, clientAccountId)))
-    .limit(1);
-  if (existing) return { id: existing.id, clientName };
-
-  const [created] = await db
-    .insert(chatThreads)
-    .values({ userId, clientAccountId })
-    .returning({ id: chatThreads.id });
-  return { id: created.id, clientName };
+function getOrCreateThread(doc: OrgDoc, userId: string): ChatThreadRecord {
+  const existing = doc.threads.find((t) => t.userId === userId);
+  if (existing) return existing;
+  const created: ChatThreadRecord = {
+    id: newId(),
+    orgId: doc.id,
+    userId,
+    title: "Policy questions",
+    createdAt: new Date().toISOString(),
+  };
+  doc.threads.push(created);
+  return created;
 }
 
-async function officerDisplayName(db: Db): Promise<string> {
-  const [officer] = await db
-    .select({ displayName: users.displayName })
-    .from(users)
-    .where(eq(users.role, "mitmark_admin"))
-    .limit(1);
+async function officerDisplayName(): Promise<string> {
+  const usersDoc = await readUsers();
+  const officer = usersDoc.users.find((u) => u.role === "mitmark_admin");
   return officer?.displayName ?? "your compliance officer";
 }
 
-function serialiseMessage(m: typeof chatMessages.$inferSelect) {
+const STATUS_MARKER = "__status:";
+
+/**
+ * `ChatMessageRecord.citations` is a plain `string[]` (db/model.ts) — there
+ * is no separate stored status. Green messages store one JSON-encoded
+ * `StoredCitation` per citation; amber/red messages (which never carry a
+ * citation) store a single status marker instead, so a later read can still
+ * tell amber apart from red. See `decodeCitations` / `statusOf`.
+ */
+function encodeStatusCitations(reply: EnforcedReply): string[] {
+  if (reply.status === "green") return reply.citations.map((c) => JSON.stringify(c));
+  return [`${STATUS_MARKER}${reply.status}`];
+}
+
+function decodeCitations(raw: string[]): StoredCitation[] {
+  const out: StoredCitation[] = [];
+  for (const s of raw) {
+    if (s.startsWith(STATUS_MARKER)) continue;
+    try {
+      out.push(JSON.parse(s) as StoredCitation);
+    } catch {
+      // Ignore anything that doesn't decode — never surface a raw parse error.
+    }
+  }
+  return out;
+}
+
+function statusOf(m: ChatMessageRecord): "green" | "amber" | "red" | null {
+  if (m.sender !== "guide") return null;
+  const marker = m.citations.find((c) => c.startsWith(STATUS_MARKER));
+  if (marker) return marker.slice(STATUS_MARKER.length) as "amber" | "red";
+  return "green";
+}
+
+function trim(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+}
+
+function serialiseMessage(m: ChatMessageRecord) {
   return {
     id: m.id,
     sender: m.sender,
     body: m.body,
-    status: m.status,
-    citations: (m.citations ?? []) as StoredCitation[],
-    createdAt: m.createdAt.toISOString(),
+    status: statusOf(m),
+    citations: decodeCitations(m.citations),
+    createdAt: m.createdAt,
   };
 }

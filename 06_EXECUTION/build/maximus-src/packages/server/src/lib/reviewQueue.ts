@@ -13,7 +13,7 @@
 
 import type { ReviewItemType } from "@maximus/shared";
 import type { ChatMessageRecord } from "../db/model.ts";
-import { exportKey, mutateOrg, newId, readOrg, writeExportBlob } from "../db/store.ts";
+import { exportKey, listOrgIds, mutateOrg, newId, readOrg, writeExportBlob } from "../db/store.ts";
 import { writeAudit } from "./audit.ts";
 import { generateDefenceFile } from "./defenceFile.ts";
 import { latestApprovedPolicies } from "./policies.ts";
@@ -34,6 +34,29 @@ export interface PendingReviewItem {
   refId: string;
   summary: string;
   createdAt: string;
+}
+
+/**
+ * Find which organisation a review item (or, by their id, an escalation)
+ * belongs to. Review items and escalations live inside a per-org document
+ * (no global table any more), so a route that only carries the item's own id
+ * — as the original API contract does — scans the small, beta-scale set of
+ * organisations rather than requiring a new query parameter.
+ */
+export async function findReviewItemOrgId(reviewItemId: string): Promise<string | null> {
+  for (const orgId of await listOrgIds()) {
+    const doc = await readOrg(orgId);
+    if (doc?.review.some((r) => r.id === reviewItemId)) return orgId;
+  }
+  return null;
+}
+
+export async function findEscalationOrgId(escalationId: string): Promise<string | null> {
+  for (const orgId of await listOrgIds()) {
+    const doc = await readOrg(orgId);
+    if (doc?.escalations.some((e) => e.id === escalationId)) return orgId;
+  }
+  return null;
 }
 
 /** Pending items for an organisation, oldest first, optional type filter. */

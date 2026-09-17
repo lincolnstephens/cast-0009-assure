@@ -5,7 +5,7 @@ export const sendChatMessageSchema = z.object({
 });
 export type SendChatMessage = z.infer<typeof sendChatMessageSchema>;
 
-/** Raw JSON the LLM (or stub) must return — parsed defensively server-side. */
+/** Raw JSON the LLM (or stub) must return - parsed defensively server-side. */
 export const guideRawResultSchema = z.object({
   status: z.enum(["green", "amber", "red"]),
   answer: z.string(),

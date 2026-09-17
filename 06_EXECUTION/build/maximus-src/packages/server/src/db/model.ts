@@ -163,8 +163,13 @@ export interface PostureHistoryRecord {
 export interface ExposureAlertRecord {
   id: string;
   orgId: string;
-  title: string;
-  detail: string;
+  /** What kind of exposure it is, for example credential_exposure. */
+  kind: string;
+  severity: string;
+  /** One plain line. Never contains a data subject's personal data. */
+  summary: string;
+  /** Free text the operator adds when triaging. This is the product surface. */
+  officerNote: string | null;
   state: AlertState;
   /** Always true in this build. Exposure data is demo data and says so. */
   demo: boolean;

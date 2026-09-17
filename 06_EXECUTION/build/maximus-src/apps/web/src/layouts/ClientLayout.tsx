@@ -5,12 +5,15 @@ import { ClientLogo } from "../components/ClientLogo";
 import { ClientPoweredBy } from "../components/ClientPoweredBy";
 import { useAuth } from "../store/auth";
 
+// `view` is the identifier the gate drives the product by. The label is what
+// the Information Officer reads; the two are deliberately not the same string.
 const navItems = [
-  { to: "/", label: "Policy Guide", end: true },
-  { to: "/posture", label: "Posture" },
-  { to: "/clocks", label: "Clocks" },
-  { to: "/exposure", label: "Exposure" },
-  { to: "/value", label: "Value snapshot" },
+  { to: "/", label: "Policy Guide", view: "guide", end: true },
+  { to: "/clocks", label: "Requests and clocks", view: "request" },
+  { to: "/value", label: "Value", view: "value", end: true },
+  { to: "/value/statement", label: "Statement for the CFO", view: "statement" },
+  { to: "/posture", label: "Posture", view: "posture" },
+  { to: "/exposure", label: "Exposure", view: "exposure" },
 ];
 
 export function ClientLayout() {
@@ -43,6 +46,7 @@ export function ClientLayout() {
               key={item.to}
               to={item.to}
               end={item.end}
+              data-view={item.view}
               className={({ isActive }) =>
                 `block border-l-2 px-4 py-2.5 text-sm transition-colors sm:px-5 ${
                   isActive

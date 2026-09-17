@@ -59,7 +59,7 @@ export function ExposurePage() {
       <h1 className="text-lg font-semibold">Exposure</h1>
       <p className="mt-0.5 text-sm text-client-muted">
         Items your compliance officer has reviewed. Alerts marked as demo data are
-        simulations for training — not live monitoring.
+        simulations for training - not live monitoring.
       </p>
       <div className="mt-1.5 h-px w-12 bg-client-line" />
 

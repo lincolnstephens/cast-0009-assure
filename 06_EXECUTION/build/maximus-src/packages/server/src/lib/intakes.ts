@@ -11,6 +11,7 @@
 import { defaultHoursFor } from "@maximus/shared";
 import { listOrgIds, newId, readOrg } from "../db/store.ts";
 import type {
+  ClockEventRecord,
   ClockKind,
   ClockRecord,
   DeadlineLabel,
@@ -104,6 +105,25 @@ export function createIntakeWithClock(doc: OrgDoc, input: CreateIntakeInput): Cr
 /** Short human-readable reference, e.g. SAR-3F2A91B0. */
 export function clockReference(intakeType: string, intakeId: string): string {
   return `${intakeType.toUpperCase()}-${intakeId.slice(0, 8).toUpperCase()}`;
+}
+
+/** The two fixed notes `createIntakeWithClock` writes when a clock starts. */
+const STARTED_NOTES = new Set([
+  "Statutory one-month SAR clock started.",
+  "72-hour breach assessment clock started.",
+]);
+
+/**
+ * An event's kind, derived rather than stored — `ClockEventRecord` (db/model.ts)
+ * carries only a note, not an event-type column. The opening note is one of
+ * two fixed strings only this codebase writes; the closing note is always
+ * exactly the clock's outcome. Anything else is a plain note. Shared by the
+ * client and admin clock routes so the two timelines agree.
+ */
+export function clockEventLabel(event: ClockEventRecord, clock: ClockRecord): string {
+  if (STARTED_NOTES.has(event.note)) return "started";
+  if (clock.closedAt && event.note === clock.outcome) return "closed";
+  return "note";
 }
 
 export interface FoundClock {

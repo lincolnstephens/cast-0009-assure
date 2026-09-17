@@ -119,6 +119,13 @@ CONFIG = {
         "password_env": "ASSURE_GATE_PASSWORD",
         "email_default": "demo@demo.local",
         "password_default": "demo",
+        # The admin workspace is a different account, not a control inside the
+        # client portal. The Information Officer must never be able to reach
+        # the operator's side, so the gate signs in again to check it.
+        "admin_email_env": "ASSURE_GATE_ADMIN_EMAIL",
+        "admin_password_env": "ASSURE_GATE_ADMIN_PASSWORD",
+        "admin_email_default": "operator@demo.local",
+        "admin_password_default": "demo",
     },
 
     # The definition of done, as data. The driven section reads its numbered
@@ -360,13 +367,62 @@ def run_driven(cfg, target):
 
 # --- helpers shared by drivers -------------------------------------------
 
-def _enter_view(page, view_id, admin_entry_selector, settle_ms):
+def _credentials(cfg, role):
+    """The account the gate signs in as for a given side of the product."""
+    s = cfg["sign_in"]
+    if role == "admin":
+        return (
+            os.environ.get(s["admin_email_env"], s["admin_email_default"]),
+            os.environ.get(s["admin_password_env"], s["admin_password_default"]),
+        )
+    return (
+        os.environ.get(s["email_env"], s["email_default"]),
+        os.environ.get(s["password_env"], s["password_default"]),
+    )
+
+
+def _sign_in(page, cfg, role, target):
+    """Sign out if signed in, then sign in as the account for `role`."""
+    email, password = _credentials(cfg, role)
+    page.goto(target.rstrip("/") + "/login", wait_until="domcontentloaded")
+    page.wait_for_timeout(300)
+    if page.locator("input[type='email']").count() == 0:
+        # Already signed in as somebody; sign out and come back.
+        out = page.locator("button:has-text('Sign out'), button:has-text('Log out')")
+        if out.count() > 0:
+            out.first.click()
+            page.wait_for_timeout(600)
+        page.goto(target.rstrip("/") + "/login", wait_until="domcontentloaded")
+        page.wait_for_timeout(300)
+    if page.locator("input[type='email']").count() == 0:
+        return False
+    page.fill("input[type='email']", email)
+    page.fill("input[type='password']", password)
+    page.click("button[type='submit']")
+    page.wait_for_timeout(1200)
+    return True
+
+
+def _ensure_role(page, cfg, role, target):
+    """Make sure the signed-in account is the one that can see `role`'s views."""
+    if role is None:
+        return True
+    probe = "[data-view='queue']" if role == "admin" else "[data-view='guide']"
+    if page.locator(probe).count() > 0:
+        return True
+    return _sign_in(page, cfg, role, target)
+
+
+def _enter_view(page, view_id, admin_entry_selector, settle_ms, cfg=None, role=None):
     """Click the nav item carrying data-view=view_id. If it is not visible
     and an admin entry selector is given, try that first, since a React SPA
     commonly hides an inactive section with CSS rather than removing it from
     the DOM, so a count() check alone would miss it."""
     nav_sel = f"[data-view='{view_id}']"
-    if not page.locator(nav_sel).first.is_visible() and admin_entry_selector:
+    if cfg is not None and role is not None and page.locator(nav_sel).count() == 0:
+        _ensure_role(page, cfg, role, cfg["_target"])
+        page.wait_for_timeout(settle_ms)
+    if page.locator(nav_sel).count() > 0 and not page.locator(nav_sel).first.is_visible() and admin_entry_selector:
         entry = page.locator(admin_entry_selector)
         if entry.count() > 0 and entry.first.is_visible():
             entry.first.click()
@@ -408,10 +464,13 @@ def drv_views_render(page, cfg, line, res, errors):
     views = line.get("views", [])
     heading_sel = line.get("heading_selector", "h1, h2")
     admin_entry = line.get("admin_entry_selector")
+    role = line.get("role")
     settle_ms = line.get("settle_ms", 400)
+    if role and not _ensure_role(page, cfg, role, cfg["_target"]):
+        return False, f"could not sign in as the {role} account"
     failed = []
     for v in views:
-        if not _enter_view(page, v, admin_entry, settle_ms):
+        if not _enter_view(page, v, admin_entry, settle_ms, cfg, role):
             failed.append(f"{v}:nav-missing")
             continue
         heading = page.locator(heading_sel).first
@@ -426,7 +485,7 @@ def drv_views_render(page, cfg, line, res, errors):
 def drv_record_table_has_rows(page, cfg, line, res, errors):
     """Line 4: the Record table renders at least one row."""
     _enter_view(page, line.get("view", "value"), line.get("admin_entry_selector"),
-                line.get("settle_ms", 400))
+                line.get("settle_ms", 400), cfg, line.get("role"))
     table_sel = line.get("table_selector", "[data-testid='record-table']")
     row_sel = line.get("row_selector", "tbody tr")
     rows = page.locator(f"{table_sel} {row_sel}")
@@ -437,7 +496,7 @@ def drv_record_table_has_rows(page, cfg, line, res, errors):
 def drv_statement_contains(page, cfg, line, res, errors):
     """Line 5: the Statement contains the limitations paragraph."""
     _enter_view(page, line.get("view", "value"), line.get("admin_entry_selector"),
-                line.get("settle_ms", 400))
+                line.get("settle_ms", 400), cfg, line.get("role"))
     stmt_sel = line.get("statement_selector", "[data-testid='statement']")
     must = line.get("must_contain", "")
     loc = page.locator(stmt_sel)
@@ -449,24 +508,38 @@ def drv_statement_contains(page, cfg, line, res, errors):
 
 
 def drv_statement_excludes_illustrative_when_off(page, cfg, line, res, errors):
-    """Line 6: with show-illustrative off, the Statement carries no
-    illustrative entries."""
-    _enter_view(page, line.get("view", "value"), line.get("admin_entry_selector"),
-                line.get("settle_ms", 400))
-    toggle_sel = line.get("toggle_selector")
-    if toggle_sel:
-        toggle = page.locator(toggle_sel)
-        if toggle.count() > 0:
-            is_on = False
-            try:
-                is_on = toggle.first.is_checked()
-            except Exception:
-                state = toggle.first.get_attribute("aria-pressed")
-                data_state = toggle.first.get_attribute("data-state")
-                is_on = state == "true" or data_state == "on"
-            if is_on:
-                toggle.first.click()
-                page.wait_for_timeout(line.get("settle_ms", 400))
+    """Line 6: with show-illustrative off, nothing illustrative reaches the
+    client. The switch is the operator's, so this signs in as the operator to
+    turn it off, then signs back in as the Information Officer to read what she
+    would actually see."""
+    settle_ms = line.get("settle_ms", 400)
+    toggle_sel = line.get("toggle_selector", "[data-testid='toggle-illustrative']")
+
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator account"
+    if not _enter_view(page, line.get("settings_view", "settings"), None, settle_ms, cfg, "admin"):
+        return False, "the operator's settings view was not reachable"
+
+    toggle = page.locator(toggle_sel)
+    if toggle.count() == 0:
+        return False, f"{toggle_sel} not found in the operator's settings"
+    is_on = False
+    try:
+        is_on = toggle.first.is_checked()
+    except Exception:
+        is_on = (
+            toggle.first.get_attribute("aria-pressed") == "true"
+            or toggle.first.get_attribute("data-state") == "on"
+        )
+    if is_on:
+        toggle.first.click()
+        page.wait_for_timeout(settle_ms * 2)
+
+    if not _sign_in(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign back in as the Information Officer"
+    if not _enter_view(page, line.get("view", "statement"), None, settle_ms, cfg, "client"):
+        return False, "the client statement view was not reachable"
+
     stmt_sel = line.get("statement_selector", "[data-testid='statement']")
     loc = page.locator(stmt_sel)
     if loc.count() == 0:
@@ -474,14 +547,14 @@ def drv_statement_excludes_illustrative_when_off(page, cfg, line, res, errors):
     text = loc.first.inner_text()
     forbidden = line.get("forbidden_text", "illustrative")
     hit = forbidden.lower() in text.lower()
-    return not hit, f"'{forbidden}' present in statement with the toggle off: {hit}"
+    return not hit, f"'{forbidden}' in the client statement with the switch off: {hit}"
 
 
 def drv_print_hides_chrome_shows_statement(page, cfg, line, res, errors):
     """Line 7: under print media, the header and nav are hidden and the
     Statement is visible."""
     _enter_view(page, line.get("view", "value"), line.get("admin_entry_selector"),
-                line.get("settle_ms", 400))
+                line.get("settle_ms", 400), cfg, line.get("role"))
     chrome_sel = line.get("chrome_selector", "header, nav")
     stmt_sel = line.get("statement_selector", "[data-testid='statement']")
     try:

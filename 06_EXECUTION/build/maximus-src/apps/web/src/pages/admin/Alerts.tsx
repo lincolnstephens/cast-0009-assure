@@ -55,7 +55,7 @@ export function AdminAlertsPage() {
         <div>
           <h1 className="text-lg font-semibold">Alert triage</h1>
           <p className="mt-0.5 text-[13px] text-hud-muted">
-            Demo alerts only in beta — every item is synthetic and labelled for the client.
+            Demo alerts only in beta - every item is synthetic and labelled for the client.
           </p>
         </div>
         <button
@@ -254,7 +254,7 @@ function CreateDemoAlertModal({
           <DemoBadge />
         </div>
         <p className="mt-1 text-[12px] text-hud-muted">
-          Always marked as demo data — cannot be presented as live monitoring.
+          Always marked as demo data - cannot be presented as live monitoring.
         </p>
 
         <label className="mt-4 block text-[13px] text-hud-muted">Kind</label>

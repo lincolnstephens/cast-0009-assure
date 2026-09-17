@@ -137,9 +137,9 @@ export function AdminAuditPage() {
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2">{row.actorName ?? "—"}</td>
+                <td className="px-3 py-2">{row.actorName ?? " - "}</td>
                 <td className="max-w-xs truncate px-3 py-2 font-mono text-[11px] text-hud-muted">
-                  {row.detail ? JSON.stringify(row.detail) : "—"}
+                  {row.detail ? JSON.stringify(row.detail) : " - "}
                 </td>
               </tr>
             ))}

@@ -27,8 +27,10 @@ exposureRoutes.get("/", async (c) => {
     officerName: officer?.displayName ?? "your compliance officer",
     alerts: (doc?.alerts ?? []).slice().sort(byCreatedDesc).map((a) => ({
       id: a.id,
-      title: a.title,
-      detail: a.detail,
+      kind: a.kind,
+      severity: a.severity,
+      summary: a.summary,
+      officerNote: a.officerNote,
       state: a.state,
       isDemo: a.demo,
       createdAt: a.createdAt,

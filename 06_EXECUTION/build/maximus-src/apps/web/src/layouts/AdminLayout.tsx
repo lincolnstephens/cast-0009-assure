@@ -4,15 +4,19 @@ import { MitmarkLogo } from "../components/MitmarkLogo";
 import { useAdmin } from "../store/admin";
 import { useAuth } from "../store/auth";
 
+// `view` is the identifier the gate drives the product by. The label is what
+// the operator reads; the two are deliberately not the same string.
 const navItems = [
-  { to: "/admin", label: "Review queue", end: true },
-  { to: "/admin/clocks", label: "Intakes & clocks" },
-  { to: "/admin/policies", label: "Policy pack" },
-  { to: "/admin/posture", label: "Posture control" },
-  { to: "/admin/alerts", label: "Alert triage" },
-  { to: "/admin/exports", label: "Exports" },
-  { to: "/admin/audit", label: "Audit log" },
-  { to: "/admin/users", label: "Users" },
+  { to: "/admin", label: "Review queue", view: "queue", end: true },
+  { to: "/admin/record", label: "Record", view: "record" },
+  { to: "/admin/clocks", label: "Intakes and clocks", view: "clocks" },
+  { to: "/admin/policies", label: "Policy pack", view: "policies-admin" },
+  { to: "/admin/posture", label: "Posture control", view: "posture-admin" },
+  { to: "/admin/alerts", label: "Alert triage", view: "alerts" },
+  { to: "/admin/exports", label: "Exports", view: "exports" },
+  { to: "/admin/settings", label: "Settings", view: "settings" },
+  { to: "/admin/audit", label: "Audit log", view: "audit" },
+  { to: "/admin/users", label: "Users", view: "users" },
 ];
 
 export function AdminLayout() {
@@ -47,6 +51,7 @@ export function AdminLayout() {
               key={item.to}
               to={item.to}
               end={item.end}
+              data-view={item.view}
               className={({ isActive }) =>
                 `block border-l-2 px-4 py-1.5 text-[13px] transition-colors ${
                   isActive

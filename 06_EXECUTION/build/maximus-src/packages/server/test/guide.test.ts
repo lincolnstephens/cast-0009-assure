@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { policyPack } from "../scripts/policyPack";
-import type { CorpusSection } from "../src/lib/guide/corpus";
-import { enforce, parseRawResult } from "../src/lib/guide/enforce";
-import { askStub } from "../src/lib/guide/stub";
+import { policyPack } from "../scripts/policyPack.ts";
+import type { CorpusSection } from "../src/lib/guide/corpus.ts";
+import { enforce, parseRawResult } from "../src/lib/guide/enforce.ts";
+import { askStub } from "../src/lib/guide/stub.ts";
 
 /** The real seeded corpus, flattened (ids/versions faked — not under test). */
 const corpus: CorpusSection[] = policyPack.flatMap((p, pi) =>

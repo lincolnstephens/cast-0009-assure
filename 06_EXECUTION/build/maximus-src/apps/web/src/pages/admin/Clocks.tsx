@@ -111,7 +111,7 @@ export function AdminClocksPage() {
                 <span className="w-32 text-hud-muted">{clock.reference}</span>
                 <span className="text-hud-muted">due {formatLondon(clock.dueAt)}</span>
                 {clock.closedAt ? (
-                  <span className="text-hud-muted">closed — {clock.outcome}</span>
+                  <span className="text-hud-muted">closed - {clock.outcome}</span>
                 ) : (
                   <>
                     <span className="tabular-nums font-semibold">
@@ -218,8 +218,8 @@ function ClockTimeline({
         {events.map((event) => (
           <li key={event.id} className="border-l-2 border-hud-accent/60 pl-3 text-[13px]">
             <span className="text-hud-muted">
-              {event.event} — {formatLondon(event.createdAt)}
-              {event.actorName ? ` — ${event.actorName}` : ""}
+              {event.event} - {formatLondon(event.createdAt)}
+              {event.actorName ? ` - ${event.actorName}` : ""}
             </span>
             {event.note && <p>{event.note}</p>}
           </li>

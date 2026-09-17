@@ -1,10 +1,11 @@
 import { addClockEventSchema, closeClockSchema, manualIntakeSchema } from "@maximus/shared";
 import { Hono } from "hono";
 import { listOrgIds, mutateOrg, newId, readOrg } from "../db/store.ts";
-import type { ClockEventRecord, ClockRecord } from "../db/model.ts";
+import type { ClockEventRecord } from "../db/model.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { clockStatus } from "../lib/deadlines.ts";
 import {
+  clockEventLabel,
   clockReference,
   createIntakeWithClock,
   findClockGlobally,
@@ -75,25 +76,13 @@ adminRoutes.get("/clocks/:id/events", async (c) => {
   return c.json({
     events: events.map((e) => ({
       id: e.id,
-      event: eventLabel(e, found.clock),
+      event: clockEventLabel(e, found.clock),
       note: e.note,
       createdAt: e.createdAt,
       actorName: null,
     })),
   });
 });
-
-const STARTED_NOTES = new Set([
-  "Statutory one-month SAR clock started.",
-  "72-hour breach assessment clock started.",
-]);
-
-/** See routes/clocks.ts for why this is derived rather than a stored column. */
-function eventLabel(event: ClockEventRecord, clock: ClockRecord): string {
-  if (STARTED_NOTES.has(event.note)) return "started";
-  if (clock.closedAt && event.note === clock.outcome) return "closed";
-  return "note";
-}
 
 /** Add a note/event to a clock. */
 adminRoutes.post("/clocks/:id/events", async (c) => {
@@ -120,7 +109,13 @@ adminRoutes.post("/clocks/:id/events", async (c) => {
   });
   if (!eventId) return c.json({ error: "Not found" }, 404);
 
-  await writeAudit(orgId, user, "clock.event_add", `Note added to clock ${found.clock.id}.`);
+  await writeAudit({
+    orgId: orgId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "clock.event_add",
+    detail: `Note added to clock ${found.clock.id}.`,
+  });
 
   return c.json({ ok: true }, 201);
 });
@@ -168,12 +163,13 @@ adminRoutes.post("/clocks/:id/close", async (c) => {
     parsed.data.insideStatute === undefined
       ? ""
       : ` Inside statute: ${parsed.data.insideStatute ? "yes" : "no"}.`;
-  await writeAudit(
-    orgId,
-    user,
-    "clock.close",
-    `Clock ${found.clock.id} closed: ${parsed.data.outcome}${insideStatuteDetail} Record entry ${entry.id} created (service line ${entry.line}).`,
-  );
+  await writeAudit({
+    orgId: orgId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "clock.close",
+    detail: `Clock ${found.clock.id} closed: ${parsed.data.outcome}${insideStatuteDetail} Record entry ${entry.id} created (service line ${entry.line}).`,
+  });
 
   return c.json({ ok: true });
 });
@@ -196,12 +192,13 @@ adminRoutes.post("/intakes", async (c) => {
     }),
   );
 
-  await writeAudit(
-    orgId,
-    user,
-    "intake.create",
-    `${parsed.data.type === "sar" ? "SAR" : "Breach"} intake created manually by the officer (${result.intake.id}).`,
-  );
+  await writeAudit({
+    orgId: orgId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "intake.create",
+    detail: `${parsed.data.type === "sar" ? "SAR" : "Breach"} intake created manually by the officer (${result.intake.id}).`,
+  });
 
   return c.json(
     {
