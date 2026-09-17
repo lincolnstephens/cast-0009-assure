@@ -8,6 +8,8 @@ export * from "./exports.ts";
 export * from "./policies.ts";
 export * from "./posture.ts";
 export * from "./record.ts";
+export * from "./tracker.ts";
+export * from "./library.ts";
 export * from "./spend.ts";
 export * from "./lines.ts";
 export * from "./requests.ts";

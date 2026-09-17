@@ -8,7 +8,8 @@ import { useAuth } from "../store/auth";
 // `view` is the identifier the gate drives the product by. The label is what
 // the Information Officer reads; the two are deliberately not the same string.
 const navItems = [
-  { to: "/", label: "Policy Guide", view: "guide", end: true },
+  { to: "/", label: "Compliance Tracker", view: "tracker", end: true },
+  { to: "/guide", label: "Policy Guide", view: "guide" },
   { to: "/clocks", label: "Requests and clocks", view: "request" },
   { to: "/value", label: "Value", view: "value", end: true },
   { to: "/value/statement", label: "Statement for the CFO", view: "statement" },

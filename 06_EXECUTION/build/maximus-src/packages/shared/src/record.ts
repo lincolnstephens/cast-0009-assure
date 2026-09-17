@@ -76,6 +76,18 @@ export const orgSettingsSchema = z.object({
   lead: z.string().max(200),
   showIllustrative: z.boolean(),
   lineStatus: z.record(z.string(), lineStatusSchema),
+
+  // --- Compliance Tracker -------------------------------------------------
+  jurisdiction: z.enum(["UK", "CH-MC", "DIFC", "SG", "US"]).default("UK"),
+  /** Null means not recorded, and the training tile says so rather than guessing. */
+  staffInScope: z.coerce.number().int().min(0).max(100000).nullable().default(null),
+  staffTrained: z.coerce.number().int().min(0).max(100000).nullable().default(null),
+  clientRoles: z.array(z.string().trim().min(1).max(120)).default([]),
+  workplanTargetDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .default(null),
 });
 export type OrgSettings = z.infer<typeof orgSettingsSchema>;
 
@@ -141,6 +153,19 @@ export const statementResponseSchema = z.object({
   generated: z.string(),
   /** True when the statement contains illustrative entries and says so. */
   illustrative: z.boolean(),
+  /**
+   * Obligations met in the period, taken from the Compliance Tracker, so the
+   * statement opens with where the client stands and not only with what
+   * MITMARK did. Null when no obligation has fallen due yet.
+   */
+  obligations: z
+    .object({
+      n: z.number().int(),
+      m: z.number().int(),
+      sentence: z.string(),
+      basis: z.string(),
+    })
+    .nullable(),
 });
 export type StatementResponse = z.infer<typeof statementResponseSchema>;
 

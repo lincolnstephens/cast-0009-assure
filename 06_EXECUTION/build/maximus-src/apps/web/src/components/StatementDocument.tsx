@@ -34,6 +34,14 @@ export function StatementDocument({ data }: { data: StatementResponse }) {
       </div>
 
       <h3 className="text-[15px] font-semibold">What was done</h3>
+      {data.obligations ? (
+        <p className="mb-2 max-w-[58ch] font-medium" data-testid="statement-obligations">
+          {data.obligations.sentence}
+          <span className="mt-1 block text-[12px] font-normal text-client-muted">
+            {data.obligations.basis}
+          </span>
+        </p>
+      ) : null}
       <p className="max-w-[58ch]">
         In {data.period} MITMARK completed {totals.items} items of work under the retainer across{" "}
         {totals.byLine.length} of the twelve service lines. {totals.deadlinesMet} of them carried a

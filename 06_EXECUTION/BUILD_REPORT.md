@@ -1,8 +1,8 @@
 ---
 document: BUILD_REPORT
 job: CAST-0009 ASSURE
-version: v1.0
-status: BUILD COMPLETE, DEPLOYED, GATE PASSED
+version: v1.1
+status: v1.1 BUILD COMPLETE, DEPLOYED, GATE PASSED
 authority: Seagull, executed by the build session under T02 A6
 ---
 
@@ -119,3 +119,77 @@ The team-level key that reaches this site is rejected by the Anthropic API with 
 The deterministic fallback is not a placeholder: on the three example questions it answers the letting-agent question green with a citation from the approved Data Protection Policy, escalates the CCTV retention question to the officer as amber, and opens the statutory process for the former-employee request as red. The model would answer the amber one rather than escalate it.
 
 After that, in order: change the two demo passwords; and put Block 1 of `ASSURE_LIVE_REQUIREMENTS.md` in front of the contract lead, because the record is only illustrative until he fills it.
+
+---
+
+# v1.1, the Compliance Tracker
+
+**Live:** https://tessera-assure.netlify.app
+**Production deploy:** `6aabf6eacfee0a56643c6915`, 2026-09-17
+**Gate:** PASS, 58 of 58, against the production URL
+**Spend:** £0
+**Built under:** `06_EXECUTION/FRAGO_01_TRACKER.md`
+
+## What v1.1 adds
+
+The client's front page is now the **Compliance Tracker**, which answers six questions about every task: what do I need to do, how, who, by when, is it done, and if not what is the status. Those six are the columns of every task table, on both sides of the product, and they are not renamed anywhere.
+
+Top to bottom, her page carries the header (display name, jurisdiction, regulation, and when MITMARK last touched the workplan); the overall status as a fraction with its percentage and its basis; the five-phase journey strip with the current phase marked; six measures, each with its basis or a stated "No data yet"; the eight areas as tiles with RAG, owner, next due date and progress; and a "for you" panel of the tasks assigned to a client role.
+
+Beneath it sit **eight area pages**, each with the obligation in plain English, the citation at the foot, the area's status and basis, the task table, "How we do it" (the approved policy and the procedure, or a card saying MITMARK has yet to publish one), a link to the Policy Guide, and the history with reviewers.
+
+The operator gains **Workplan** (every field of every task, filters, the add and edit form, and apply-library) and **Procedures** (one card per area). Settings gains jurisdiction, staff in scope, staff trained, the client role list and the workplan target date.
+
+## The rule the whole version turns on
+
+The workplan is MITMARK's workplan for the client. The operator owns it.
+
+A task assigned to a client role shows her a **Confirm** button and nothing else. Confirming is not a status change: it creates an item in the operator's review queue, and the operator accepts it (which closes the task and books the Record entry) or reopens it (which clears the claim). She cannot create, edit, reorder, close or reprioritise anything, anywhere.
+
+This is what keeps A7 intact while still giving Rich the tracker he asked for. Permissions were built that way first and the interface followed. The gate checks it as a stop condition: line 15 looks for the **absence** of every edit, delete, reopen, reprioritise and status control on the tracker and all eight area pages.
+
+## The denominator, and why it is stated the way it is
+
+The overall figure reads, for example, "6 of 15 obligations met, 40%, as at 17 September 2026".
+
+The denominator is every task due on or before today, plus every always-on duty, which is due continuously. Tasks marked not applicable drop out entirely. A task due next month is not counted, because it is not yet an obligation anyone has failed to meet.
+
+**The fraction always travels with the percentage.** A bare percentage hides whether it rests on two obligations or two hundred, and a figure like that is exactly the claim A7 refuses. The rule is in the arithmetic, tested from every side, and checked on the rendered page by the gate.
+
+One consequence worth Sunray's eye: an always-on duty reads as unmet until the operator closes it for the cycle, so a freshly applied workplan opens low. That is what the order specifies. Whether "being kept up" should count as met is the smallest next decision below.
+
+## The task library
+
+28 obligations across the eight areas, drawn from UK GDPR and the Data Protection Act 2018, expanded into 54 dated instances for the twelve months from 2026-09-01. Monthly becomes twelve, quarterly four, always-on stays one undated duty.
+
+**Re-applying is additive only.** Identity is the library task plus its due date, so a re-apply adds what is missing and never touches an edit. Tested both ways.
+
+It is **Seagull's draft and marked DRAFT**. Lurong authenticates the wording, the owners and the cadence.
+
+## What the gate caught that reading the code did not
+
+1. **The gate itself was confirming tasks.** Its area-tile selector was a comma-separated list, which CSS reads as three selectors, not one scoped selector, so it matched every button on the page and clicked the client's Confirm buttons while walking "tiles" by index. Nine false confirmations were left in the demo. The selector is now the tile's own test id, the nine were reopened through the operator's review queue, and a re-run was checked to leave the demo untouched. A test harness that mutates the product it is testing is worse than no harness, and this one did.
+2. **The operator had no answer to a client confirmation.** The item was created and nothing could be done with it. Accept and reopen are now wired, and accepting books the Record entry by the same path as closing the task.
+3. **A closed task showed "Invalid Date".** The date helper took a plain date; a closing time is a timestamp.
+
+## What was deferred, and why
+
+- **Procedures are unpublished** for all eight areas, so every area page shows the "to be published" card. Publishing them is MITMARK's content work, not a build step.
+- **Areas 2, 5 and 7 have no matching approved policy** in the six-policy pack, so their "How we do it" shows the procedure card alone rather than pointing at a policy that does not exist.
+- **Two measures read "No data yet"** because no statutory clock has closed on the demo this year. They fill as clocks close.
+- **Jurisdiction** accepts five values; only the United Kingdom has a library and obligation text. The others are named so the field is honest about what it does not yet cover.
+- **The Anthropic key** is still rejected with 401, so the Policy Guide answers from its deterministic fallback. Unchanged from v1.0.
+
+## The demo organisation
+
+54 tasks applied from 2026-09-01. Six always-on duties MITMARK genuinely maintains are closed, and the six Record entries those closures created are **marked illustrative**, as the fifteen seeded entries already are. A demo showing nothing done would misrepresent a working service as badly as one showing work that never happened; marking the generated entries keeps every fabricated figure flagged.
+
+Ten tasks wait on the client, so the "for you" panel and the confirm path can both be driven.
+
+## The smallest next decision for Sunray
+
+**Should an always-on duty that is being kept up read as met, or only when the operator closes it for the cycle?**
+
+As specified in FRAGO 01 section 4.2 it is the latter, which is what is built. The effect is that a client who is entirely up to date still opens on a low figure until the operator has been round the always-on duties and closed each one for the period. If Rich wants the front page to reflect "nothing is overdue" rather than "nothing has been signed off this cycle", that is a one-line change to the denominator and a different sentence beneath it. It is his call, not the build's.
+
+After that, in order: Lurong authenticates the task library; MITMARK publishes the first procedures; and the Anthropic key is replaced.

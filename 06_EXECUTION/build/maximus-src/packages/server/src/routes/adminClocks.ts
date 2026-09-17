@@ -120,9 +120,18 @@ adminRoutes.post("/clocks/:id/events", async (c) => {
   return c.json({ ok: true }, 201);
 });
 
-/** Close a clock with an outcome; SARs must record whether inside statute. */
+/**
+ * Close a clock with an outcome. SARs must record whether inside statute
+ * (validated by `closeClockSchema`) - it feeds the "data requests on time"
+ * KPI tile. A reported concern may also record whether the ICO was
+ * notified, feeding the breach KPI tile; `closeClockSchema` does not carry
+ * this field (it belongs to the tracker work, not the request-lifecycle
+ * schema this route otherwise leaves alone), so it is read directly off the
+ * request body alongside the validated fields.
+ */
 adminRoutes.post("/clocks/:id/close", async (c) => {
-  const parsed = closeClockSchema.safeParse(await c.req.json().catch(() => null));
+  const raw = await c.req.json().catch(() => null);
+  const parsed = closeClockSchema.safeParse(raw);
   if (!parsed.success) return c.json({ error: "Enter an outcome." }, 400);
 
   const user = c.get("user");
@@ -133,6 +142,10 @@ adminRoutes.post("/clocks/:id/close", async (c) => {
     return c.json({ error: "Closing a SAR must record whether it was inside statute." }, 400);
   }
 
+  const icoNotifiedRaw =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>).icoNotified : undefined;
+  const icoNotified = typeof icoNotifiedRaw === "boolean" ? icoNotifiedRaw : null;
+
   const orgId = found.doc.id;
   const closedAt = new Date();
   const entry = await mutateOrg(orgId, (doc) => {
@@ -141,6 +154,12 @@ adminRoutes.post("/clocks/:id/close", async (c) => {
     clock.closedAt = closedAt.toISOString();
     clock.closedBy = user.id;
     clock.outcome = parsed.data.outcome;
+    if (clock.kind === "sar_1_month") {
+      clock.insideStatute = parsed.data.insideStatute ?? null;
+    }
+    if (clock.kind === "breach_72h") {
+      clock.icoNotified = icoNotified;
+    }
     doc.clockEvents.push({
       id: newId(),
       clockId: clock.id,
@@ -163,12 +182,16 @@ adminRoutes.post("/clocks/:id/close", async (c) => {
     parsed.data.insideStatute === undefined
       ? ""
       : ` Inside statute: ${parsed.data.insideStatute ? "yes" : "no"}.`;
+  const icoNotifiedDetail =
+    found.clock.kind === "breach_72h" && icoNotified !== null
+      ? ` ICO notified: ${icoNotified ? "yes" : "no"}.`
+      : "";
   await writeAudit({
     orgId: orgId,
     actorId: user.id,
     actorName: user.displayName,
     action: "clock.close",
-    detail: `Clock ${found.clock.id} closed: ${parsed.data.outcome}${insideStatuteDetail} Record entry ${entry.id} created (service line ${entry.line}).`,
+    detail: `Clock ${found.clock.id} closed: ${parsed.data.outcome}${insideStatuteDetail}${icoNotifiedDetail} Record entry ${entry.id} created (service line ${entry.line}).`,
   });
 
   return c.json({ ok: true });

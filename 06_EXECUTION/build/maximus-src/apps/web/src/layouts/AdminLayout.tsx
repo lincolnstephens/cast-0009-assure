@@ -8,8 +8,10 @@ import { useAuth } from "../store/auth";
 // the operator reads; the two are deliberately not the same string.
 const navItems = [
   { to: "/admin", label: "Review queue", view: "queue", end: true },
+  { to: "/admin/workplan", label: "Workplan", view: "workplan" },
   { to: "/admin/record", label: "Record", view: "record" },
   { to: "/admin/clocks", label: "Intakes and clocks", view: "clocks" },
+  { to: "/admin/procedures", label: "Procedures", view: "procedures" },
   { to: "/admin/policies", label: "Policy pack", view: "policies-admin" },
   { to: "/admin/posture", label: "Posture control", view: "posture-admin" },
   { to: "/admin/alerts", label: "Alert triage", view: "alerts" },

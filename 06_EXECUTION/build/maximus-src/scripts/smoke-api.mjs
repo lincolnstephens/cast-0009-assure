@@ -220,6 +220,172 @@ check(
   intakeItem ? String(intakeItem.context.intakeType) : "no intake item",
 );
 
+// --- the Compliance Tracker -------------------------------------------------
+await signIn("operator@demo.local", "demo");
+// The seed already applies the library, so a fresh organisation opens on a
+// working tracker. Applying it again must therefore be purely additive.
+const seeded = await call("GET", "/admin/workplan?org=demo");
+check(
+  "the seeded organisation already has a workplan",
+  (seeded.body?.tasks ?? []).length > 0,
+  `${seeded.body?.tasks?.length} tasks`,
+);
+
+const applied = await call("POST", "/admin/workplan/apply-library?org=demo", {
+  startDate: "2026-09-01",
+});
+check("the library applies to an organisation", applied.status === 200, `status ${applied.status}`);
+check(
+  "re-applying adds nothing and overwrites nothing",
+  (applied.body?.created ?? -1) === 0 && (applied.body?.skipped ?? 0) > 0,
+  `created ${applied.body?.created}, skipped ${applied.body?.skipped}`,
+);
+
+const fresh = await call("POST", "/admin/workplan/apply-library?org=demo", {
+  startDate: "2027-01-04",
+});
+check(
+  "applying from a later date adds that cycle's tasks",
+  (fresh.body?.created ?? 0) > 0,
+  `${fresh.body?.created} created`,
+);
+
+await signIn("demo@demo.local", "demo");
+const home = await call("GET", "/tracker/home");
+check("the tracker home responds", home.status === 200, `status ${home.status}`);
+check("the home is no longer empty", home.body?.empty === false, String(home.body?.empty));
+check("eight areas are returned", (home.body?.areas ?? []).length === 8, `${home.body?.areas?.length}`);
+check("five phases are returned", (home.body?.phases ?? []).length === 5, `${home.body?.phases?.length}`);
+check("six measures are returned", (home.body?.kpis ?? []).length === 6, `${home.body?.kpis?.length}`);
+check(
+  "every measure states its basis",
+  (home.body?.kpis ?? []).every((k) => typeof k.basis === "string" && k.basis.length > 10),
+  "",
+);
+check(
+  "the overall figure never shows a percentage without its fraction",
+  !/\d+%/.test(home.body?.overall?.sentence ?? "") ||
+    /\d+ of \d+/.test(home.body?.overall?.sentence ?? ""),
+  home.body?.overall?.sentence ?? "",
+);
+check(
+  "the denominator counts only what has fallen due",
+  typeof home.body?.overall?.m === "number" && home.body.overall.m >= 0,
+  `${home.body?.overall?.n} of ${home.body?.overall?.m}`,
+);
+check(
+  "tasks are waiting for the client",
+  (home.body?.forYou ?? []).length > 0,
+  `${home.body?.forYou?.length} for you`,
+);
+
+const areaPage = await call("GET", "/tracker/areas/6");
+check("an area page responds", areaPage.status === 200, `status ${areaPage.status}`);
+check(
+  "the area states the obligation in plain words with the citation at the foot",
+  (areaPage.body?.obligation ?? "").length > 80 && (areaPage.body?.citation ?? "").length > 5,
+  "",
+);
+check(
+  "the obligation body carries no citation",
+  !/Article\s*\d/i.test(areaPage.body?.obligation ?? ""),
+  "",
+);
+check("the area lists its tasks", (areaPage.body?.tasks ?? []).length > 0, `${areaPage.body?.tasks?.length}`);
+
+// The client may confirm a task of their own, and nothing else.
+const mine = (home.body?.forYou ?? [])[0];
+const confirmed = await call("POST", `/tracker/tasks/${mine.id}/confirm`, {
+  note: "Done on our side.",
+  evidence: "",
+});
+check("the client can confirm a task assigned to them", confirmed.status === 200, `status ${confirmed.status}`);
+
+await signIn("operator@demo.local", "demo");
+const afterConfirm = await call("GET", "/admin/workplan?org=demo");
+const confirmedTask = (afterConfirm.body?.tasks ?? []).find((t) => t.id === mine.id);
+check(
+  "confirming does not change the status; the operator still owns it",
+  confirmedTask && confirmedTask.status !== "done" && confirmedTask.clientConfirmedAt,
+  confirmedTask ? `status ${confirmedTask.status}` : "task not found",
+);
+const queueAfter = await call("GET", "/admin/review?accountId=demo");
+check(
+  "the confirmation reaches the operator's review queue",
+  (queueAfter.body?.items ?? []).some((i) => i.type === "task_confirmation"),
+  "",
+);
+
+// The client may not touch MITMARK's own work.
+const mitmarkTask = (afterConfirm.body?.tasks ?? []).find((t) => t.ownerType === "mitmark");
+await signIn("demo@demo.local", "demo");
+const refused = await call("POST", `/tracker/tasks/${mitmarkTask.id}/confirm`, { note: "", evidence: "" });
+check(
+  "the client cannot confirm MITMARK's own work",
+  refused.status === 403,
+  `status ${refused.status}`,
+);
+
+// The operator answers the confirmation: reopening clears the client's claim,
+// accepting closes the task and books the work.
+await signIn("operator@demo.local", "demo");
+const queueItems = (queueAfter.body?.items ?? []).filter((i) => i.type === "task_confirmation");
+const reopened = await call("POST", `/admin/review/${queueItems[0].id}/reject`, { note: "Not yet." });
+check("the operator can reopen a confirmation", reopened.status === 200, `status ${reopened.status}`);
+const afterReopen = await call("GET", "/admin/workplan?org=demo");
+const reopenedTask = (afterReopen.body?.tasks ?? []).find((t) => t.id === mine.id);
+check(
+  "reopening clears the client's claim and leaves the task open",
+  reopenedTask && reopenedTask.clientConfirmedAt === null && reopenedTask.status !== "done",
+  reopenedTask ? `confirmedAt ${reopenedTask.clientConfirmedAt}` : "not found",
+);
+
+await signIn("demo@demo.local", "demo");
+await call("POST", `/tracker/tasks/${mine.id}/confirm`, { note: "Done now.", evidence: "" });
+await signIn("operator@demo.local", "demo");
+const queue2 = await call("GET", "/admin/review?accountId=demo");
+const item2 = (queue2.body?.items ?? []).find((i) => i.type === "task_confirmation");
+const beforeAccept = await call("GET", "/admin/record?org=demo");
+const accepted = await call("POST", `/admin/review/${item2.id}/approve`, {});
+check("the operator can accept a confirmation", accepted.status === 200, `status ${accepted.status}`);
+const afterAccept = await call("GET", "/admin/workplan?org=demo");
+const acceptedTask = (afterAccept.body?.tasks ?? []).find((t) => t.id === mine.id);
+check(
+  "accepting closes the task",
+  acceptedTask && acceptedTask.status === "done",
+  acceptedTask ? acceptedTask.status : "not found",
+);
+const recordAfterAccept = await call("GET", "/admin/record?org=demo");
+check(
+  "accepting books the work on the Record once",
+  (recordAfterAccept.body?.entries ?? []).length - (beforeAccept.body?.entries ?? []).length === 1,
+  `${(recordAfterAccept.body?.entries ?? []).length - (beforeAccept.body?.entries ?? []).length} added`,
+);
+
+// Closing a task books the work on the Record.
+await signIn("operator@demo.local", "demo");
+const beforeClose = await call("GET", "/admin/record?org=demo");
+const toClose = (afterConfirm.body?.tasks ?? []).find(
+  (t) => t.ownerType === "mitmark" && t.status !== "done",
+);
+const closedTask = await call("PATCH", `/admin/workplan/${toClose.id}?org=demo`, { status: "done" });
+check("the operator can close a task", closedTask.status === 200, `status ${closedTask.status}`);
+const afterClose = await call("GET", "/admin/record?org=demo");
+check(
+  "closing a task creates exactly one Record entry",
+  (afterClose.body?.entries ?? []).length - (beforeClose.body?.entries ?? []).length === 1,
+  `${(afterClose.body?.entries ?? []).length - (beforeClose.body?.entries ?? []).length} added`,
+);
+
+// The statement opens with where the client stands.
+await signIn("demo@demo.local", "demo");
+const stmt2 = await call("GET", "/value/statement");
+check(
+  "the statement carries the obligations line from the tracker",
+  stmt2.body?.obligations && /\d+ of \d+/.test(stmt2.body.obligations.sentence),
+  stmt2.body?.obligations?.sentence ?? "absent",
+);
+
 rmSync(dir, { recursive: true, force: true });
 console.log(failures === 0 ? "\nSMOKE PASS" : `\nSMOKE FAIL: ${failures} checks failed`);
 process.exit(failures === 0 ? 0 : 1);

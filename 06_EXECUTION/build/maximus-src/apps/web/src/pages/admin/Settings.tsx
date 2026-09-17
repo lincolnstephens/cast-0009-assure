@@ -1,16 +1,33 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { lineStatusSchema } from "@maximus/shared";
-import type { LineStatus, OrgSettings } from "@maximus/shared";
+import { JURISDICTION_LABEL, jurisdictionSchema, lineStatusSchema } from "@maximus/shared";
+import type { Jurisdiction, LineStatus, OrgSettings as BaseOrgSettings } from "@maximus/shared";
 import { LINES } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { useAdmin } from "../../store/admin";
 
 const STATUS_OPTS = lineStatusSchema.options;
+const JURISDICTION_OPTS = jurisdictionSchema.options;
 
 interface Branding {
   accent: string;
   displayName: string;
 }
+
+/**
+ * The Compliance Tracker fields on settings. Typed here rather than relying
+ * solely on the shared `OrgSettings` shape so this page compiles whichever
+ * order the data-model lane's schema update and this UI lane land in; the
+ * server is the source of truth for what actually comes back.
+ */
+interface TrackerFields {
+  jurisdiction: Jurisdiction;
+  staffInScope: number | null;
+  staffTrained: number | null;
+  clientRoles: string[];
+  workplanTargetDate: string | null;
+}
+
+type OrgSettings = BaseOrgSettings & TrackerFields;
 
 /**
  * The operator's settings: rates and names for the statement, the twelve
@@ -26,6 +43,10 @@ export function AdminSettingsPage() {
   const [accent, setAccent] = useState("");
   const [accentSaved, setAccentSaved] = useState(false);
   const [accentError, setAccentError] = useState<string | null>(null);
+  const [trackerSaved, setTrackerSaved] = useState(false);
+  const [trackerError, setTrackerError] = useState<string | null>(null);
+  const [newRole, setNewRole] = useState("");
+  const [rolesError, setRolesError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return;
@@ -76,6 +97,60 @@ export function AdminSettingsPage() {
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to save the rates.");
+    }
+  }
+
+  async function submitTracker(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!settings) return;
+    const form = new FormData(e.currentTarget);
+    const inScopeRaw = String(form.get("staffInScope") ?? "");
+    const trainedRaw = String(form.get("staffTrained") ?? "");
+    const targetDateRaw = String(form.get("workplanTargetDate") ?? "");
+    try {
+      await saveSettings({
+        jurisdiction: form.get("jurisdiction") as OrgSettings["jurisdiction"],
+        staffInScope: inScopeRaw === "" ? null : Number(inScopeRaw),
+        staffTrained: trainedRaw === "" ? null : Number(trainedRaw),
+        workplanTargetDate: targetDateRaw === "" ? null : targetDateRaw,
+      });
+      setTrackerError(null);
+      setTrackerSaved(true);
+      setTimeout(() => setTrackerSaved(false), 2000);
+    } catch (err) {
+      setTrackerError(err instanceof ApiError ? err.message : "Unable to save these settings.");
+    }
+  }
+
+  async function addRole() {
+    if (!settings) return;
+    const role = newRole.trim();
+    if (!role || settings.clientRoles.includes(role)) {
+      setNewRole("");
+      return;
+    }
+    const clientRoles = [...settings.clientRoles, role];
+    setSettings({ ...settings, clientRoles });
+    setNewRole("");
+    try {
+      await saveSettings({ clientRoles });
+      setRolesError(null);
+    } catch (err) {
+      setRolesError(err instanceof ApiError ? err.message : "Unable to add that role.");
+      void load();
+    }
+  }
+
+  async function removeRole(index: number) {
+    if (!settings) return;
+    const clientRoles = settings.clientRoles.filter((_, i) => i !== index);
+    setSettings({ ...settings, clientRoles });
+    try {
+      await saveSettings({ clientRoles });
+      setRolesError(null);
+    } catch (err) {
+      setRolesError(err instanceof ApiError ? err.message : "Unable to remove that role.");
+      void load();
     }
   }
 
@@ -224,6 +299,126 @@ export function AdminSettingsPage() {
               </p>
             )}
           </form>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <form onSubmit={submitTracker} className="rounded border border-hud-line bg-hud-panel/60 p-4">
+          <h2 className="text-sm font-semibold">Compliance Tracker</h2>
+          <div className="mt-3 grid grid-cols-1 gap-3">
+            <F label="Jurisdiction">
+              <select
+                name="jurisdiction"
+                defaultValue={settings.jurisdiction}
+                className="w-full rounded border border-hud-line bg-hud-bg px-2 py-1.5 text-[13px]"
+              >
+                {JURISDICTION_OPTS.map((j) => (
+                  <option key={j} value={j}>
+                    {JURISDICTION_LABEL[j]}
+                  </option>
+                ))}
+              </select>
+            </F>
+            <p className="-mt-1 text-[12px] text-hud-muted">
+              Only the United Kingdom has task and obligation content in this version.
+            </p>
+            <F label="Staff in scope for training">
+              <input
+                name="staffInScope"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={settings.staffInScope ?? ""}
+                placeholder="blank means not recorded"
+              />
+            </F>
+            <F label="Staff trained">
+              <input
+                name="staffTrained"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={settings.staffTrained ?? ""}
+                placeholder="blank means not recorded"
+              />
+            </F>
+            <p className="-mt-1 text-[12px] text-hud-muted">
+              Leave either figure blank and the client's training tile shows "not recorded" until
+              both are set.
+            </p>
+            <F label="Workplan target date, shown on the client's empty portal">
+              <input
+                name="workplanTargetDate"
+                type="date"
+                defaultValue={settings.workplanTargetDate ?? ""}
+              />
+            </F>
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              type="submit"
+              className="rounded bg-hud-accent px-3 py-1.5 text-[13px] font-medium text-white hover:bg-hud-accent/90"
+            >
+              Save Compliance Tracker settings
+            </button>
+            {trackerSaved && <span className="text-[12px] text-status-green">Saved</span>}
+          </div>
+          {trackerError && (
+            <p className="mt-2 border-l-2 border-status-red pl-3 text-[13px] text-status-red" role="alert">
+              {trackerError}
+            </p>
+          )}
+        </form>
+
+        <div className="rounded border border-hud-line bg-hud-panel/60 p-4">
+          <h2 className="text-sm font-semibold">Client roles</h2>
+          <p className="mt-1 text-[12px] text-hud-muted">
+            The roles a task can be assigned to on the client side, offered in the workplan's owner
+            role field.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <input
+              type="text"
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value)}
+              placeholder="e.g. Facilities"
+              className="w-full rounded border border-hud-line bg-hud-bg px-2 py-1.5 text-[13px]"
+            />
+            <button
+              type="button"
+              onClick={() => void addRole()}
+              className="shrink-0 rounded border border-hud-line px-3 py-1.5 text-[13px] hover:bg-hud-bg"
+            >
+              Add
+            </button>
+          </div>
+          {settings.clientRoles.length === 0 && (
+            <p className="mt-2 text-[13px] text-hud-muted">No client roles set.</p>
+          )}
+          {settings.clientRoles.length > 0 && (
+            <ul className="mt-2 space-y-1 text-[13px]">
+              {settings.clientRoles.map((r, i) => (
+                <li
+                  key={i}
+                  className="flex items-center justify-between gap-2 rounded border border-hud-line px-2 py-1"
+                >
+                  {r}
+                  <button
+                    type="button"
+                    onClick={() => void removeRole(i)}
+                    className="shrink-0 text-[12px] text-status-red hover:underline"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {rolesError && (
+            <p className="mt-2 border-l-2 border-status-red pl-3 text-[13px] text-status-red" role="alert">
+              {rolesError}
+            </p>
+          )}
         </div>
       </div>
 

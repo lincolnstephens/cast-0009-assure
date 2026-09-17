@@ -8,13 +8,17 @@ import { AdminExportsPage } from "./pages/admin/Exports";
 import { AdminClocksPage } from "./pages/admin/Clocks";
 import { AdminPoliciesPage } from "./pages/admin/Policies";
 import { AdminPosturePage } from "./pages/admin/Posture";
+import { AdminProceduresPage } from "./pages/admin/Procedures";
 import { AdminRecordPage } from "./pages/admin/Record";
 import { AdminSettingsPage } from "./pages/admin/Settings";
 import { AdminReviewQueuePage } from "./pages/admin/ReviewQueue";
+import { AdminWorkplanPage } from "./pages/admin/Workplan";
+import { AreaPageView } from "./pages/client/Area";
 import { ClocksPage } from "./pages/client/Clocks";
 import { ExposurePage } from "./pages/client/Exposure";
 import { GuidePage } from "./pages/client/Guide";
 import { PosturePage } from "./pages/client/Posture";
+import { TrackerPage } from "./pages/client/Tracker";
 import { ValuePage } from "./pages/client/Value";
 import { StatementPage } from "./pages/client/Statement";
 import { LoginPage } from "./pages/Login";
@@ -49,7 +53,13 @@ export default function App() {
           </RequireRole>
         }
       >
-        <Route index element={<GuidePage />} />
+        {/* The Compliance Tracker is the client's front page: it answers the
+            six questions before anything else is offered. The Policy Guide
+            keeps its own address. */}
+        <Route index element={<TrackerPage />} />
+        <Route path="tracker" element={<TrackerPage />} />
+        <Route path="guide" element={<GuidePage />} />
+        <Route path="tracker/areas/:area" element={<AreaPageView />} />
         <Route path="posture" element={<PosturePage />} />
         <Route path="clocks" element={<ClocksPage />} />
         <Route path="exposure" element={<ExposurePage />} />
@@ -66,7 +76,9 @@ export default function App() {
         }
       >
         <Route index element={<AdminReviewQueuePage />} />
+        <Route path="workplan" element={<AdminWorkplanPage />} />
         <Route path="clocks" element={<AdminClocksPage />} />
+        <Route path="procedures" element={<AdminProceduresPage />} />
         <Route path="policies" element={<AdminPoliciesPage />} />
         <Route path="posture" element={<AdminPosturePage />} />
         <Route path="record" element={<AdminRecordPage />} />

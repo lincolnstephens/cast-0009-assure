@@ -21,8 +21,17 @@ export function formatGBP(amount: number): string {
 }
 
 /** British short date, e.g. "12 Sep 2026", from a YYYY-MM-DD date string. */
+/**
+ * A date the reader can trust. Takes either a plain YYYY-MM-DD, as a due date
+ * is, or a full ISO timestamp, as a closing time is. Anything it cannot read
+ * says so rather than rendering "Invalid Date" at the reader.
+ */
 export function formatDateGB(date: string): string {
-  return new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", {
+  if (!date) return "No date";
+  const value = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00` : date;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "No date";
+  return d.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",

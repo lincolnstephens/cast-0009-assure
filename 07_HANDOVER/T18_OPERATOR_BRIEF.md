@@ -1,8 +1,8 @@
 ---
 document: OPERATOR_BRIEF
 job: CAST-0009 ASSURE
-product: Tessera Assure v1.0
-version: v1.0
+product: Tessera Assure v1.1
+version: v1.1
 status: FOR THE MITMARK OPERATOR
 authority: Seagull, written by the build session under T02 A6
 register_id: T18
@@ -19,10 +19,12 @@ For the MITMARK data compliance officer who runs the client's DPO contract, and 
 
 Tessera Assure is the record of what MITMARK does under the retained contract, and the statement that record produces. It has two sides.
 
-- The **client portal** is what the Information Officer sees: the Policy Guide, the two intakes she already had, the policy pack, the posture, and the **Value** section, which is the Record and the Statement.
-- The **admin workspace** is yours: the review queue, the statutory clocks, the policies, the posture, the **Record** and the **Settings**.
+- The **client portal** is what the Information Officer sees. Her front page is the **Compliance Tracker**: where she stands overall, the five phases of the journey, six measures, the eight areas of the work, and anything waiting on her. Beneath it sit the eight area pages, the Policy Guide, the two intakes she already had, the policy pack, the posture, and the **Value** section, which is the Record and the Statement.
+- The **admin workspace** is yours: the **Workplan**, the review queue, the statutory clocks, the policies, the **Procedures**, the posture, the **Record** and the **Settings**.
 
-The product does not deliver the service. It records it, so that the Information Officer can see what she is getting and put a number on it for her CFO.
+The product does not deliver the service. It records it, and now it also plans it, so that the Information Officer can see what she is getting, what is still to do, and what it is worth to her CFO.
+
+The tracker answers six questions about every task, and they are the same six wherever you look: **what do I need to do, how, who, by when, is it done, and if not what is the status.**
 
 ## 2. Signing in
 
@@ -76,6 +78,70 @@ Rules that the product enforces and you should not try to get round:
 - An entry with no named reviewer does not reach the client.
 - An entry marked illustrative does not reach the client unless you have switched on "show illustrative" for a demo, and then a banner says so on her screen.
 - Every figure the Information Officer sees traces back to an entry with a reviewer. That is the point. A figure with no entry behind it is a claim, and claims are what the CFO is sceptical of.
+
+## 5a. The workplan (v1.1)
+
+**Workplan**, in the admin workspace. This is the heart of v1.1 and it is yours.
+
+The workplan is **MITMARK's workplan for the client**. You own it. The client can see it, and can confirm the tasks you have assigned to a client role. The client cannot create, edit, reorder or close anything. That is deliberate and it is what keeps A7 intact: she has no system to maintain.
+
+### Applying the library
+
+The task library holds 28 obligations across the eight areas, drawn from UK GDPR and the Data Protection Act 2018. **Apply library** takes a start date and expands the recurring ones into dated tasks for the next twelve months. A monthly task becomes twelve, a quarterly one becomes four, an always-on duty stays as a single undated obligation.
+
+Re-applying is safe. It adds what is missing and never overwrites an edit you have made. If you have changed a due date or a status, re-applying leaves it alone.
+
+The library is marked DRAFT until Lurong has read it. Go through it once: the wording of each task, who owns it, and how often it really happens at this client. Change what is wrong. It is a starting point, not a standard.
+
+### The six columns
+
+Every task table, on your side and hers, shows the same six columns in the same order: **What, How, Who, When, Done, Status**. They answer the six questions Rich asked for. They are not renamed and not reordered.
+
+- **How** is the one line she reads to know what the task actually involves. Write it in plain words. It is not a restatement of the title.
+- **Who** is MITMARK or one of the client roles. Assign to a client role only when the client genuinely has to do it: paying the ICO fee, running a deletion, forwarding a request. Everything else is yours.
+- **When** is the due date. An always-on duty has none, and that is correct.
+- **Done** is the date you closed it.
+- **Status** is yours. It is the only status the client ever sees.
+
+### Closing a task
+
+Closing a task as done creates a Record entry automatically, with the default hours for that task, reviewed by you. That is how the workplan feeds the Statement: work you do against the plan becomes value she can show her CFO, without you typing it twice.
+
+Client-owned tasks book zero hours. MITMARK did not do that work and must not claim it.
+
+### When the client confirms
+
+A task you assigned to a client role shows her a **Confirm** button. When she uses it, the task does not change status. It appears in your **Review queue** as a client confirmation, and you accept it or reopen it. Your acceptance is what closes it.
+
+This is the same rule as everywhere else in the product: nothing reaches the record without a MITMARK decision behind it.
+
+## 5b. Procedures
+
+**Procedures**, in the admin workspace. One card per area.
+
+Each area page in the client portal has a "How we do it" section. Until you publish a procedure for that area, she sees a card saying **"Procedure to be published by MITMARK"** with your target date. That is honest and it is better than a generic document dressed up as hers.
+
+Set the target date so the card says something. Publish the procedure when it is real.
+
+## 5c. The tracker settings
+
+**Settings** gains four things that feed the client's front page.
+
+| Field | What it drives |
+|---|---|
+| Jurisdiction | The regulation line in the header. Only the United Kingdom has content in this version. |
+| Staff in scope | The denominator of the Training tile. Blank means the tile says "not recorded", which is the truth. |
+| Staff trained | The numerator. |
+| Client roles | The list you can assign a task to. |
+| Workplan target date | Shown on her portal while it is still empty. |
+
+Do not guess the staffing numbers. A tile that says "not recorded" is worth more than a tile that says something you made up, and the whole product rests on that distinction.
+
+### What the overall figure means
+
+The front page says something like "12 of 18 obligations met, 67%, as at 17 September". The denominator is every task that has actually fallen due, plus the always-on duties. A task due next month is not counted, because it is not yet an obligation she has failed to meet. Tasks you mark **not applicable** drop out of the count entirely.
+
+The fraction always appears beside the percentage. If anyone asks what the number rests on, the answer is on the page.
 
 ## 6. Importing the v0.1 export
 

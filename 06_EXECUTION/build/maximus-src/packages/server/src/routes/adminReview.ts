@@ -9,8 +9,10 @@ import {
   findReviewItemOrgId,
   pendingReviewItems,
   rejectReviewItem,
+  decideTaskConfirmation,
   ReviewError,
 } from "../lib/reviewQueue.ts";
+import { closeTaskAndRaiseEntry } from "./adminWorkplan.ts";
 
 export const adminReviewRoutes = new Hono<AppEnv>();
 adminReviewRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
@@ -69,6 +71,22 @@ adminReviewRoutes.post("/review/:id/approve", async (c) => {
       await approveReviewItem(orgId, id, user.id, user.displayName, item.type);
       return c.json({ ok: true });
     }
+    if (item.type === "task_confirmation") {
+      // Accepting the client's word is what closes the task, and closing it is
+      // what books the work on the Record. The operator's decision, not the
+      // client's, is the thing with consequences.
+      await decideTaskConfirmation(orgId, id, user.id, user.displayName, true, (doc, task, name) => {
+        task.status = "done";
+        task.progress = 100;
+        task.updatedBy = name;
+        task.updatedAt = new Date().toISOString();
+        closeTaskAndRaiseEntry(doc, task, {
+          reviewer: name,
+          outcome: "Confirmed by the client and accepted by MITMARK.",
+        });
+      });
+      return c.json({ ok: true });
+    }
     return c.json({ error: "This item must be answered, not approved." }, 409);
   } catch (err) {
     if (err instanceof ReviewError) return c.json({ error: err.message }, err.status as 400);
@@ -86,6 +104,13 @@ adminReviewRoutes.post("/review/:id/reject", async (c) => {
   if (!orgId) return c.json({ error: "Review item not found or already decided." }, 404);
 
   try {
+    const doc = await readOrg(orgId);
+    const item = doc?.review.find((r) => r.id === id);
+    if (item?.type === "task_confirmation") {
+      // Reopening clears the client's claim and leaves the task where it was.
+      await decideTaskConfirmation(orgId, id, user.id, user.displayName, false, () => {});
+      return c.json({ ok: true });
+    }
     await rejectReviewItem(orgId, id, user.id, user.displayName, parsed.data.note);
     return c.json({ ok: true });
   } catch (err) {

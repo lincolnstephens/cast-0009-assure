@@ -6,6 +6,7 @@ import {
   periodsOf,
   serviceLineViews,
   statementOf,
+  obligationsLine,
   totalsOf,
 } from "../lib/record.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
@@ -61,5 +62,7 @@ valueRoutes.get("/statement", async (c) => {
   const period = periodParam(c.req.query("period"), available);
   const entries = applyFilter(visible, { period });
 
-  return c.json(statementOf(entries, doc.settings, period || "all periods"));
+  return c.json(
+    statementOf(entries, doc.settings, period || "all periods", new Date(), obligationsLine(doc)),
+  );
 });

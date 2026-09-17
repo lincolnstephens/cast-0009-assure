@@ -17,6 +17,7 @@ const typeLabels: Record<ReviewItemType, string> = {
   export_request: "Export request",
   alert: "Exposure alert",
   intake: "Intake",
+  task_confirmation: "Client confirmation",
 };
 
 const filterOptions: { value: "" | ReviewItemType; label: string }[] = [
@@ -25,6 +26,7 @@ const filterOptions: { value: "" | ReviewItemType; label: string }[] = [
   { value: "export_request", label: "Export requests" },
   { value: "alert", label: "Alerts" },
   { value: "intake", label: "Intakes" },
+  { value: "task_confirmation", label: "Client confirmations" },
 ];
 
 export function AdminReviewQueuePage() {

@@ -12,7 +12,7 @@
  */
 
 import type { ReviewItemType } from "@maximus/shared";
-import type { ChatMessageRecord, OrgDoc, ReviewItemRecord } from "../db/model.ts";
+import type { ChatMessageRecord, OrgDoc, ReviewItemRecord, TaskRecord } from "../db/model.ts";
 import { exportKey, listOrgIds, mutateOrg, newId, readOrg, writeExportBlob } from "../db/store.ts";
 import { writeAudit } from "./audit.ts";
 import { generateDefenceFile } from "./defenceFile.ts";
@@ -315,5 +315,53 @@ export async function resolveReviewByRef(
     item.state = state;
     item.decidedBy = officerId;
     item.decidedAt = new Date().toISOString();
+  });
+}
+
+/**
+ * The operator's answer to a client confirmation.
+ *
+ * A client saying a task is done is not a status change; it is a claim waiting
+ * on MITMARK. Accepting it closes the task, which books the work on the Record
+ * exactly as closing it from the workplan does. Reopening clears the claim and
+ * leaves the task where it was, so the client sees the confirm control again
+ * and nothing false reaches the record.
+ */
+export async function decideTaskConfirmation(
+  orgId: string,
+  reviewItemId: string,
+  officerId: string,
+  officerName: string,
+  accept: boolean,
+  closeTask: (doc: OrgDoc, task: TaskRecord, officerName: string) => void,
+): Promise<void> {
+  await mutateOrg(orgId, (doc) => {
+    const item = doc.review.find(
+      (r) => r.id === reviewItemId && r.state === "pending" && r.type === "task_confirmation",
+    );
+    if (!item) throw new ReviewError("Review item not found or already decided.", 404);
+    const task = doc.tasks.find((t) => t.id === item.refId);
+    if (!task) throw new ReviewError("The task this confirmation belongs to is gone.", 404);
+
+    if (accept) {
+      closeTask(doc, task, officerName);
+    } else {
+      task.clientConfirmedAt = null;
+      task.clientConfirmedBy = null;
+      task.updatedBy = officerName;
+      task.updatedAt = new Date().toISOString();
+    }
+
+    item.state = accept ? "approved" : "rejected";
+    item.decidedBy = officerId;
+    item.decidedAt = new Date().toISOString();
+  });
+
+  await writeAudit({
+    orgId,
+    actorId: officerId,
+    actorName: officerName,
+    action: accept ? "review.task_confirmation.accept" : "review.task_confirmation.reopen",
+    detail: `item=${reviewItemId}`,
   });
 }

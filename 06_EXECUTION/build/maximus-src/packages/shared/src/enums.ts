@@ -41,6 +41,7 @@ export const reviewItemTypeSchema = z.enum([
   "export_request",
   "alert",
   "intake",
+  "task_confirmation",
 ]);
 export type ReviewItemType = z.infer<typeof reviewItemTypeSchema>;
 

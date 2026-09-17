@@ -22,7 +22,12 @@ export type IntakeType = 'sar' | 'breach';
 export type IntakeSource = 'chat' | 'manual';
 export type ClockKind = 'sar_1_month' | 'breach_72h';
 export type AlertState = 'new' | 'triaged' | 'actioned' | 'dismissed';
-export type ReviewItemType = 'chat_amber' | 'export_request' | 'alert' | 'intake';
+export type ReviewItemType =
+  | 'chat_amber'
+  | 'export_request'
+  | 'alert'
+  | 'intake'
+  | 'task_confirmation';
 export type ReviewItemState = 'pending' | 'approved' | 'rejected';
 export type ExportState = 'requested' | 'approved' | 'generated';
 
@@ -130,6 +135,10 @@ export interface ClockRecord {
   outcome: string | null;
   /** The Record entry this clock created when it closed. */
   entryId: string | null;
+  /** Set when a data request closed: was it answered inside the statutory month. */
+  insideStatute: boolean | null;
+  /** Set when a reported concern closed: was the ICO notified. Feeds the breach tile. */
+  icoNotified: boolean | null;
 }
 
 export interface ClockEventRecord {
@@ -216,6 +225,75 @@ export interface ExportRecord {
 }
 
 // ---------------------------------------------------------------------------
+// The Compliance Tracker
+// ---------------------------------------------------------------------------
+
+export type OwnerType = 'mitmark' | 'client';
+export type Recurrence = 'once' | 'monthly' | 'quarterly' | 'annual' | 'always-on';
+export type TaskStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'blocked'
+  | 'done'
+  | 'not_applicable';
+
+/**
+ * One obligation in MITMARK's workplan for the client.
+ *
+ * The six columns the client sees map to: title (What), how (How), owner
+ * (Who), dueAt (When), closedAt (Done) and status (Status).
+ */
+export interface TaskRecord {
+  id: string;
+  orgId: string;
+  /** One of the eight areas, 1 to 8. */
+  area: number;
+  /** One of the five phases, 1 to 5. */
+  phase: number;
+  title: string;
+  how: string;
+  howLink: string | null;
+  ownerType: OwnerType;
+  /** Empty when MITMARK owns it. */
+  ownerRole: string;
+  /** YYYY-MM-DD, or null for an always-on duty that has no single date. */
+  dueAt: string | null;
+  recurrence: Recurrence;
+  status: TaskStatus;
+  progress: number;
+  evidence: string[];
+  notes: string;
+  /** Library task id, clock id, or "manual". */
+  source: string;
+  recordEntryId: string | null;
+  closedAt: Iso | null;
+  /**
+   * The client saying a task assigned to them is done. This is not a status
+   * change: the operator accepts it from the review queue, and the operator's
+   * acceptance is what moves the status.
+   */
+  clientConfirmedAt: Iso | null;
+  clientConfirmedBy: string | null;
+  createdBy: string;
+  updatedBy: string;
+  updatedAt: Iso;
+}
+
+/** How MITMARK does the work in an area, for the client to read. */
+export interface ProcedureRecord {
+  id: string;
+  orgId: string | null;
+  area: number;
+  title: string;
+  body: string;
+  link: string;
+  processMapLink: string;
+  publishedAt: Iso | null;
+  /** When MITMARK expects to publish. Shown on the waiting card until then. */
+  targetDate: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // The ASSURE value layer
 // ---------------------------------------------------------------------------
 
@@ -272,6 +350,18 @@ export interface OrgSettings {
   showIllustrative: boolean;
   /** Service line status by line id, 1 to 12. */
   lineStatus: Record<string, LineStatus>;
+
+  // --- Compliance Tracker -------------------------------------------------
+  /** Which regime the workplan is written against. Only UK has content. */
+  jurisdiction: 'UK' | 'CH-MC' | 'DIFC' | 'SG' | 'US';
+  /** Staff in scope for training. Null until the operator records it. */
+  staffInScope: number | null;
+  /** Staff who have completed training. Null until the operator records it. */
+  staffTrained: number | null;
+  /** The roles a task may be assigned to on the client side. */
+  clientRoles: string[];
+  /** Shown on the empty portal while MITMARK prepares the workplan. */
+  workplanTargetDate: string | null;
 }
 
 /** Everything belonging to one organisation. One blob, one tenant. */
@@ -296,6 +386,8 @@ export interface OrgDoc {
   audit: AuditRecord[];
   exports: ExportRecord[];
   entries: EntryRecord[];
+  tasks: TaskRecord[];
+  procedures: ProcedureRecord[];
 }
 
 export const DEFAULT_LINE_STATUS: Record<string, LineStatus> = {
@@ -322,6 +414,18 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   lead: '',
   showIllustrative: true,
   lineStatus: { ...DEFAULT_LINE_STATUS },
+  jurisdiction: 'UK',
+  staffInScope: null,
+  staffTrained: null,
+  clientRoles: [
+    'Information Officer',
+    'HR',
+    'IT',
+    'Finance',
+    'Facilities',
+    'Board',
+  ],
+  workplanTargetDate: null,
 };
 
 export function emptyOrgDoc(id: string, name: string): OrgDoc {
@@ -345,5 +449,7 @@ export function emptyOrgDoc(id: string, name: string): OrgDoc {
     audit: [],
     exports: [],
     entries: [],
+    tasks: [],
+    procedures: [],
   };
 }

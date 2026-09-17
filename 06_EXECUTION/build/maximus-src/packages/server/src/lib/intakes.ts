@@ -72,6 +72,8 @@ export function createIntakeWithClock(doc: OrgDoc, input: CreateIntakeInput): Cr
     closedBy: null,
     outcome: null,
     entryId: null,
+    insideStatute: null,
+    icoNotified: null,
   };
   doc.clocks.push(clock);
 

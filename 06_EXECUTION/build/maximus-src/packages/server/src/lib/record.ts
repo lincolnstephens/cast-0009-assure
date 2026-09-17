@@ -14,6 +14,7 @@ import type {
   StatementResponse,
 } from "@maximus/shared";
 import type { EntryRecord, OrgDoc, OrgSettings } from "../db/model.ts";
+import { overallStatus } from "./tracker.ts";
 
 /** 2026-09-12 becomes 2026 Q3. */
 export function quarterOf(date: string): string {
@@ -110,6 +111,7 @@ export function statementOf(
   s: OrgSettings,
   period: string,
   now: Date = new Date(),
+  obligations: StatementResponse["obligations"] = null,
 ): StatementResponse {
   const totals = totalsOf(rows, s);
   const months = monthsCovered(rows, period);
@@ -137,7 +139,22 @@ export function statementOf(
       year: "numeric",
     }),
     illustrative: totals.anyIllustrative,
+    obligations,
   };
+}
+
+/**
+ * The obligations line the statement opens with, from the Compliance Tracker.
+ *
+ * It is stated as at today, not scoped to the statement's period: the tracker
+ * measures where the client stands now, and pretending it could be rewound to
+ * the end of a past quarter would be a figure without a basis. The sentence
+ * carries its own date so a reader is never in doubt which it is.
+ */
+export function obligationsLine(doc: OrgDoc, now: Date = new Date()) {
+  const o = overallStatus(doc, now);
+  if (o.m === 0) return null;
+  return { n: o.n, m: o.m, sentence: o.sentence, basis: o.basis };
 }
 
 export { lineOf };

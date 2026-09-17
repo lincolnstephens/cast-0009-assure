@@ -28,11 +28,14 @@ import {
   setSeedMarker,
 } from "../db/store.ts";
 import { sarDueAt } from "./deadlines.ts";
+import { applyLibraryToDoc } from "./workplan.ts";
 
 const ORG_ID = "demo";
 const ORG_NAME = "Demo Organisation";
 const CLIENT_EMAIL = "demo@demo.local";
 const OFFICER_EMAIL = "operator@demo.local";
+/** The demo workplan runs from the start of the quarter the record covers. */
+const SEED_WORKPLAN_START = "2026-09-01";
 const CLIENT_DISPLAY_NAME = "Information Officer";
 const OFFICER_DISPLAY_NAME = "MITMARK data compliance officer";
 
@@ -267,6 +270,8 @@ async function seedClock(): Promise<void> {
       closedBy: null,
       outcome: null,
       entryId: null,
+      insideStatute: null,
+      icoNotified: null,
     });
     doc.clockEvents.push({
       id: newId(),
@@ -345,6 +350,26 @@ export interface SeedOptions {
  * illustrative Record entries. Safe to call more than once - each part skips
  * itself if it finds data already there, unless `reset` is set.
  */
+/**
+ * Apply the task library so a fresh store opens on a working Compliance
+ * Tracker rather than an empty one. The start date is the beginning of the
+ * current quarter, so the demo always has obligations that have fallen due and
+ * some that have not, which is what the front page is there to show.
+ */
+async function seedWorkplan(): Promise<void> {
+  const existing = await readOrg(ORG_ID);
+  if (existing && existing.tasks.length > 0) {
+    console.log("Workplan already present, left alone.");
+    return;
+  }
+  const result = await mutateOrg(ORG_ID, (doc) =>
+    applyLibraryToDoc(doc, SEED_WORKPLAN_START, "MITMARK data compliance officer"),
+  );
+  console.log(
+    `Seeded workplan: ${result.created} tasks from ${SEED_WORKPLAN_START}, ${result.skipped} already present`,
+  );
+}
+
 export async function seedAll(opts: SeedOptions = {}): Promise<void> {
   await ensureOrg(ORG_ID, ORG_NAME);
 
@@ -392,6 +417,7 @@ export async function seedAll(opts: SeedOptions = {}): Promise<void> {
   await seedPosture();
   await seedClock();
   await seedEntries();
+  await seedWorkplan();
 
   console.log("");
   console.log("Seed complete. Sign in with:");

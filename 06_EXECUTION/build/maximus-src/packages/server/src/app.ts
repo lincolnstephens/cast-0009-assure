@@ -10,6 +10,7 @@ import { adminPolicyRoutes } from "./routes/adminPolicies.ts";
 import { adminPostureRoutes } from "./routes/adminPosture.ts";
 import { adminRecordRoutes } from "./routes/adminRecord.ts";
 import { adminReviewRoutes } from "./routes/adminReview.ts";
+import { adminWorkplanRoutes } from "./routes/adminWorkplan.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { chatRoutes } from "./routes/chat.ts";
 import { clockRoutes, requestRoutes } from "./routes/clocks.ts";
@@ -17,6 +18,7 @@ import { exportRoutes } from "./routes/exports.ts";
 import { exposureRoutes } from "./routes/exposure.ts";
 import { policyRoutes } from "./routes/policies.ts";
 import { postureRoutes } from "./routes/posture.ts";
+import { trackerRoutes } from "./routes/tracker.ts";
 import { valueRoutes } from "./routes/value.ts";
 
 export const app = new Hono<AppEnv>().basePath("/api");
@@ -77,6 +79,7 @@ app.route("/exposure", exposureRoutes);
 app.route("/policies", policyRoutes);
 app.route("/posture", postureRoutes);
 app.route("/requests", requestRoutes);
+app.route("/tracker", trackerRoutes);
 app.route("/value", valueRoutes);
 app.route("/admin", adminAuditRoutes);
 app.route("/admin", adminRoutes);
@@ -87,6 +90,7 @@ app.route("/admin", adminPolicyRoutes);
 app.route("/admin", adminPostureRoutes);
 app.route("/admin", adminRecordRoutes);
 app.route("/admin", adminReviewRoutes);
+app.route("/admin", adminWorkplanRoutes);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 

@@ -10,7 +10,14 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { EMPTY_USERS_DOC, emptyOrgDoc, type OrgDoc, type SessionRecord, type UsersDoc } from './model.ts';
+import {
+  DEFAULT_SETTINGS,
+  EMPTY_USERS_DOC,
+  emptyOrgDoc,
+  type OrgDoc,
+  type SessionRecord,
+  type UsersDoc,
+} from './model.ts';
 
 export const newId = (): string => randomUUID();
 
@@ -145,9 +152,56 @@ export const exportKey = (exportId: string) => `exports/${exportId}.zip`;
 // Organisations
 // ---------------------------------------------------------------------------
 
+/**
+ * Bring a stored document up to the current shape.
+ *
+ * Organisations written by an earlier version have no tasks, no procedures and
+ * none of the tracker settings. Reading one would then hand the rest of the
+ * server undefined where it expects an array. This fills what is missing and
+ * changes nothing that is already there, so an operator's edits always win.
+ * It runs on every read and is cheap; the alternative, a migration step someone
+ * has to remember to run, is the one that gets forgotten.
+ */
+export function migrateOrg(doc: OrgDoc): OrgDoc {
+  doc.tasks ??= [];
+  doc.procedures ??= [];
+  doc.policies ??= [];
+  doc.threads ??= [];
+  doc.messages ??= [];
+  doc.escalations ??= [];
+  doc.intakes ??= [];
+  doc.clocks ??= [];
+  doc.clockEvents ??= [];
+  doc.posture ??= [];
+  doc.postureHistory ??= [];
+  doc.alerts ??= [];
+  doc.review ??= [];
+  doc.audit ??= [];
+  doc.exports ??= [];
+  doc.entries ??= [];
+
+  const s = doc.settings ?? ({} as OrgDoc['settings']);
+  s.jurisdiction ??= DEFAULT_SETTINGS.jurisdiction;
+  s.staffInScope = s.staffInScope === undefined ? null : s.staffInScope;
+  s.staffTrained = s.staffTrained === undefined ? null : s.staffTrained;
+  s.clientRoles ??= [...DEFAULT_SETTINGS.clientRoles];
+  s.workplanTargetDate = s.workplanTargetDate === undefined ? null : s.workplanTargetDate;
+  s.lineStatus ??= { ...DEFAULT_SETTINGS.lineStatus };
+  doc.settings = s;
+
+  // Two clock fields arrived with the tracker's KPI tiles. An older clock has
+  // no answer to either question, and "not known" is null, never false.
+  for (const c of doc.clocks) {
+    if (c.insideStatute === undefined) c.insideStatute = null;
+    if (c.icoNotified === undefined) c.icoNotified = null;
+  }
+
+  return doc;
+}
+
 export async function readOrg(orgId: string): Promise<OrgDoc | null> {
   const raw = await getDriver().get(orgKey(orgId));
-  return raw ? (JSON.parse(raw) as OrgDoc) : null;
+  return raw ? migrateOrg(JSON.parse(raw) as OrgDoc) : null;
 }
 
 export async function writeOrg(doc: OrgDoc): Promise<void> {

@@ -63,7 +63,7 @@ import sys
 CONFIG = {
     # Identity of the run, for the report header.
     "codename": "ASSURE",
-    "iteration": "v1.0",
+    "iteration": "v1.1",
 
     # What is gated. Either a deployed URL or a path to a local artefact.
     # Passed on the command line; these are the defaults.
@@ -306,6 +306,38 @@ def check_print_stylesheet(text, cfg):
                  "'@media print' found" if found else "'@media print' not found")
 
 
+# v1.1. Added for the Compliance Tracker: the six task-table columns are a
+# contract (FRAGO section 9, tracker.ts's own comment), and the gate reads the
+# same source of truth the product renders from so a rename in one place is
+# caught here rather than discovered by a driven line failing lower down.
+TASK_COLUMNS_SOURCE = "06_EXECUTION/build/maximus-src/packages/shared/src/tracker.ts"
+TASK_COLUMNS_EXPECTED = ["What", "How", "Who", "When", "Done", "Status"]
+
+
+def check_task_columns_contract(sources, cfg):
+    """TASK_COLUMNS in tracker.ts is exactly the six questions, in order.
+    This is a source check so the contract cannot drift before it ever
+    reaches the browser; drv_task_table_columns checks the rendered result
+    separately, driven."""
+    target = cfg["root"] / TASK_COLUMNS_SOURCE
+    text = None
+    for p, t in sources.items():
+        if p == target:
+            text = t
+            break
+    if text is None:
+        return check("static: TASK_COLUMNS contract present", False,
+                      f"{TASK_COLUMNS_SOURCE} not found in scanned source")
+    m = re.search(r"TASK_COLUMNS\s*=\s*\[([^\]]*)\]", text)
+    if not m:
+        return check("static: TASK_COLUMNS contract present", False,
+                      "TASK_COLUMNS declaration not found in tracker.ts")
+    found = re.findall(r'"([^"]*)"', m.group(1))
+    ok = found == TASK_COLUMNS_EXPECTED
+    return check("static: TASK_COLUMNS is What, How, Who, When, Done, Status in order",
+                 ok, "matches exactly" if ok else f"found {found}")
+
+
 def run_static(cfg):
     print("\n--- static ---")
     sources = read_source(cfg)
@@ -322,6 +354,16 @@ def run_static(cfg):
     check_restricted_names(sources, cfg, "static")
     check_no_key_values(sources, cfg)
     check_print_stylesheet(joined, cfg)
+    check_task_columns_contract(sources, cfg)
+
+    # A static check for a bare percentage in a template literal was
+    # considered for v1.1 and deliberately left out. See
+    # T14_DEFINITION_OF_DONE_V1_1.md, "static checks", for why: the source
+    # tree mixes CSS/Tailwind percentages (width, opacity, grid tracks) with
+    # data percentages, and a regex over source text cannot see whether the
+    # rendered fraction sits beside a given percentage in the DOM, which is
+    # the actual rule (FRAGO section 4.2). Line 13, driven, checks the real
+    # rule against the rendered page instead.
 
 
 # =============================================================================
@@ -467,6 +509,47 @@ def _enter_view(page, view_id, admin_entry_selector, settle_ms, cfg=None, role=N
     if loc.count() == 0:
         return False
     loc.first.click()
+    page.wait_for_timeout(settle_ms)
+    return True
+
+
+# v1.1. Area pages are not top-level nav items (FRAGO 4.5: they open from a
+# tile on the tracker home, not from the sidebar), so they cannot be reached
+# by _enter_view's data-view lookup. These two helpers reach them by clicking
+# into the area-tiles grid instead, and are shared by every new driver that
+# needs "an area page" or "every area page".
+
+AREA_TILE_SELECTOR = "[data-testid='area-tile']"
+
+
+def _area_tile_count(page, cfg, settle_ms):
+    """Sign in as the client, open the tracker, and count the clickable
+    tiles inside area-tiles. Returns 0 if the tracker or the tiles are not
+    reachable, which a caller treats as a driver failure, not a skip."""
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return 0
+    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        return 0
+    tiles_sel = "[data-testid='area-tiles']"
+    if not _wait_for(page, tiles_sel, 6000):
+        return 0
+    return page.locator(AREA_TILE_SELECTOR).count()
+
+
+def _enter_area_page(page, cfg, settle_ms, index=0):
+    """Sign in as the client, open the tracker, and click the tile at
+    `index` inside area-tiles. Returns False if any step fails."""
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False
+    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        return False
+    tiles_sel = "[data-testid='area-tiles']"
+    if not _wait_for(page, tiles_sel, 6000):
+        return False
+    tiles = page.locator(AREA_TILE_SELECTOR)
+    if tiles.count() <= index:
+        return False
+    tiles.nth(index).click()
     page.wait_for_timeout(settle_ms)
     return True
 
@@ -653,13 +736,26 @@ def drv_print_hides_chrome_shows_statement(page, cfg, line, res, errors):
 
 
 def drv_no_horizontal_overflow(page, cfg, line, res, errors):
-    """Line 8: at 390 wide, no named view produces horizontal overflow."""
+    """Line 8: at 390 wide, no named view produces horizontal overflow.
+    v1.1 adds "area" as a pseudo-view name: since an area page has no
+    data-view nav item (FRAGO 4.5), it is reached via _enter_area_page
+    instead of _enter_view. cfg and role are now passed into _enter_view too,
+    so a view is re-reached correctly even if the session role has drifted;
+    previously this was omitted, which happened to work only because line 7
+    always leaves the session on the client role immediately before this
+    line runs."""
     views = line.get("views", [])
     admin_entry = line.get("admin_entry_selector")
     settle_ms = line.get("settle_ms", 400)
+    role = line.get("role")
     overflowing = []
     for v in views:
-        if not _enter_view(page, v, admin_entry, settle_ms):
+        entered = (
+            _enter_area_page(page, cfg, settle_ms)
+            if v == "area"
+            else _enter_view(page, v, admin_entry, settle_ms, cfg, role)
+        )
+        if not entered:
             overflowing.append(f"{v}:nav-missing")
             continue
         over = page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
@@ -684,6 +780,331 @@ def drv_noindex_in_head(page, cfg, line, res, errors):
     return ok, "noindex present in head" if ok else "noindex not found in head"
 
 
+# --- v1.1 drivers, for the Compliance Tracker. --------------------------
+
+def drv_tracker_home_elements(page, cfg, line, res, errors):
+    """Line 11: the client's home is the Compliance Tracker and answers the
+    six questions. Every named test id must be present; a missing one is a
+    fail, not a skip, exactly as line 11's own wording says."""
+    settle_ms = line.get("settle_ms", 400)
+    testids = line.get("testids", [])
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        return False, "the client tracker view was not reachable"
+    missing = [t for t in testids if not _wait_for(page, f"[data-testid='{t}']", 6000)]
+    ok = not missing
+    return ok, (f"all {len(testids)} test ids present" if ok
+                else f"missing: {', '.join(missing)}")
+
+
+def drv_task_table_columns(page, cfg, line, res, errors):
+    """Line 12: every task table shows the six questions, in order, and they
+    are not renamed.
+
+    The six must appear as a contiguous run, in order. A table may carry extra
+    operator-only columns around them: the admin workplan adds area, phase,
+    progress and actions, which the client never sees. What the rule forbids is
+    renaming one of the six, dropping one, or reordering them.
+    """
+    settle_ms = line.get("settle_ms", 400)
+    expected = [c.upper() for c in line.get("columns", ["What", "How", "Who", "When", "Done", "Status"])]
+    table_sel = line.get("table_selector", "[data-testid='task-table']")
+    problems = []
+    checked = 0
+
+    def headers_of(scope_label):
+        nonlocal checked
+        tables = page.locator(table_sel)
+        count = tables.count()
+        if count == 0:
+            problems.append(f"{scope_label}: {table_sel} not found")
+            return
+        for i in range(count):
+            cells = tables.nth(i).locator("th")
+            got = [cells.nth(j).inner_text().strip().upper() for j in range(cells.count())]
+            if not got:
+                problems.append(f"{scope_label} table[{i}]: no header cells")
+                continue
+            checked += 1
+            joined = "|".join(got)
+            run = "|".join(expected)
+            if run not in joined:
+                problems.append(f"{scope_label} table[{i}]: {got}")
+
+    # The client's area page carries a task table. The tracker home does not:
+    # it is tiles and a "for you" list, and the order does not put a table there.
+    if _enter_area_page(page, cfg, settle_ms):
+        headers_of("client:area")
+    else:
+        problems.append("client:area: no area page reachable")
+
+    if _ensure_role(page, cfg, "admin", cfg["_target"]) and _enter_view(
+        page, "workplan", None, settle_ms, cfg, "admin"
+    ):
+        _wait_for(page, table_sel, 6000)
+        headers_of("admin:workplan")
+    else:
+        problems.append("admin:workplan: view not reachable")
+
+    ok = not problems
+    detail = (
+        f"{checked} task table(s) carry the six questions in order"
+        if ok
+        else "; ".join(problems[:4])
+    )
+    return ok, detail
+
+
+def _find_percentages_without_fraction(page):
+    """Runs in the browser. Walks the text nodes of the page, and for any
+    text containing a bare N%, checks whether the fraction "N of M" appears
+    in the same element's text or its parent's text. Returns the offending
+    snippets, trimmed; this is rendered UI copy, not restricted data, so it
+    may be quoted in the report."""
+    return page.evaluate(
+        """
+        () => {
+          const pctRe = /\\d+%/;
+          const fracRe = /\\d+\\s+of\\s+\\d+/;
+          const offenders = [];
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          let node;
+          while ((node = walker.nextNode())) {
+            const raw = node.textContent;
+            if (!pctRe.test(raw)) continue;
+            const el = node.parentElement;
+            if (!el) continue;
+            const nearby = el.textContent + " " + (el.parentElement ? el.parentElement.textContent : "");
+            if (!fracRe.test(nearby)) {
+              offenders.push(raw.trim().slice(0, 120));
+            }
+          }
+          return offenders;
+        }
+        """
+    )
+
+
+def drv_percentage_has_fraction(page, cfg, line, res, errors):
+    """Line 13: no percentage is shown without its fraction beside it, on
+    every client tracker and area page."""
+    settle_ms = line.get("settle_ms", 400)
+    offenders = []
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        offenders.append("tracker: view not reachable")
+    else:
+        page.wait_for_timeout(settle_ms)
+        for f in _find_percentages_without_fraction(page):
+            offenders.append(f'tracker: "{f}"')
+
+    if not _enter_area_page(page, cfg, settle_ms):
+        offenders.append("area: view not reachable")
+    else:
+        page.wait_for_timeout(settle_ms)
+        for f in _find_percentages_without_fraction(page):
+            offenders.append(f'area: "{f}"')
+
+    ok = not offenders
+    return ok, ("no bare percentage found" if ok else "; ".join(offenders[:8]))
+
+
+def _restore_illustrative_switch(page, cfg, toggle_sel, settle_ms):
+    """Sign back in as the operator and switch show-illustrative back on.
+    Shared by line 6's driver logic and the v1.1 tracker equivalent, kept as
+    a separate copy in each driver rather than a shared refactor of line 6,
+    so line 6's working behaviour is not touched by this addition."""
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False
+    if not _enter_view(page, "settings", None, settle_ms, cfg, "admin"):
+        return False
+    if not _wait_for(page, toggle_sel):
+        return False
+    toggle = page.locator(toggle_sel).first
+    try:
+        toggle.wait_for(state="visible", timeout=6000)
+        page.wait_for_timeout(600)
+        toggle.check(timeout=6000)
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            page.wait_for_timeout(settle_ms * 5)
+        return toggle.is_checked()
+    except Exception:
+        return False
+
+
+def drv_tracker_excludes_illustrative_when_off(page, cfg, line, res, errors):
+    """Line 14: with the operator's show-illustrative switch off, no
+    illustrative figure is reachable on the client side of the tracker. Same
+    two-role pattern as line 6: turn the switch off as the operator, read the
+    client side, then put the switch back before returning, whatever the
+    result, so later lines and resolutions are not left with an empty demo
+    Record."""
+    settle_ms = line.get("settle_ms", 400)
+    toggle_sel = line.get("toggle_selector", "[data-testid='toggle-illustrative']")
+    forbidden = line.get("forbidden_text", "illustrative")
+
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator account"
+    if not _enter_view(page, line.get("settings_view", "settings"), None, settle_ms, cfg, "admin"):
+        return False, "the operator's settings view was not reachable"
+    if not _wait_for(page, toggle_sel):
+        return False, f"{toggle_sel} not found in the operator's settings"
+    toggle = page.locator(toggle_sel).first
+    try:
+        toggle.wait_for(state="visible", timeout=6000)
+        page.wait_for_timeout(600)
+        toggle.uncheck(timeout=6000)
+    except Exception as exc:
+        return False, f"could not switch the demo setting off: {type(exc).__name__}"
+    try:
+        page.wait_for_load_state("networkidle", timeout=10000)
+    except Exception:
+        page.wait_for_timeout(settle_ms * 5)
+    if toggle.is_checked():
+        return False, "the demo switch did not stay off"
+
+    hits = []
+    if not _sign_in(page, cfg, "client", cfg["_target"]):
+        hits.append("could not sign back in as the client account")
+    else:
+        if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+            hits.append("tracker: view not reachable")
+        else:
+            page.wait_for_timeout(settle_ms)
+            body_text = page.locator("body").inner_text()
+            if forbidden.lower() in body_text.lower():
+                hits.append("tracker")
+
+        if not _enter_area_page(page, cfg, settle_ms):
+            hits.append("area: view not reachable")
+        else:
+            page.wait_for_timeout(settle_ms)
+            body_text = page.locator("body").inner_text()
+            if forbidden.lower() in body_text.lower():
+                hits.append("area")
+
+    restored = _restore_illustrative_switch(page, cfg, toggle_sel, settle_ms)
+    if not restored:
+        return False, "the demo switch could not be put back on after the check"
+
+    ok = not hits
+    return ok, (f"'{forbidden}' not found on the client tracker or area page" if ok
+                else f"'{forbidden}' found on: {', '.join(hits)}")
+
+
+_FORBIDDEN_TASK_CONTROL_RE = re.compile(
+    r"edit|delete|remove|reopen|reprioritise|change status|mark done", re.I
+)
+
+
+def drv_client_read_only_workplan(page, cfg, line, res, errors):
+    """Line 15: the client can confirm a task assigned to them and can do
+    nothing else to the workplan. This is FRAGO section 12's stop condition
+    made executable, so it is deliberately strict: a confirm control must
+    exist in for-you, and no button or link anywhere on the tracker or any
+    area page may offer to edit, delete, reprioritise or change status."""
+    settle_ms = line.get("settle_ms", 400)
+    for_you_sel = line.get("for_you_selector", "[data-testid='for-you']")
+    confirm_sel = line.get("confirm_selector", "[data-testid='confirm-task']")
+    pattern = _FORBIDDEN_TASK_CONTROL_RE
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        return False, "the client tracker view was not reachable"
+    if not _wait_for(page, for_you_sel, 6000):
+        return False, f"{for_you_sel} not found"
+    for_you = page.locator(for_you_sel)
+    if for_you.locator(confirm_sel).count() == 0:
+        return False, f"{confirm_sel} not found inside {for_you_sel}"
+
+    offenders = []
+
+    def scan(label):
+        controls = page.locator("button, a")
+        for i in range(controls.count()):
+            try:
+                text = controls.nth(i).inner_text().strip()
+            except Exception:
+                continue
+            if text and pattern.search(text):
+                offenders.append(f"{label}: '{text}'")
+
+    scan("tracker")
+
+    tile_count = _area_tile_count(page, cfg, settle_ms)
+    for idx in range(tile_count):
+        if not _enter_area_page(page, cfg, settle_ms, idx):
+            offenders.append(f"area[{idx}]: view not reachable")
+            continue
+        scan(f"area[{idx}]")
+
+    ok = not offenders
+    detail = ("confirm control present; no edit/delete/reprioritise control found"
+              if ok else f"confirm present; forbidden controls: {'; '.join(offenders[:8])}")
+    return ok, detail
+
+
+def drv_area_print_clean(page, cfg, line, res, errors):
+    """Line 16: an area page prints as a clean document. Header and nav are
+    hidden; the obligation text and the task table remain visible. Reset to
+    screen explicitly afterwards, as line 7 already does, for the same
+    reason: media=None does not reliably clear the override in this
+    Playwright build."""
+    settle_ms = line.get("settle_ms", 400)
+    if not _enter_area_page(page, cfg, settle_ms):
+        return False, "no area page reachable"
+    chrome_sel = line.get("chrome_selector", "header, nav")
+    obligation_sel = line.get("obligation_selector", "[data-testid='obligation']")
+    table_sel = line.get("table_selector", "[data-testid='task-table']")
+    _wait_for(page, table_sel, 6000)
+    try:
+        page.emulate_media(media="print")
+        page.wait_for_timeout(200)
+        chrome_loc = page.locator(chrome_sel)
+        chrome_visible = chrome_loc.first.is_visible() if chrome_loc.count() > 0 else False
+        obligation_loc = page.locator(obligation_sel)
+        obligation_visible = obligation_loc.first.is_visible() if obligation_loc.count() > 0 else False
+        table_loc = page.locator(table_sel)
+        table_visible = table_loc.first.is_visible() if table_loc.count() > 0 else False
+    finally:
+        page.emulate_media(media="screen")
+        page.wait_for_timeout(100)
+    ok = (not chrome_visible) and obligation_visible and table_visible
+    return ok, (f"chrome visible under print: {chrome_visible}, "
+                f"obligation visible: {obligation_visible}, task table visible: {table_visible}")
+
+
+def drv_kpi_tiles_never_blank(page, cfg, line, res, errors):
+    """Line 17: "no data yet" is a state, not a blank. Every KPI tile on the
+    client tracker must render non-empty text."""
+    settle_ms = line.get("settle_ms", 400)
+    row_sel = line.get("kpi_row_selector", "[data-testid='kpi-row']")
+    tile_sel = line.get("kpi_tile_selector", "[data-testid='kpi-tile']")
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        return False, "the client tracker view was not reachable"
+    if not _wait_for(page, row_sel, 6000):
+        return False, f"{row_sel} not found"
+
+    tiles = page.locator(f"{row_sel} {tile_sel}")
+    n = tiles.count()
+    if n == 0:
+        return False, f"no {tile_sel} found inside {row_sel}"
+
+    blanks = [str(i) for i in range(n) if not tiles.nth(i).inner_text().strip()]
+    ok = not blanks
+    return ok, (f"{n} KPI tile(s), all non-empty" if ok
+                else f"{n} KPI tile(s), blank at index: {', '.join(blanks)}")
+
+
 DRIVERS = {
     "sign_in_lands_on_portal": drv_sign_in_lands_on_portal,
     "views_render": drv_views_render,
@@ -694,6 +1115,14 @@ DRIVERS = {
     "no_horizontal_overflow": drv_no_horizontal_overflow,
     "console_clean": drv_console_clean,
     "noindex_in_head": drv_noindex_in_head,
+    # v1.1, the Compliance Tracker.
+    "tracker_home_elements": drv_tracker_home_elements,
+    "task_table_columns": drv_task_table_columns,
+    "percentage_has_fraction": drv_percentage_has_fraction,
+    "tracker_excludes_illustrative_when_off": drv_tracker_excludes_illustrative_when_off,
+    "client_read_only_workplan": drv_client_read_only_workplan,
+    "area_print_clean": drv_area_print_clean,
+    "kpi_tiles_never_blank": drv_kpi_tiles_never_blank,
 }
 
 

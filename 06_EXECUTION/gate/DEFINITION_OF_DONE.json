@@ -1,5 +1,5 @@
 {
-  "iteration": "v1.0",
+  "iteration": "v1.1",
   "written": "2026-09-16",
   "lines": [
     {
@@ -31,7 +31,8 @@
         "value",
         "statement",
         "posture",
-        "exposure"
+        "exposure",
+        "tracker"
       ],
       "heading_selector": "h1, h2",
       "settle_ms": 400,
@@ -44,7 +45,7 @@
     },
     {
       "id": 3,
-      "line": "Signed in as the operator, every admin view loads and renders a heading: review queue, Record, clocks, policy pack, posture, alerts, exports, settings, audit.",
+      "line": "Signed in as the operator, every admin view loads and renders a heading: review queue, Record, clocks, policy pack, posture, alerts, exports, settings, audit, workplan, procedures.",
       "drive": "playwright",
       "check": "views_render",
       "pass": "The operator account signs in and each nav element carrying data-view for the listed id is clickable and a non-empty heading appears.",
@@ -57,7 +58,9 @@
         "alerts",
         "exports",
         "settings",
-        "audit"
+        "audit",
+        "workplan",
+        "procedures"
       ],
       "heading_selector": "h1, h2",
       "settle_ms": 400,
@@ -144,14 +147,16 @@
       "line": "At 390 pixels wide, no view produces horizontal overflow.",
       "drive": "playwright",
       "check": "no_horizontal_overflow",
-      "pass": "document.documentElement.scrollWidth does not exceed window.innerWidth + 1 on any listed view.",
+      "pass": "document.documentElement.scrollWidth does not exceed window.innerWidth + 1 on any listed view. \"area\" is a pseudo-view: an area page reached by clicking the first tile in area-tiles, since area pages have no nav data-view.",
       "views": [
         "guide",
         "request",
         "value",
         "statement",
         "posture",
-        "exposure"
+        "exposure",
+        "tracker",
+        "area"
       ],
       "settle_ms": 400,
       "applies_to": [
@@ -182,6 +187,144 @@
         "1366x768",
         "390x844"
       ]
+    },
+    {
+      "id": 11,
+      "line": "The client's home is the Compliance Tracker and answers the six questions.",
+      "drive": "playwright",
+      "check": "tracker_home_elements",
+      "pass": "Signed in as the client, data-view='tracker' is reachable, and every one of tracker-header, overall-status, journey-strip, kpi-row, area-tiles and for-you is present. A missing test id is a fail, not a skip.",
+      "testids": [
+        "tracker-header",
+        "overall-status",
+        "journey-strip",
+        "kpi-row",
+        "area-tiles",
+        "for-you"
+      ],
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 12,
+      "line": "Every task table shows the six questions, in order, and they are not renamed.",
+      "drive": "playwright",
+      "check": "task_table_columns",
+      "pass": "Every [data-testid='task-table'] found on the client tracker, on an area page, and on the admin Workplan page has header cells reading exactly What, How, Who, When, Done, Status, in that order.",
+      "table_selector": "[data-testid='task-table']",
+      "columns": [
+        "What",
+        "How",
+        "Who",
+        "When",
+        "Done",
+        "Status"
+      ],
+      "targets": [
+        {
+          "role": "client",
+          "view": "tracker"
+        },
+        {
+          "role": "client",
+          "view": "area"
+        },
+        {
+          "role": "admin",
+          "view": "workplan"
+        }
+      ],
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ]
+    },
+    {
+      "id": 13,
+      "line": "No percentage is shown without its fraction beside it.",
+      "drive": "playwright",
+      "check": "percentage_has_fraction",
+      "pass": "On the client tracker and on an area page, every rendered N% has an \"N of M\" fraction in the same element's text or its parent's text. Offending text is reported quoted; it is rendered UI copy, not restricted data.",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 14,
+      "line": "No illustrative figure is reachable on the client side of the tracker.",
+      "drive": "playwright",
+      "check": "tracker_excludes_illustrative_when_off",
+      "pass": "With the operator's show-illustrative switch off, the word \"illustrative\" does not appear anywhere on the client tracker or on an area page. The switch is put back on afterwards regardless of the result.",
+      "toggle_selector": "[data-testid='toggle-illustrative']",
+      "forbidden_text": "illustrative",
+      "settings_view": "settings",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 15,
+      "line": "The client can confirm a task assigned to them and can do nothing else to the workplan.",
+      "drive": "playwright",
+      "check": "client_read_only_workplan",
+      "pass": "A [data-testid='confirm-task'] control exists inside [data-testid='for-you']. No button or link on the client tracker or on any area page has accessible text matching edit, delete, remove, reopen, reprioritise, change status or mark done. This is FRAGO section 12's stop condition made executable, so it is strict: every area tile is visited, not just one.",
+      "for_you_selector": "[data-testid='for-you']",
+      "confirm_selector": "[data-testid='confirm-task']",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 16,
+      "line": "An area page prints as a clean document.",
+      "drive": "playwright",
+      "check": "area_print_clean",
+      "pass": "With media emulated as print, header and nav are not visible, and the obligation text and the task table are visible. Media is reset to screen explicitly afterwards, as line 7 already does.",
+      "chrome_selector": "header, nav",
+      "obligation_selector": "[data-testid='obligation']",
+      "table_selector": "[data-testid='task-table']",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 17,
+      "line": "\"No data yet\" is a state, not a blank.",
+      "drive": "playwright",
+      "check": "kpi_tiles_never_blank",
+      "pass": "Every tile inside [data-testid='kpi-row'] renders non-empty text. A tile with nothing to count says \"No data yet\" (or equivalent); it never renders empty.",
+      "kpi_row_selector": "[data-testid='kpi-row']",
+      "kpi_tile_selector": "[data-testid='kpi-tile']",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
     }
   ]
 }

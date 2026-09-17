@@ -7,7 +7,14 @@ import {
 } from "@maximus/shared";
 import { mutateOrg, newId, readOrg } from "../db/store.ts";
 import type { EntryRecord, DeadlineLabel } from "../db/model.ts";
-import { applyFilter, periodsOf, serviceLineViews, statementOf, totalsOf } from "../lib/record.ts";
+import {
+  applyFilter,
+  obligationsLine,
+  periodsOf,
+  serviceLineViews,
+  statementOf,
+  totalsOf,
+} from "../lib/record.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
 
@@ -54,7 +61,15 @@ adminRecordRoutes.get("/record/statement", async (c) => {
   const visible = doc.entries.filter(
     (e) => e.reviewed && (doc.settings.showIllustrative || !e.ill),
   );
-  return c.json(statementOf(applyFilter(visible, { period }), doc.settings, period || "all periods"));
+  return c.json(
+    statementOf(
+      applyFilter(visible, { period }),
+      doc.settings,
+      period || "all periods",
+      new Date(),
+      obligationsLine(doc),
+    ),
+  );
 });
 
 adminRecordRoutes.post("/record", async (c) => {
