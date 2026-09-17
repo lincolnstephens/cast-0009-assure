@@ -34,7 +34,7 @@ export function LoginPage() {
     <div className="flex h-full items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="text-2xl font-semibold tracking-[0.3em] text-hud-text">MAXIMUS</div>
+          <div className="text-2xl font-semibold tracking-[0.3em] text-hud-text">TESSERA ASSURE</div>
           <div className="mt-2 border-t border-hud-gold/60 pt-2 text-xs uppercase tracking-widest text-hud-muted">
             MITMARK Intelligence
           </div>

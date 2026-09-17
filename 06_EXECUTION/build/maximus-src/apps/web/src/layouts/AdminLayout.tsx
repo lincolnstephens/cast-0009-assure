@@ -39,9 +39,9 @@ export function AdminLayout() {
       <aside className="flex w-full shrink-0 flex-col border-b border-hud-line bg-hud-panel/60 sm:w-44 sm:border-b-0 sm:border-r md:w-52">
         <div className="border-b border-hud-gold/40 px-4 py-3">
           <MitmarkLogo className="mb-2 h-5 w-auto opacity-80" />
-          <div className="text-sm font-semibold tracking-[0.25em]">MAXIMUS</div>
+          <div className="text-sm font-semibold tracking-[0.25em]">TESSERA ASSURE</div>
           <div className="mt-0.5 text-[11px] uppercase tracking-wider text-hud-gold">
-            MITMARK HITL
+            ADMIN WORKSPACE
           </div>
         </div>
         <nav className="flex-1 py-2">

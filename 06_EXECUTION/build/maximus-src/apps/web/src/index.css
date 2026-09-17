@@ -52,8 +52,16 @@
 }
 
 /* Expose the house tokens to Tailwind so utilities (bg-hud-bg, text-client-muted, ...)
-   resolve to them. Existing class names in components keep working unchanged. */
-@theme {
+   resolve to them. Existing class names in components keep working unchanged.
+
+   `inline` matters here and is not cosmetic. A custom property declared on
+   :root with a var() value is substituted once, at :root, and the result is
+   what inherits; redefining --surface-base further down the tree would not
+   change it. That is why the client portal rendered in night colours while
+   carrying data-theme="day". With `inline`, Tailwind emits the underlying
+   var() in the utility itself, so each element resolves the token in its own
+   scope and the day override takes effect. */
+@theme inline {
   /* Reference (not inline) the house radius so the plain `rounded` utility
      stays theme-reactive: square at night, 8px in day, per element scope. */
   --radius: var(--radius);
@@ -96,24 +104,27 @@ body {
   font-family: var(--sans);
 }
 
+/* These read the house tokens directly, not the Tailwind colour aliases. An
+   alias is substituted once at :root, so it would pin the portal to the night
+   palette regardless of the data-theme="day" it carries. */
 .client-portal {
   min-height: 100%;
   width: 100%;
-  background-color: var(--color-client-bg);
-  color: var(--color-client-text);
+  background-color: var(--surface-base);
+  color: var(--text);
 }
 
 .client-portal h1,
 .client-portal h2,
 .client-portal h3 {
-  color: var(--color-client-accent);
+  color: var(--client-accent, var(--accent));
 }
 
 .admin-workspace {
   min-height: 100%;
   width: 100%;
-  background-color: var(--color-hud-bg);
-  color: var(--color-hud-text);
+  background-color: var(--surface-base);
+  color: var(--text);
 }
 
 .tabular-nums {
@@ -130,28 +141,28 @@ body {
 .client-portal .markdown-body p {
   margin-bottom: 0.6em;
   line-height: 1.65;
-  color: var(--color-client-text);
+  color: var(--text);
 }
 .client-portal .markdown-body ul,
 .client-portal .markdown-body ol {
   margin: 0.4em 0 0.8em 1.2em;
   list-style: disc;
-  color: var(--color-client-text);
+  color: var(--text);
 }
 .client-portal .markdown-body ol {
   list-style: decimal;
 }
 .client-portal .markdown-body strong {
-  color: var(--color-client-text);
+  color: var(--text);
   font-weight: 600;
 }
 .client-portal .markdown-body a {
-  color: var(--color-client-accent);
+  color: var(--client-accent, var(--accent));
   text-decoration: underline;
 }
 .client-portal .markdown-body code {
-  background: var(--color-client-line);
-  color: var(--color-client-text);
+  background: var(--border);
+  color: var(--text);
   padding: 0.1em 0.35em;
   border-radius: 3px;
   font-size: 0.9em;
@@ -161,7 +172,7 @@ body {
 .client-portal .markdown-body h3 {
   font-weight: 600;
   margin: 0.8em 0 0.4em;
-  color: var(--color-client-accent);
+  color: var(--client-accent, var(--accent));
 }
 
 /* Policy markdown - admin HUD */
@@ -178,11 +189,11 @@ body {
   list-style: decimal;
 }
 .markdown-body strong {
-  color: var(--color-hud-text);
+  color: var(--text);
   font-weight: 600;
 }
 .markdown-body a {
-  color: var(--color-hud-accent);
+  color: var(--accent);
   text-decoration: underline;
 }
 .markdown-body code {
