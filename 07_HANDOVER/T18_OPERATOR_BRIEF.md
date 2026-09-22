@@ -1,8 +1,8 @@
 ---
 document: OPERATOR_BRIEF
 job: CAST-0009 ASSURE
-product: Tessera Assure v1.1
-version: v1.1
+product: Tessera Assure v1.2
+version: v1.2
 status: FOR THE MITMARK OPERATOR
 authority: Seagull, written by the build session under T02 A6
 register_id: T18
@@ -19,8 +19,8 @@ For the MITMARK data compliance officer who runs the client's DPO contract, and 
 
 Tessera Assure is the record of what MITMARK does under the retained contract, and the statement that record produces. It has two sides.
 
-- The **client portal** is what the Information Officer sees. Her front page is the **Compliance Tracker**: where she stands overall, the five phases of the journey, six measures, the eight areas of the work, and anything waiting on her. Beneath it sit the eight area pages, the Policy Guide, the two intakes she already had, the policy pack, the posture, and the **Value** section, which is the Record and the Statement.
-- The **admin workspace** is yours: the **Workplan**, the review queue, the statutory clocks, the policies, the **Procedures**, the posture, the **Record** and the **Settings**.
+- The **client portal** is what the Information Officer sees, in six places: Compliance Tracker, Compliance Documents, Jobs, Requests and clocks, Value, and Statement for the CFO. Her front page is the **Compliance Tracker**: where she stands overall, the five phases of the journey, six measures, the eight areas of the work, and anything waiting on her. Beneath it sit the eight area pages, the Policy Guide, the two intakes she already had, the policy pack, the posture, and the **Value** section, which is the Record and the Statement.
+- The **admin workspace** is yours: the **Workplan**, **Jobs**, **Documents**, the review queue, the statutory clocks, the policies, the **Procedures**, the posture, the exposure alerts, the **Record** and the **Settings**.
 
 The product does not deliver the service. It records it, and now it also plans it, so that the Information Officer can see what she is getting, what is still to do, and what it is worth to her CFO.
 
@@ -142,6 +142,63 @@ Do not guess the staffing numbers. A tile that says "not recorded" is worth more
 The front page says something like "12 of 18 obligations met, 67%, as at 17 September". The denominator is every task that has actually fallen due, plus the always-on duties. A task due next month is not counted, because it is not yet an obligation she has failed to meet. Tasks you mark **not applicable** drop out of the count entirely.
 
 The fraction always appears beside the percentage. If anyone asks what the number rests on, the answer is on the page.
+
+## 5d. Compliance Documents (v1.2)
+
+**Documents**, in the admin workspace. The client sees the same repository read only.
+
+Three sections, because they answer three different questions.
+
+| Section | What goes in it | Who fills it |
+|---|---|---|
+| Policies | The approved policy pack, with its version history | **Nobody. It fills itself** from the policy pack as you approve versions |
+| Procedures | How MITMARK does the work in each module, and the process map | You, from the Procedures page |
+| Trackers | The registers: processing activities, employee access, data requests, breaches, vendors, transfers | You, here |
+
+You add a tracker either as a **file** or as a **link**. A link is better for anything that changes weekly: link the live spreadsheet and the client always sees the current one. A file is a point-in-time copy, so give it an as-at date.
+
+**There is a file size limit and it is lower than you might expect.** Files pass through the site's function layer, which rejects anything much over 4 MB once encoded. The interface tells you the working limit and refuses a file over it rather than failing halfway through an upload. Anything larger goes in as a link. That is not a shortcoming to work around: a 20 MB register is better linked than copied anyway, because the copy goes stale the day you upload it.
+
+The client can open and download. She cannot upload, edit or delete anything, and there is no control on her side that suggests otherwise.
+
+Set the **documents target date** in Settings. Until a section has anything in it, the client sees what MITMARK will publish there and when. An empty section with a date is a promise; an empty section without one looks like neglect.
+
+## 5e. Jobs (v1.2)
+
+**Jobs** is every task across all eight modules in one list, on both sides. It is the page Lurong asked for: one place to see what is outstanding rather than eight.
+
+Three groups, in her words:
+
+- **Not started**
+- **In progress**. This includes blocked tasks, each carrying a "blocked" flag. Blocked is not a fourth column; it is a thing to go and unblock.
+- **Completed**
+
+Tasks marked **not applicable** are not listed to the client, but the count is shown, so nothing disappears silently.
+
+The tasks waiting on the client sit at the top of her page with the confirm control. The rest she reads. The same six columns as everywhere else.
+
+The **Policy Guide sits at the foot of this page** as "Ask a question". Questions and tasks are in one place, which is how she said she works.
+
+## 5f. What changed in the modules at v1.2
+
+Two modules were re-scoped. Nothing was deleted and no task was lost: existing tasks moved with their identity.
+
+| Module | Was | Now |
+|---|---|---|
+| 2 | Data mapping and processing records | **Data tracker review**: the RoPA plus the registers: employee access and international transfers |
+| 4 | Cross-border data transfers | **Policy review**: the pack reviewed one policy at a time, plus the privacy notice |
+
+The old cross-border work did not vanish: the transfers register review moved into module 2, and the safeguard that must be in place before a new transfer starts moved into module 7 with the rest of the vendor and contract work.
+
+The annual "policy suite refresh" was one task covering six policies, which is not how you actually work. It is now six tasks, one per policy, two hours each. The old task is retired from new applications but still exists, because live tasks point at it.
+
+## 5g. The overall figure changed at v1.2
+
+It now reads **"Nothing overdue"** or **"{k} overdue or blocked"** beneath the fraction.
+
+The change is in how continuous duties count. A duty like "handle every request within one month" has no date, so it can never be overdue. Before, it counted as unmet until you signed it off for the period, which meant a client who was entirely up to date still opened on a low number. Now it counts only when there is something live against it: an open clock, or something waiting in your review queue.
+
+The stricter view is still yours. **Settings** has a toggle: "Signed off this cycle" counts every continuous duty until you close it. Use it to see what you have not yet signed off. The client always sees the overdue view.
 
 ## 6. Importing the v0.1 export
 

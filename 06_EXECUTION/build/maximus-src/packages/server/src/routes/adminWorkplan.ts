@@ -1,19 +1,25 @@
 import { Hono } from "hono";
 import {
   AREA_IDS,
+  JOB_GROUP_LABEL,
   LIBRARY_TASKS,
+  RAG_LABEL,
+  TASK_STATUS_LABEL,
   applyLibrarySchema,
   areaName,
   expandLibrary,
+  jobGroupOf,
   procedureInputSchema,
   taskInputSchema,
   taskStatusSchema,
+  type JobGroup,
 } from "@maximus/shared";
 import type { OrgDoc, ProcedureRecord, TaskRecord } from "../db/model.ts";
 import { mutateOrg, newId, readOrg } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
 import { raiseEntry } from "../lib/raiseEntry.ts";
+import { overallStatus, ownerLabel, taskRag, today } from "../lib/tracker.ts";
 import { AREA_LINE, applyLibraryToDoc, hoursForTask } from "../lib/workplan.ts";
 
 /**
@@ -317,4 +323,67 @@ adminWorkplanRoutes.put("/procedures/:area", async (c) => {
   });
 
   return c.json(procedure);
+});
+
+// ---------------------------------------------------------------------------
+// Jobs: the operator's mirror of the client's Jobs page (FRAGO §5). Unlike
+// the client's view, a not applicable task is not hidden - it is the
+// operator's working view, so it is listed under `notApplicable` rather
+// than folded into a count only.
+// ---------------------------------------------------------------------------
+
+const JOB_GROUP_ORDER: JobGroup[] = ["not_started", "in_progress", "completed"];
+
+function jobTaskOf(t: TaskRecord, asAt: string) {
+  const rag = taskRag(t, asAt);
+  return {
+    ...t,
+    rag,
+    ragLabel: RAG_LABEL[rag],
+    statusLabel: TASK_STATUS_LABEL[t.status],
+    ownerLabel: ownerLabel(t),
+    areaName: areaName(t.area),
+    blocked: t.status === "blocked",
+    forYou: t.ownerType === "client",
+  };
+}
+
+adminWorkplanRoutes.get("/jobs", async (c) => {
+  const orgId = orgIdOf(c);
+  const doc = await readOrg(orgId);
+  if (!doc) return c.json({ error: "Organisation not found" }, 404);
+
+  const asAt = today(new Date());
+  const all = doc.tasks;
+
+  const modules = AREA_IDS.filter((id) => all.some((t) => t.area === id)).map((id) => ({
+    id,
+    name: areaName(id),
+  }));
+  const owners = Array.from(new Set(all.map((t) => ownerLabel(t)))).sort();
+
+  const groups = JOB_GROUP_ORDER.map((id) => ({
+    id,
+    name: JOB_GROUP_LABEL[id],
+    tasks: all
+      .filter((t) => jobGroupOf(t.status) === id)
+      .map((t) => jobTaskOf(t, asAt)),
+  }));
+
+  const notApplicable = all.filter((t) => t.status === "not_applicable").map((t) => jobTaskOf(t, asAt));
+
+  return c.json({
+    groups,
+    notApplicable,
+    notApplicableCount: notApplicable.length,
+    modules,
+    owners,
+    /**
+     * The operator's own reading of where the client stands, counted the way
+     * they have chosen in settings. The client's figure is always the overdue
+     * count and is unaffected by this; see lib/tracker.ts.
+     */
+    overall: overallStatus(doc, new Date(), doc.settings.denominatorMode ?? "overdue"),
+    clientOverall: overallStatus(doc, new Date(), "overdue"),
+  });
 });

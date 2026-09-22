@@ -42,7 +42,8 @@ export const AREA_DEFAULT_HOURS: Record<AreaId, number> = {
   1: 1,
   2: 4,
   3: 6,
-  4: 5,
+  // Policy review is two hours a policy, not the five a transfer assessment took.
+  4: 2,
   5: 8,
   6: 4,
   7: 6,
@@ -63,7 +64,8 @@ export const AREA_LINE: Record<AreaId, number> = {
   1: 12,
   2: 2,
   3: 3,
-  4: 12,
+  // Module 4 is policy review from v1.2, so its work books to the policy line.
+  4: 3,
   5: 1,
   6: 4,
   7: 6,

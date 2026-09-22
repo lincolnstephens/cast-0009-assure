@@ -1054,3 +1054,1124 @@
 | 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
 | 16 | L16 @390x844: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
 | 17 | L17 @390x844: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+
+## Run 2026-09-22 09:29Z - https://tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.2. **Verdict:** FAIL, 50 of 75.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 121 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | static: TASK_COLUMNS is What, How, Who, When, Done, Status in order | PASS | matches exactly |
+|  | static: the eight module names match FRAGO 02 section 3, in order | PASS | matches exactly |
+|  | static: no file write outside documents.ts and the Blobs store | PASS | no hits |
+|  | driven: definition of done present | PASS | 22 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track | FAIL | failed: documents:nav-missing, jobs:nav-missing |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | FAIL | failed: documents-admin:nav-missing, jobs-admin:nav-missing |
+| 4 | L4 @1920x1080: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1920x1080: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1920x1080: Every task table shows the six questions, in order, and they are not r | FAIL | client:jobs: view not reachable |
+| 13 | L13 @1920x1080: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else | FAIL | confirm present; forbidden controls: jobs: view not reachable; documents: view not reachable |
+| 16 | L16 @1920x1080: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
+| 17 | L17 @1920x1080: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1920x1080: The client's navigation is Lurong's, in her order. | FAIL | expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure'] |
+| 19 | L19 @1920x1080: The eight modules carry their v1.2 titles. | FAIL | [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found |
+| 20 | L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr | FAIL | the client documents view was not reachable |
+| 21 | L21 @1920x1080: Jobs shows every task in the three groups with the six questions. | FAIL | the client jobs view was not reachable |
+| 22 | L22 @1920x1080: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track | FAIL | failed: documents:nav-missing, jobs:nav-missing |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | FAIL | failed: documents-admin:nav-missing, jobs-admin:nav-missing |
+| 4 | L4 @1366x768: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1366x768: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1366x768: Every task table shows the six questions, in order, and they are not r | FAIL | client:jobs: view not reachable |
+| 13 | L13 @1366x768: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1366x768: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1366x768: The client can confirm a task assigned to them and can do nothing else | FAIL | confirm present; forbidden controls: area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Oct 2026DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Jan 2027DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Apr 2027DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Jul 2027DoneNot yetStatusOn trackNot started'; jobs: view not reachable; documents: view not reachable |
+| 16 | L16 @1366x768: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
+| 17 | L17 @1366x768: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1366x768: The client's navigation is Lurong's, in her order. | FAIL | expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure'] |
+| 19 | L19 @1366x768: The eight modules carry their v1.2 titles. | FAIL | [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found |
+| 20 | L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr | FAIL | the client documents view was not reachable |
+| 21 | L21 @1366x768: Jobs shows every task in the three groups with the six questions. | FAIL | the client jobs view was not reachable |
+| 22 | L22 @1366x768: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Compliance Track | FAIL | failed: documents:nav-missing, jobs:nav-missing |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | FAIL | failed: documents-admin:nav-missing, jobs-admin:nav-missing |
+| 4 | L4 @390x844: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th | FAIL | overflow on: documents:nav-missing, jobs:nav-missing |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @390x844: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @390x844: Every task table shows the six questions, in order, and they are not r | FAIL | client:area: [data-testid='task-table'] not found; client:jobs: view not reachable |
+| 13 | L13 @390x844: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @390x844: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | FAIL | confirm present; forbidden controls: area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Oct 2026
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Jan 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Apr 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Jul 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; jobs: view not reachable; documents: view not reachable |
+| 16 | L16 @390x844: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
+| 17 | L17 @390x844: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @390x844: The client's navigation is Lurong's, in her order. | FAIL | expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure'] |
+| 19 | L19 @390x844: The eight modules carry their v1.2 titles. | FAIL | [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found |
+| 20 | L20 @390x844: Compliance Documents shows the three sections and the client cannot wr | FAIL | the client documents view was not reachable |
+| 21 | L21 @390x844: Jobs shows every task in the three groups with the six questions. | FAIL | the client jobs view was not reachable |
+| 22 | L22 @390x844: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+
+**Failed:**
+
+- L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track: failed: documents:nav-missing, jobs:nav-missing
+- L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin: failed: documents-admin:nav-missing, jobs-admin:nav-missing
+- L12 @1920x1080: Every task table shows the six questions, in order, and they are not r: client:jobs: view not reachable
+- L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else: confirm present; forbidden controls: jobs: view not reachable; documents: view not reachable
+- L18 @1920x1080: The client's navigation is Lurong's, in her order.: expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure']
+- L19 @1920x1080: The eight modules carry their v1.2 titles.: [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found
+- L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr: the client documents view was not reachable
+- L21 @1920x1080: Jobs shows every task in the three groups with the six questions.: the client jobs view was not reachable
+- L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track: failed: documents:nav-missing, jobs:nav-missing
+- L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin: failed: documents-admin:nav-missing, jobs-admin:nav-missing
+- L12 @1366x768: Every task table shows the six questions, in order, and they are not r: client:jobs: view not reachable
+- L15 @1366x768: The client can confirm a task assigned to them and can do nothing else: confirm present; forbidden controls: area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Oct 2026DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Jan 2027DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Apr 2027DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Jul 2027DoneNot yetStatusOn trackNot started'; jobs: view not reachable; documents: view not reachable
+- L18 @1366x768: The client's navigation is Lurong's, in her order.: expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure']
+- L19 @1366x768: The eight modules carry their v1.2 titles.: [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found
+- L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr: the client documents view was not reachable
+- L21 @1366x768: Jobs shows every task in the three groups with the six questions.: the client jobs view was not reachable
+- L2 @390x844: Every client portal view loads and renders a heading: Compliance Track: failed: documents:nav-missing, jobs:nav-missing
+- L3 @390x844: Signed in as the operator, every admin view loads and renders a headin: failed: documents-admin:nav-missing, jobs-admin:nav-missing
+- L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th: overflow on: documents:nav-missing, jobs:nav-missing
+- L12 @390x844: Every task table shows the six questions, in order, and they are not r: client:area: [data-testid='task-table'] not found; client:jobs: view not reachable
+- L15 @390x844: The client can confirm a task assigned to them and can do nothing else: confirm present; forbidden controls: area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Oct 2026
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Jan 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Apr 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Jul 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; jobs: view not reachable; documents: view not reachable
+- L18 @390x844: The client's navigation is Lurong's, in her order.: expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure']
+- L19 @390x844: The eight modules carry their v1.2 titles.: [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found
+- L20 @390x844: Compliance Documents shows the three sections and the client cannot wr: the client documents view was not reachable
+- L21 @390x844: Jobs shows every task in the three groups with the six questions.: the client jobs view was not reachable
+
+## Run 2026-09-22 09:38Z - https://6ab24a32a5466b9b50484f46--tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.2. **Verdict:** FAIL, 62 of 75.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 122 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | static: TASK_COLUMNS is What, How, Who, When, Done, Status in order | PASS | matches exactly |
+|  | static: the eight module names match FRAGO 02 section 3, in order | PASS | matches exactly |
+|  | static: no file write outside documents.ts and the Blobs store | PASS | no hits |
+|  | driven: definition of done present | PASS | 22 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1920x1080: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1920x1080: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1920x1080: Every task table shows the six questions, in order, and they are not r | FAIL | client:area: [data-testid='task-table'] not found; client:jobs table[1]: no header cells |
+| 13 | L13 @1920x1080: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else | FAIL | confirm present; forbidden controls: area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Oct 2026DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Jan 2027DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Apr 2027DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Jul 2027DoneNot yetStatusOn trackNot started' |
+| 16 | L16 @1920x1080: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
+| 17 | L17 @1920x1080: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1920x1080: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1920x1080: The eight modules carry their v1.2 titles. | FAIL | [data-testid='area-tile-name'] not found; sub-nav reads ['1. DPO registration', '2. Data tracker review', '3. Data retention', '4. Policy review', '5. Data protection impact assessment', '6. Data subject requests', '7. Vendor data risk', '8. Data breach and incident management'] |
+| 20 | L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1920x1080: Jobs shows every task in the three groups with the six questions. | FAIL | group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed'; table[1] columns read [] |
+| 22 | L22 @1920x1080: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1366x768: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1366x768: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1366x768: Every task table shows the six questions, in order, and they are not r | FAIL | client:area: [data-testid='task-table'] not found; client:jobs table[1]: no header cells |
+| 13 | L13 @1366x768: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1366x768: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1366x768: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1366x768: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
+| 17 | L17 @1366x768: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1366x768: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1366x768: The eight modules carry their v1.2 titles. | FAIL | [data-testid='area-tile-name'] not found; sub-nav reads ['1. DPO registration', '2. Data tracker review', '3. Data retention', '4. Policy review', '5. Data protection impact assessment', '6. Data subject requests', '7. Vendor data risk', '8. Data breach and incident management'] |
+| 20 | L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1366x768: Jobs shows every task in the three groups with the six questions. | FAIL | group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed'; table[1] columns read [] |
+| 22 | L22 @1366x768: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @390x844: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | FAIL | the operator's settings view was not reachable |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | FAIL | chrome visible under print: False, statement visible under print: False |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th | PASS | 7 views checked, no overflow |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @390x844: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @390x844: Every task table shows the six questions, in order, and they are not r | FAIL | client:jobs table[1]: no header cells |
+| 13 | L13 @390x844: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @390x844: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | FAIL | confirm present; forbidden controls: area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Oct 2026
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Jan 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Apr 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Jul 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started' |
+| 16 | L16 @390x844: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
+| 17 | L17 @390x844: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @390x844: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @390x844: The eight modules carry their v1.2 titles. | FAIL | [data-testid='area-tile-name'] not found; sub-nav reads ['1. DPO registration', '2. Data tracker review', '3. Data retention', '4. Policy review', '5. Data protection impact assessment', '6. Data subject requests', '7. Vendor data risk', '8. Data breach and incident management'] |
+| 20 | L20 @390x844: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @390x844: Jobs shows every task in the three groups with the six questions. | FAIL | group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed'; table[1] columns read [] |
+| 22 | L22 @390x844: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+
+**Failed:**
+
+- L12 @1920x1080: Every task table shows the six questions, in order, and they are not r: client:area: [data-testid='task-table'] not found; client:jobs table[1]: no header cells
+- L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else: confirm present; forbidden controls: area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Oct 2026DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Jan 2027DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Apr 2027DoneNot yetStatusOn trackNot started'; area[1]: 'WhatReview the employee access tracker: who can reach what personal data, and whether they still need to.HowMITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.WhoMITMARKWhen21 Jul 2027DoneNot yetStatusOn trackNot started'
+- L19 @1920x1080: The eight modules carry their v1.2 titles.: [data-testid='area-tile-name'] not found; sub-nav reads ['1. DPO registration', '2. Data tracker review', '3. Data retention', '4. Policy review', '5. Data protection impact assessment', '6. Data subject requests', '7. Vendor data risk', '8. Data breach and incident management']
+- L21 @1920x1080: Jobs shows every task in the three groups with the six questions.: group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed'; table[1] columns read []
+- L12 @1366x768: Every task table shows the six questions, in order, and they are not r: client:area: [data-testid='task-table'] not found; client:jobs table[1]: no header cells
+- L19 @1366x768: The eight modules carry their v1.2 titles.: [data-testid='area-tile-name'] not found; sub-nav reads ['1. DPO registration', '2. Data tracker review', '3. Data retention', '4. Policy review', '5. Data protection impact assessment', '6. Data subject requests', '7. Vendor data risk', '8. Data breach and incident management']
+- L21 @1366x768: Jobs shows every task in the three groups with the six questions.: group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed'; table[1] columns read []
+- L6 @390x844: With the operator's show illustrative switch off, no illustrative entr: the operator's settings view was not reachable
+- L7 @390x844: Print output hides the header and navigation and shows the Statement.: chrome visible under print: False, statement visible under print: False
+- L12 @390x844: Every task table shows the six questions, in order, and they are not r: client:jobs table[1]: no header cells
+- L15 @390x844: The client can confirm a task assigned to them and can do nothing else: confirm present; forbidden controls: area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Oct 2026
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Jan 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Apr 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'; area[1]: 'WHAT
+
+Review the employee access tracker: who can reach what personal data, and whether they still need to.
+
+HOW
+
+MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.
+
+WHO
+
+MITMARK
+
+WHEN
+
+21 Jul 2027
+
+DONE
+
+Not yet
+
+STATUS
+
+ON TRACK
+Not started'
+- L19 @390x844: The eight modules carry their v1.2 titles.: [data-testid='area-tile-name'] not found; sub-nav reads ['1. DPO registration', '2. Data tracker review', '3. Data retention', '4. Policy review', '5. Data protection impact assessment', '6. Data subject requests', '7. Vendor data risk', '8. Data breach and incident management']
+- L21 @390x844: Jobs shows every task in the three groups with the six questions.: group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed'; table[1] columns read []
+
+## Run 2026-09-22 09:41Z - https://tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.2. **Verdict:** FAIL, 49 of 75.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 122 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | static: TASK_COLUMNS is What, How, Who, When, Done, Status in order | PASS | matches exactly |
+|  | static: the eight module names match FRAGO 02 section 3, in order | PASS | matches exactly |
+|  | static: no file write outside documents.ts and the Blobs store | PASS | no hits |
+|  | driven: definition of done present | PASS | 22 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track | FAIL | failed: documents:nav-missing, jobs:nav-missing |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | FAIL | failed: documents-admin:nav-missing, jobs-admin:nav-missing |
+| 4 | L4 @1920x1080: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1920x1080: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1920x1080: Every task table shows the six questions, in order, and they are not r | FAIL | client:area: [data-testid='task-table'] not found; client:jobs: view not reachable |
+| 13 | L13 @1920x1080: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else | FAIL | confirm present; forbidden controls: jobs: view not reachable; documents: view not reachable |
+| 16 | L16 @1920x1080: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
+| 17 | L17 @1920x1080: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1920x1080: The client's navigation is Lurong's, in her order. | FAIL | expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure'] |
+| 19 | L19 @1920x1080: The eight modules carry their v1.2 titles. | FAIL | [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found |
+| 20 | L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr | FAIL | the client documents view was not reachable |
+| 21 | L21 @1920x1080: Jobs shows every task in the three groups with the six questions. | FAIL | the client jobs view was not reachable |
+| 22 | L22 @1920x1080: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track | FAIL | failed: documents:nav-missing, jobs:nav-missing |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | FAIL | failed: documents-admin:nav-missing, jobs-admin:nav-missing |
+| 4 | L4 @1366x768: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1366x768: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1366x768: Every task table shows the six questions, in order, and they are not r | FAIL | client:area: [data-testid='task-table'] not found; client:jobs: view not reachable |
+| 13 | L13 @1366x768: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1366x768: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1366x768: The client can confirm a task assigned to them and can do nothing else | FAIL | confirm present; forbidden controls: jobs: view not reachable; documents: view not reachable |
+| 16 | L16 @1366x768: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
+| 17 | L17 @1366x768: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1366x768: The client's navigation is Lurong's, in her order. | FAIL | expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure'] |
+| 19 | L19 @1366x768: The eight modules carry their v1.2 titles. | FAIL | [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found |
+| 20 | L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr | FAIL | the client documents view was not reachable |
+| 21 | L21 @1366x768: Jobs shows every task in the three groups with the six questions. | FAIL | the client jobs view was not reachable |
+| 22 | L22 @1366x768: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Compliance Track | FAIL | failed: documents:nav-missing, jobs:nav-missing |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | FAIL | failed: documents-admin:nav-missing, jobs-admin:nav-missing |
+| 4 | L4 @390x844: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th | FAIL | overflow on: documents:nav-missing, jobs:nav-missing |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @390x844: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @390x844: Every task table shows the six questions, in order, and they are not r | FAIL | client:area: [data-testid='task-table'] not found; client:jobs: view not reachable |
+| 13 | L13 @390x844: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @390x844: No illustrative figure is reachable on the client side of the tracker. | FAIL | 'illustrative' found on: tracker: view not reachable |
+| 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | FAIL | confirm present; forbidden controls: jobs: view not reachable; documents: view not reachable |
+| 16 | L16 @390x844: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
+| 17 | L17 @390x844: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @390x844: The client's navigation is Lurong's, in her order. | FAIL | expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure'] |
+| 19 | L19 @390x844: The eight modules carry their v1.2 titles. | FAIL | [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found |
+| 20 | L20 @390x844: Compliance Documents shows the three sections and the client cannot wr | FAIL | the client documents view was not reachable |
+| 21 | L21 @390x844: Jobs shows every task in the three groups with the six questions. | FAIL | the client jobs view was not reachable |
+| 22 | L22 @390x844: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+
+**Failed:**
+
+- L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track: failed: documents:nav-missing, jobs:nav-missing
+- L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin: failed: documents-admin:nav-missing, jobs-admin:nav-missing
+- L12 @1920x1080: Every task table shows the six questions, in order, and they are not r: client:area: [data-testid='task-table'] not found; client:jobs: view not reachable
+- L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else: confirm present; forbidden controls: jobs: view not reachable; documents: view not reachable
+- L18 @1920x1080: The client's navigation is Lurong's, in her order.: expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure']
+- L19 @1920x1080: The eight modules carry their v1.2 titles.: [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found
+- L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr: the client documents view was not reachable
+- L21 @1920x1080: Jobs shows every task in the three groups with the six questions.: the client jobs view was not reachable
+- L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track: failed: documents:nav-missing, jobs:nav-missing
+- L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin: failed: documents-admin:nav-missing, jobs-admin:nav-missing
+- L12 @1366x768: Every task table shows the six questions, in order, and they are not r: client:area: [data-testid='task-table'] not found; client:jobs: view not reachable
+- L15 @1366x768: The client can confirm a task assigned to them and can do nothing else: confirm present; forbidden controls: jobs: view not reachable; documents: view not reachable
+- L18 @1366x768: The client's navigation is Lurong's, in her order.: expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure']
+- L19 @1366x768: The eight modules carry their v1.2 titles.: [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found
+- L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr: the client documents view was not reachable
+- L21 @1366x768: Jobs shows every task in the three groups with the six questions.: the client jobs view was not reachable
+- L2 @390x844: Every client portal view loads and renders a heading: Compliance Track: failed: documents:nav-missing, jobs:nav-missing
+- L3 @390x844: Signed in as the operator, every admin view loads and renders a headin: failed: documents-admin:nav-missing, jobs-admin:nav-missing
+- L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th: overflow on: documents:nav-missing, jobs:nav-missing
+- L12 @390x844: Every task table shows the six questions, in order, and they are not r: client:area: [data-testid='task-table'] not found; client:jobs: view not reachable
+- L14 @390x844: No illustrative figure is reachable on the client side of the tracker.: 'illustrative' found on: tracker: view not reachable
+- L15 @390x844: The client can confirm a task assigned to them and can do nothing else: confirm present; forbidden controls: jobs: view not reachable; documents: view not reachable
+- L18 @390x844: The client's navigation is Lurong's, in her order.: expected ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], got ['tracker', 'guide', 'request', 'value', 'statement', 'posture', 'exposure']
+- L19 @390x844: The eight modules carry their v1.2 titles.: [data-testid='area-tile-name'] not found; [data-testid='module-nav-item'] not found
+- L20 @390x844: Compliance Documents shows the three sections and the client cannot wr: the client documents view was not reachable
+- L21 @390x844: Jobs shows every task in the three groups with the six questions.: the client jobs view was not reachable
+
+## Run 2026-09-22 09:50Z - https://6ab24cf8a3bfe5804cb0fdf1--tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.2. **Verdict:** FAIL, 65 of 75.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 122 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | static: TASK_COLUMNS is What, How, Who, When, Done, Status in order | PASS | matches exactly |
+|  | static: the eight module names match FRAGO 02 section 3, in order | PASS | matches exactly |
+|  | static: no file write outside documents.ts and the Blobs store | PASS | no hits |
+|  | driven: definition of done present | PASS | 22 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1920x1080: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1920x1080: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1920x1080: Every task table shows the six questions, in order, and they are not r | FAIL | client:area: [data-testid='task-table'] not found |
+| 13 | L13 @1920x1080: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1920x1080: An area page prints as a clean document. | FAIL | chrome visible under print: False, obligation visible: True, task table visible: False |
+| 17 | L17 @1920x1080: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1920x1080: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1920x1080: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1920x1080: Jobs shows every task in the three groups with the six questions. | FAIL | group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed' |
+| 22 | L22 @1920x1080: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1366x768: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1366x768: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1366x768: Every task table shows the six questions, in order, and they are not r | FAIL | client:area: [data-testid='task-table'] not found |
+| 13 | L13 @1366x768: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1366x768: No illustrative figure is reachable on the client side of the tracker. | FAIL | 'illustrative' found on: tracker: view not reachable |
+| 15 | L15 @1366x768: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1366x768: An area page prints as a clean document. | FAIL | chrome visible under print: False, obligation visible: True, task table visible: False |
+| 17 | L17 @1366x768: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1366x768: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1366x768: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1366x768: Jobs shows every task in the three groups with the six questions. | FAIL | group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed' |
+| 22 | L22 @1366x768: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @390x844: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th | PASS | 7 views checked, no overflow |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @390x844: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @390x844: Every task table shows the six questions, in order, and they are not r | FAIL | client:area: [data-testid='task-table'] not found |
+| 13 | L13 @390x844: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @390x844: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @390x844: An area page prints as a clean document. | FAIL | chrome visible under print: False, obligation visible: True, task table visible: False |
+| 17 | L17 @390x844: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @390x844: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @390x844: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @390x844: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @390x844: Jobs shows every task in the three groups with the six questions. | FAIL | group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed' |
+| 22 | L22 @390x844: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+
+**Failed:**
+
+- L12 @1920x1080: Every task table shows the six questions, in order, and they are not r: client:area: [data-testid='task-table'] not found
+- L16 @1920x1080: An area page prints as a clean document.: chrome visible under print: False, obligation visible: True, task table visible: False
+- L21 @1920x1080: Jobs shows every task in the three groups with the six questions.: group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed'
+- L12 @1366x768: Every task table shows the six questions, in order, and they are not r: client:area: [data-testid='task-table'] not found
+- L14 @1366x768: No illustrative figure is reachable on the client side of the tracker.: 'illustrative' found on: tracker: view not reachable
+- L16 @1366x768: An area page prints as a clean document.: chrome visible under print: False, obligation visible: True, task table visible: False
+- L21 @1366x768: Jobs shows every task in the three groups with the six questions.: group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed'
+- L12 @390x844: Every task table shows the six questions, in order, and they are not r: client:area: [data-testid='task-table'] not found
+- L16 @390x844: An area page prints as a clean document.: chrome visible under print: False, obligation visible: True, task table visible: False
+- L21 @390x844: Jobs shows every task in the three groups with the six questions.: group heading missing: 'Not started'; group heading missing: 'In progress'; group heading missing: 'Completed'
+
+## Run 2026-09-22 10:02Z - https://6ab24fd43b4730c00c78c16f--tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.2. **Verdict:** FAIL, 71 of 75.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 122 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | static: TASK_COLUMNS is What, How, Who, When, Done, Status in order | PASS | matches exactly |
+|  | static: the eight module names match FRAGO 02 section 3, in order | PASS | matches exactly |
+|  | static: no file write outside documents.ts and the Blobs store | PASS | no hits |
+|  | driven: definition of done present | PASS | 22 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1920x1080: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1920x1080: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1920x1080: Every task table shows the six questions, in order, and they are not r | PASS | 4 task table(s) carry the six questions in order |
+| 13 | L13 @1920x1080: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker. | FAIL | 'illustrative' found on: tracker: view not reachable |
+| 15 | L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1920x1080: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
+| 17 | L17 @1920x1080: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1920x1080: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1920x1080: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1920x1080: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @1920x1080: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1366x768: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1366x768: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1366x768: Every task table shows the six questions, in order, and they are not r | FAIL | client:area: [data-testid='task-table'] not found |
+| 13 | L13 @1366x768: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1366x768: No illustrative figure is reachable on the client side of the tracker. | FAIL | 'illustrative' found on: tracker: view not reachable |
+| 15 | L15 @1366x768: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1366x768: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, task table visible: True |
+| 17 | L17 @1366x768: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1366x768: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1366x768: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1366x768: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @1366x768: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @390x844: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th | PASS | 7 views checked, no overflow |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @390x844: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @390x844: Every task table shows the six questions, in order, and they are not r | PASS | 4 task table(s) carry the six questions in order |
+| 13 | L13 @390x844: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @390x844: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @390x844: An area page prints as a clean document. | FAIL | chrome visible under print: False, obligation visible: True, task table visible: False |
+| 17 | L17 @390x844: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @390x844: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @390x844: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @390x844: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @390x844: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @390x844: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+
+**Failed:**
+
+- L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker.: 'illustrative' found on: tracker: view not reachable
+- L12 @1366x768: Every task table shows the six questions, in order, and they are not r: client:area: [data-testid='task-table'] not found
+- L14 @1366x768: No illustrative figure is reachable on the client side of the tracker.: 'illustrative' found on: tracker: view not reachable
+- L16 @390x844: An area page prints as a clean document.: chrome visible under print: False, obligation visible: True, task table visible: False
+
+## Run 2026-09-22 10:12Z - https://6ab24fd43b4730c00c78c16f--tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.2. **Verdict:** FAIL, 74 of 75.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 122 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | static: TASK_COLUMNS is What, How, Who, When, Done, Status in order | PASS | matches exactly |
+|  | static: the eight module names match FRAGO 02 section 3, in order | PASS | matches exactly |
+|  | static: no file write outside documents.ts and the Blobs store | PASS | no hits |
+|  | driven: definition of done present | PASS | 22 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1920x1080: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1920x1080: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1920x1080: Every task table shows the six questions, in order, and they are not r | PASS | 4 task table(s) carry the six questions in order |
+| 13 | L13 @1920x1080: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1920x1080: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, tasks visible: True |
+| 17 | L17 @1920x1080: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1920x1080: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1920x1080: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1920x1080: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @1920x1080: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1366x768: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1366x768: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1366x768: Every task table shows the six questions, in order, and they are not r | PASS | 4 task table(s) carry the six questions in order |
+| 13 | L13 @1366x768: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1366x768: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1366x768: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1366x768: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, tasks visible: True |
+| 17 | L17 @1366x768: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1366x768: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1366x768: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1366x768: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @1366x768: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @390x844: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th | PASS | 7 views checked, no overflow |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @390x844: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @390x844: Every task table shows the six questions, in order, and they are not r | FAIL | client:area: [data-testid='task-table'] not found |
+| 13 | L13 @390x844: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @390x844: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @390x844: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, tasks visible: True |
+| 17 | L17 @390x844: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @390x844: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @390x844: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @390x844: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @390x844: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @390x844: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+
+**Failed:**
+
+- L12 @390x844: Every task table shows the six questions, in order, and they are not r: client:area: [data-testid='task-table'] not found
+
+## Run 2026-09-22 10:21Z - https://6ab24fd43b4730c00c78c16f--tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.2. **Verdict:** PASS, 75 of 75.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 122 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | static: TASK_COLUMNS is What, How, Who, When, Done, Status in order | PASS | matches exactly |
+|  | static: the eight module names match FRAGO 02 section 3, in order | PASS | matches exactly |
+|  | static: no file write outside documents.ts and the Blobs store | PASS | no hits |
+|  | driven: definition of done present | PASS | 22 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1920x1080: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1920x1080: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1920x1080: Every task table shows the six questions, in order, and they are not r | PASS | 4 task table(s) carry the six questions in order |
+| 13 | L13 @1920x1080: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1920x1080: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, tasks visible: True |
+| 17 | L17 @1920x1080: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1920x1080: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1920x1080: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1920x1080: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @1920x1080: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1366x768: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1366x768: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1366x768: Every task table shows the six questions, in order, and they are not r | PASS | 4 task table(s) carry the six questions in order |
+| 13 | L13 @1366x768: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1366x768: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1366x768: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1366x768: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, tasks visible: True |
+| 17 | L17 @1366x768: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1366x768: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1366x768: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1366x768: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @1366x768: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @390x844: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th | PASS | 7 views checked, no overflow |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @390x844: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @390x844: Every task table shows the six questions, in order, and they are not r | PASS | 4 task table(s) carry the six questions in order |
+| 13 | L13 @390x844: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @390x844: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @390x844: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, tasks visible: True |
+| 17 | L17 @390x844: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @390x844: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @390x844: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @390x844: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @390x844: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @390x844: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+
+## Run 2026-09-22 10:33Z - https://tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.2. **Verdict:** PASS, 75 of 75.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 122 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | static: TASK_COLUMNS is What, How, Who, When, Done, Status in order | PASS | matches exactly |
+|  | static: the eight module names match FRAGO 02 section 3, in order | PASS | matches exactly |
+|  | static: no file write outside documents.ts and the Blobs store | PASS | no hits |
+|  | driven: definition of done present | PASS | 22 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1920x1080: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1920x1080: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1920x1080: Every task table shows the six questions, in order, and they are not r | PASS | 4 task table(s) carry the six questions in order |
+| 13 | L13 @1920x1080: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1920x1080: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, tasks visible: True |
+| 17 | L17 @1920x1080: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1920x1080: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1920x1080: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1920x1080: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @1920x1080: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @1366x768: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1366x768: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @1366x768: Every task table shows the six questions, in order, and they are not r | PASS | 4 task table(s) carry the six questions in order |
+| 13 | L13 @1366x768: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @1366x768: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1366x768: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1366x768: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, tasks visible: True |
+| 17 | L17 @1366x768: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @1366x768: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @1366x768: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1366x768: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @1366x768: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | PASS | 13 views render a heading |
+| 4 | L4 @390x844: The Record table in the Value view renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th | PASS | 7 views checked, no overflow |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @390x844: The client's home is the Compliance Tracker and answers the six questi | PASS | all 6 test ids present |
+| 12 | L12 @390x844: Every task table shows the six questions, in order, and they are not r | PASS | 4 task table(s) carry the six questions in order |
+| 13 | L13 @390x844: No percentage is shown without its fraction beside it. | PASS | no bare percentage found |
+| 14 | L14 @390x844: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @390x844: An area page prints as a clean document. | PASS | chrome visible under print: False, obligation visible: True, tasks visible: True |
+| 17 | L17 @390x844: "No data yet" is a state, not a blank. | PASS | 6 KPI tile(s), all non-empty |
+| 18 | L18 @390x844: The client's navigation is Lurong's, in her order. | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'value', 'statement'], in order, with none of ['posture', 'exposure'] |
+| 19 | L19 @390x844: The eight modules carry their v1.2 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @390x844: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @390x844: Jobs shows every task in the three groups with the six questions. | PASS | three groups present, task tables carry the six columns, confirm control present |
+| 22 | L22 @390x844: The overall figure says where the client stands. | PASS | standing phrase present: True; percentage present: True, fraction present: True |

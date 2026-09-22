@@ -6,15 +6,22 @@ import { ClientPoweredBy } from "../components/ClientPoweredBy";
 import { useAuth } from "../store/auth";
 
 // `view` is the identifier the gate drives the product by. The label is what
-// the Information Officer reads; the two are deliberately not the same string.
+// the Information Officer reads; the two are deliberately not the same
+// string.
+//
+// v1.2 (FRAGO 02 section 4): the client navigation follows the operator's structure.
+// Posture is folded into the tracker as its "Areas by status" panel, and the
+// Policy Guide is no longer a menu item - it sits at the foot of Jobs and
+// stays reachable from each module page. Their routes stay live in App.tsx
+// so any existing link to /posture, /exposure or /guide still works; only
+// the menu items go.
 const navItems = [
   { to: "/", label: "Compliance Tracker", view: "tracker", end: true },
-  { to: "/guide", label: "Policy Guide", view: "guide" },
+  { to: "/documents", label: "Compliance Documents", view: "documents" },
+  { to: "/jobs", label: "Jobs", view: "jobs" },
   { to: "/clocks", label: "Requests and clocks", view: "request" },
   { to: "/value", label: "Value", view: "value", end: true },
   { to: "/value/statement", label: "Statement for the CFO", view: "statement" },
-  { to: "/posture", label: "Posture", view: "posture" },
-  { to: "/exposure", label: "Exposure", view: "exposure" },
 ];
 
 export function ClientLayout() {

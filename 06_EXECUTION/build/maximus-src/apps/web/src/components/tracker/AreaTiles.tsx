@@ -24,7 +24,9 @@ export function AreaTiles({ areas }: { areas: AreaSummary[] }) {
               data-testid="area-tile"
               className="block rounded border border-client-line bg-client-surface p-4 hover:border-client-accent"
             >
-              <div className="text-[13px] font-medium leading-snug text-client-text">{a.name}</div>
+              <div data-testid="area-tile-name" className="text-[13px] font-medium leading-snug text-client-text">
+                {a.name}
+              </div>
               <div className="mt-2">
                 <RagMark rag={a.rag} label={a.ragLabel} />
               </div>

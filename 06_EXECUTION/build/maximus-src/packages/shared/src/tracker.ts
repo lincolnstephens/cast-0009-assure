@@ -17,12 +17,20 @@ import { z } from "zod";
 // The eight areas and the five phases
 // ---------------------------------------------------------------------------
 
+/**
+ * The eight modules, titled as MITMARK's operator names them.
+ *
+ * The ids are stable. Two modules were re-scoped at v1.2: module 2 became the
+ * review of the trackers the client keeps, and module 4 became policy review,
+ * with the old cross-border work moved into modules 2 and 7 where it belongs.
+ * Nothing was deleted; existing tasks were moved by id.
+ */
 export const AREAS = [
-  { id: 1, name: "DPO registration and ICO" },
-  { id: 2, name: "Data mapping and processing records" },
+  { id: 1, name: "DPO registration" },
+  { id: 2, name: "Data tracker review" },
   { id: 3, name: "Data retention" },
-  { id: 4, name: "Cross-border data transfers" },
-  { id: 5, name: "Data protection impact assessments" },
+  { id: 4, name: "Policy review" },
+  { id: 5, name: "Data protection impact assessment" },
   { id: 6, name: "Data subject requests" },
   { id: 7, name: "Vendor data risk" },
   { id: 8, name: "Data breach and incident management" },
@@ -240,6 +248,14 @@ export const libraryTaskSchema = z.object({
   defaultHours: z.number().min(0),
   /** Days after the cycle start that the first instance falls due. */
   defaultOffsetDays: z.number().int().min(0),
+  /**
+   * True for a library task that must no longer be applied to a fresh
+   * workplan, because it has been replaced by other tasks. Its id is kept,
+   * never deleted, because existing tasks already created from it still
+   * point at this id by `source` and must keep resolving. `expandLibrary`
+   * skips a retired task, so a fresh apply produces only its replacements.
+   */
+  retired: z.boolean().optional(),
 });
 export type LibraryTask = z.infer<typeof libraryTaskSchema>;
 
@@ -273,8 +289,12 @@ export const overallStatusSchema = z.object({
   pct: z.number().int(),
   /** "12 of 18 obligations met, 67%, as at 17 September 2026" */
   sentence: z.string(),
+  /** "Nothing overdue", or "3 overdue or blocked". */
+  standing: z.string(),
   asAt: z.string(),
   basis: z.string(),
+  /** Which way the obligations were counted. */
+  mode: z.enum(["overdue", "cycle"]),
   byArea: z.array(
     z.object({
       area: z.number().int(),
@@ -405,3 +425,187 @@ export type AreaPage = z.infer<typeof areaPageSchema>;
 
 /** The six questions, in order, on every task table. Never renamed. */
 export const TASK_COLUMNS = ["What", "How", "Who", "When", "Done", "Status"] as const;
+
+// ---------------------------------------------------------------------------
+// Compliance Documents
+// ---------------------------------------------------------------------------
+
+/**
+ * The repository. Three sections, because that is how the operator thinks about
+ * them: what we said we would do, how we do it, and the registers that record
+ * that we did.
+ *
+ * The client reads and downloads. Only the operator puts anything in.
+ */
+export const documentSectionSchema = z.enum(["policies", "procedures", "trackers"]);
+export type DocumentSection = z.infer<typeof documentSectionSchema>;
+
+export const DOCUMENT_SECTIONS: { id: DocumentSection; name: string; blurb: string }[] = [
+  {
+    id: "policies",
+    name: "Policies",
+    blurb: "What the organisation has committed to. The approved pack, with its version history.",
+  },
+  {
+    id: "procedures",
+    name: "Procedures",
+    blurb: "How MITMARK does the work in each module, and the process map for it.",
+  },
+  {
+    id: "trackers",
+    name: "Trackers",
+    blurb:
+      "The registers that record what happened: processing activities, employee access, data requests, breaches, vendors and transfers.",
+  },
+];
+
+export const documentKindSchema = z.enum(["file", "link", "policy"]);
+export type DocumentKind = z.infer<typeof documentKindSchema>;
+
+/** The registers the Trackers section expects, so an empty one can still be named. */
+export const TRACKER_DOCUMENTS: { key: string; title: string; area: number }[] = [
+  { key: "ropa", title: "Record of processing activities", area: 2 },
+  { key: "access", title: "Employee access tracker", area: 2 },
+  { key: "transfers", title: "International transfers register", area: 2 },
+  { key: "dsar", title: "Data request log", area: 6 },
+  { key: "breach", title: "Breach register", area: 8 },
+  { key: "vendor", title: "Vendor list", area: 7 },
+];
+
+export const documentSchema = z.object({
+  id: z.string(),
+  orgId: z.string(),
+  section: documentSectionSchema,
+  /** The module it belongs to, or null when it spans all of them. */
+  area: z.number().int().min(1).max(8).nullable(),
+  title: z.string(),
+  /** A version for a policy, an as-at date for a register. Either may be empty. */
+  version: z.string(),
+  asAt: z.string(),
+  owner: z.string(),
+  kind: documentKindSchema,
+  /** Set when the item is a file in the store. */
+  blobKey: z.string().nullable(),
+  fileName: z.string(),
+  contentType: z.string(),
+  sizeBytes: z.number().int(),
+  /** Set when the item is a link to somewhere else. */
+  url: z.string(),
+  published: z.boolean(),
+  updatedAt: z.string(),
+  updatedBy: z.string(),
+});
+export type ComplianceDocument = z.infer<typeof documentSchema>;
+
+/**
+ * The cap on a stored file. Anything larger is held as a link instead.
+ *
+ * The order asked for 10 MB. The platform cannot carry it: a function request
+ * body is buffered at 6 MB, and a file travels as base64, which inflates it by
+ * a third. Measured against the deployed site, a 6 MB body is refused with 413
+ * and 4 MB passes. The cap is therefore the largest that reliably arrives, and
+ * the operator's page says so rather than failing an upload halfway through.
+ * Recorded against FRAGO 02 section 4.2 in the build report.
+ */
+export const DOCUMENT_MAX_BYTES = 4 * 1024 * 1024;
+
+export const documentInputSchema = z.object({
+  section: documentSectionSchema,
+  area: z.coerce.number().int().min(1).max(8).nullable().default(null),
+  title: z.string().trim().min(1).max(300),
+  version: z.string().trim().max(60).default(""),
+  asAt: z.string().trim().max(40).default(""),
+  owner: z.string().trim().max(160).default(""),
+  kind: documentKindSchema.default("link"),
+  url: z.string().trim().max(1000).default(""),
+  /** Base64 of the file, when one is being uploaded. */
+  fileBase64: z.string().default(""),
+  fileName: z.string().trim().max(300).default(""),
+  contentType: z.string().trim().max(200).default(""),
+  published: z.boolean().default(true),
+});
+export type DocumentInput = z.infer<typeof documentInputSchema>;
+
+export const documentsResponseSchema = z.object({
+  sections: z.array(
+    z.object({
+      id: documentSectionSchema,
+      name: z.string(),
+      blurb: z.string(),
+      items: z.array(documentSchema),
+      /** What MITMARK will publish here, and when, while it is empty. */
+      emptyMessage: z.string(),
+      emptyTargetDate: z.string().nullable(),
+    }),
+  ),
+});
+export type DocumentsResponse = z.infer<typeof documentsResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Jobs
+// ---------------------------------------------------------------------------
+
+/**
+ * Every task across all eight modules in one list, grouped the way the operator
+ * speaks about them. The internal statuses are finer than this on purpose: a
+ * blocked task is still in progress to a reader, but it carries a flag saying
+ * so, because "blocked" is the word that gets it unblocked.
+ */
+export const jobGroupSchema = z.enum(["not_started", "in_progress", "completed"]);
+export type JobGroup = z.infer<typeof jobGroupSchema>;
+
+export const JOB_GROUP_LABEL: Record<JobGroup, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  completed: "Completed",
+};
+
+export function jobGroupOf(status: TaskStatus): JobGroup | null {
+  if (status === "not_applicable") return null;
+  if (status === "done") return "completed";
+  if (status === "not_started") return "not_started";
+  return "in_progress";
+}
+
+export const jobsResponseSchema = z.object({
+  groups: z.array(
+    z.object({
+      id: jobGroupSchema,
+      name: z.string(),
+      tasks: z.array(
+        taskSchema.extend({
+          rag: ragSchema,
+          ragLabel: z.string(),
+          statusLabel: z.string(),
+          ownerLabel: z.string(),
+          areaName: z.string(),
+          blocked: z.boolean(),
+          forYou: z.boolean(),
+        }),
+      ),
+    }),
+  ),
+  /** Tasks marked not applicable are not shown, but they are counted. */
+  notApplicableCount: z.number().int(),
+  modules: z.array(z.object({ id: z.number().int(), name: z.string() })),
+  owners: z.array(z.string()),
+});
+export type JobsResponse = z.infer<typeof jobsResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// How the overall figure is counted
+// ---------------------------------------------------------------------------
+
+/**
+ * Two ways to count the same obligations.
+ *
+ * `overdue` is what the client sees: an always-on duty only counts once
+ * something live has been raised against it, so a client who is up to date
+ * reads as up to date rather than as nothing-signed-off.
+ *
+ * `cycle` is the stricter operator view, where every always-on duty counts
+ * until it has been closed for the period. It is a toggle in admin and is
+ * never the client's default.
+ */
+export const denominatorModeSchema = z.enum(["overdue", "cycle"]);
+export type DenominatorMode = z.infer<typeof denominatorModeSchema>;

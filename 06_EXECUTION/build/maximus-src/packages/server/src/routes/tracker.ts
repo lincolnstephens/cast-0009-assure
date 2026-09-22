@@ -2,17 +2,21 @@ import { Hono } from "hono";
 import {
   AREA_IDS,
   AREA_OBLIGATIONS,
+  JOB_GROUP_LABEL,
   JURISDICTION_LABEL,
   JURISDICTION_REGULATION,
   RAG_LABEL,
   TASK_STATUS_LABEL,
   areaName,
+  jobGroupOf,
   taskConfirmSchema,
   type AreaId,
+  type JobGroup,
 } from "@maximus/shared";
-import type { EntryRecord } from "../db/model.ts";
-import { mutateOrg, newId, readOrg } from "../db/store.ts";
+import type { EntryRecord, TaskRecord } from "../db/model.ts";
+import { mutateOrg, newId, readDocumentBlob, readOrg } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
+import { buildDocumentsResponse } from "../lib/documents.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
 import {
   areaSummaries,
@@ -242,4 +246,132 @@ trackerRoutes.post("/tasks/:id/confirm", async (c) => {
   });
 
   return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Jobs: every task across all eight modules in one list, grouped the way
+// the operator speaks about them (JOB_GROUP_LABEL). Not applicable tasks are never
+// shown to the client - only counted - because this is a to-do list, not the
+// workplan itself.
+// ---------------------------------------------------------------------------
+
+const JOB_GROUP_ORDER: JobGroup[] = ["not_started", "in_progress", "completed"];
+
+function jobTaskOf(t: TaskRecord, asAt: string) {
+  const rag = taskRag(t, asAt);
+  return {
+    ...t,
+    rag,
+    ragLabel: RAG_LABEL[rag],
+    statusLabel: TASK_STATUS_LABEL[t.status],
+    ownerLabel: ownerLabel(t),
+    areaName: areaName(t.area),
+    // Blocked is a status of its own internally, but it reads as "In
+    // progress" to the client with a flag, because "blocked" is the word
+    // that gets it unblocked.
+    blocked: t.status === "blocked",
+    forYou: t.ownerType === "client",
+  };
+}
+
+trackerRoutes.get("/jobs", async (c) => {
+  const user = c.get("user");
+  if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
+  const doc = await readOrg(user.clientAccountId);
+  if (!doc) return c.json({ error: "No organisation" }, 404);
+
+  const asAt = today(new Date());
+
+  const moduleParam = c.req.query("module");
+  const ownerParam = c.req.query("owner");
+  const dueParam = c.req.query("due");
+  const moduleFilter = moduleParam ? Number(moduleParam) : null;
+
+  // Tasks marked not applicable are not a client-facing job; they are
+  // excluded here and counted instead, never hidden silently.
+  const notApplicableCount = doc.tasks.filter((t) => t.status === "not_applicable").length;
+  const visible = doc.tasks.filter((t) => t.status !== "not_applicable");
+
+  // The filter controls list every value actually present before any filter
+  // narrows the list, so picking one filter never removes another's options.
+  const modules = AREA_IDS.filter((id) => visible.some((t) => t.area === id)).map((id) => ({
+    id,
+    name: areaName(id),
+  }));
+  const owners = Array.from(new Set(visible.map((t) => ownerLabel(t)))).sort();
+
+  let filtered = visible;
+  if (moduleFilter !== null && AREA_IDS.includes(moduleFilter as AreaId)) {
+    filtered = filtered.filter((t) => t.area === moduleFilter);
+  }
+  if (ownerParam) {
+    filtered = filtered.filter((t) => ownerLabel(t) === ownerParam);
+  }
+  if (dueParam === "month") {
+    // "Due this month" means the literal current calendar month, not a
+    // rolling 30 days.
+    const monthPrefix = asAt.slice(0, 7);
+    filtered = filtered.filter((t) => t.dueAt !== null && t.dueAt.slice(0, 7) === monthPrefix);
+  }
+
+  filtered = filtered.slice().sort((a, b) => ascNullsLast(a.dueAt, b.dueAt));
+
+  const groups = JOB_GROUP_ORDER.map((id) => ({
+    id,
+    name: JOB_GROUP_LABEL[id],
+    tasks: filtered.filter((t) => jobGroupOf(t.status) === id).map((t) => jobTaskOf(t, asAt)),
+  }));
+
+  return c.json({ groups, notApplicableCount, modules, owners });
+});
+
+// ---------------------------------------------------------------------------
+// Compliance Documents: read and download only. The client never creates,
+// edits or deletes a document here - that is the operator's side entirely
+// (routes/adminDocuments.ts). See lib/documents.ts for how the three
+// sections are built from the org document.
+// ---------------------------------------------------------------------------
+
+trackerRoutes.get("/documents", async (c) => {
+  const user = c.get("user");
+  if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
+  const doc = await readOrg(user.clientAccountId);
+  if (!doc) return c.json({ error: "No organisation" }, 404);
+
+  return c.json(buildDocumentsResponse(doc));
+});
+
+trackerRoutes.get("/documents/:id/download", async (c) => {
+  const user = c.get("user");
+  if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
+  const doc = await readOrg(user.clientAccountId);
+  if (!doc) return c.json({ error: "No organisation" }, 404);
+
+  const id = c.req.param("id");
+  // Unpublished stays invisible even to a client who has guessed an id -
+  // the same rule a draft policy already follows (routes/policies.ts).
+  const record = doc.documents.find((d) => d.id === id && d.published);
+  if (!record) return c.json({ error: "Not found" }, 404);
+
+  if (record.kind === "link") {
+    if (!record.url) return c.json({ error: "Not found" }, 404);
+    return c.redirect(record.url, 302);
+  }
+
+  if (record.kind === "file") {
+    const bytes = await readDocumentBlob(doc.id, record.id);
+    if (!bytes) return c.json({ error: "This file is not available." }, 404);
+    const filename = record.fileName || "document";
+    // Cast: @types/node's Uint8Array<ArrayBufferLike> is not structurally
+    // assignable to lib.dom's BodyInit even though this is exactly the byte
+    // buffer a Response body accepts at runtime (see routes/exports.ts).
+    return new Response(bytes as unknown as BodyInit, {
+      headers: {
+        "Content-Type": record.contentType || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  }
+
+  return c.json({ error: "Not found" }, 404);
 });

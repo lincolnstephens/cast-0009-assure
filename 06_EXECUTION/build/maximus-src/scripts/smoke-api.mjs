@@ -386,6 +386,98 @@ check(
   stmt2.body?.obligations?.sentence ?? "absent",
 );
 
+// --- v1.2: modules, documents, jobs ----------------------------------------
+await signIn("demo@demo.local", "demo");
+const home12 = await call("GET", "/tracker/home");
+const moduleNames = (home12.body?.areas ?? []).map((a) => a.name);
+check(
+  "the eight modules carry the operator's titles",
+  moduleNames[1] === "Data tracker review" && moduleNames[3] === "Policy review",
+  moduleNames.join(", "),
+);
+check(
+  "the overall figure says where the client stands",
+  /^(Nothing overdue|\d+ overdue or blocked)$/.test(home12.body?.overall?.standing ?? ""),
+  home12.body?.overall?.standing ?? "absent",
+);
+check(
+  "the client's figure is always counted the overdue way",
+  home12.body?.overall?.mode === "overdue",
+  String(home12.body?.overall?.mode),
+);
+
+const docs = await call("GET", "/tracker/documents");
+check("the documents repository responds", docs.status === 200, `status ${docs.status}`);
+const sections = docs.body?.sections ?? [];
+check(
+  "it has the three sections in order",
+  sections.map((x) => x.id).join(",") === "policies,procedures,trackers",
+  sections.map((x) => x.id).join(","),
+);
+check(
+  "the approved policy pack lists itself without anything being uploaded",
+  (sections.find((x) => x.id === "policies")?.items ?? []).length >= 6,
+  `${sections.find((x) => x.id === "policies")?.items?.length} policies`,
+);
+check(
+  "every section states what goes in it",
+  sections.every((x) => (x.emptyMessage ?? "").length > 10 || x.items.length > 0),
+  "",
+);
+
+const jobs = await call("GET", "/tracker/jobs");
+check("the jobs list responds", jobs.status === 200, `status ${jobs.status}`);
+const groups = jobs.body?.groups ?? [];
+check(
+  "jobs are grouped in the operator's three words",
+  groups.map((g) => g.name).join(" | ") === "Not started | In progress | Completed",
+  groups.map((g) => g.name).join(" | "),
+);
+const allJobs = groups.flatMap((g) => g.tasks);
+check("every task appears in the jobs list", allJobs.length > 0, `${allJobs.length} tasks`);
+check(
+  "no task marked not applicable is listed to the client",
+  allJobs.every((t) => t.status !== "not_applicable"),
+  `${jobs.body?.notApplicableCount} counted but not listed`,
+);
+check(
+  "the client's own tasks are marked as theirs",
+  allJobs.some((t) => t.forYou === true),
+  "",
+);
+
+// The client reads the repository and writes nothing to it.
+const clientCreate = await call("POST", "/admin/documents?org=demo", {
+  section: "trackers",
+  title: "Should not exist",
+  kind: "link",
+  url: "https://example.invalid",
+});
+check(
+  "the client cannot add a document",
+  clientCreate.status === 403 || clientCreate.status === 401,
+  `status ${clientCreate.status}`,
+);
+
+// The operator's stricter view is theirs alone.
+await signIn("operator@demo.local", "demo");
+await call("PUT", "/admin/settings?org=demo", { denominatorMode: "cycle" });
+await signIn("demo@demo.local", "demo");
+const afterToggle = await call("GET", "/tracker/home");
+check(
+  "the operator's toggle does not move the client's figure",
+  afterToggle.body?.overall?.mode === "overdue",
+  String(afterToggle.body?.overall?.mode),
+);
+await signIn("operator@demo.local", "demo");
+const adminJobs = await call("GET", "/admin/jobs?org=demo");
+check(
+  "the operator sees their own stricter count and the client's side by side",
+  adminJobs.body?.overall?.mode === "cycle" && adminJobs.body?.clientOverall?.mode === "overdue",
+  `${adminJobs.body?.overall?.mode} / ${adminJobs.body?.clientOverall?.mode}`,
+);
+await call("PUT", "/admin/settings?org=demo", { denominatorMode: "overdue" });
+
 rmSync(dir, { recursive: true, force: true });
 console.log(failures === 0 ? "\nSMOKE PASS" : `\nSMOKE FAIL: ${failures} checks failed`);
 process.exit(failures === 0 ? 0 : 1);

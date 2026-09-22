@@ -25,6 +25,8 @@ interface TrackerFields {
   staffTrained: number | null;
   clientRoles: string[];
   workplanTargetDate: string | null;
+  denominatorMode: "overdue" | "cycle";
+  documentsTargetDate: string | null;
 }
 
 type OrgSettings = BaseOrgSettings & TrackerFields;
@@ -107,12 +109,16 @@ export function AdminSettingsPage() {
     const inScopeRaw = String(form.get("staffInScope") ?? "");
     const trainedRaw = String(form.get("staffTrained") ?? "");
     const targetDateRaw = String(form.get("workplanTargetDate") ?? "");
+    const denominatorModeRaw = String(form.get("denominatorMode") ?? "overdue");
+    const documentsTargetDateRaw = String(form.get("documentsTargetDate") ?? "");
     try {
       await saveSettings({
         jurisdiction: form.get("jurisdiction") as OrgSettings["jurisdiction"],
         staffInScope: inScopeRaw === "" ? null : Number(inScopeRaw),
         staffTrained: trainedRaw === "" ? null : Number(trainedRaw),
         workplanTargetDate: targetDateRaw === "" ? null : targetDateRaw,
+        denominatorMode: denominatorModeRaw === "cycle" ? "cycle" : "overdue",
+        documentsTargetDate: documentsTargetDateRaw === "" ? null : documentsTargetDateRaw,
       });
       setTrackerError(null);
       setTrackerSaved(true);
@@ -353,6 +359,50 @@ export function AdminSettingsPage() {
                 defaultValue={settings.workplanTargetDate ?? ""}
               />
             </F>
+            <F label="Documents target date, shown to the client while a documents section is still empty">
+              <input
+                name="documentsTargetDate"
+                type="date"
+                defaultValue={settings.documentsTargetDate ?? ""}
+              />
+            </F>
+            <div className="text-[13px]">
+              <span className="mb-1 block text-[11px] uppercase tracking-wider text-hud-muted">
+                How obligations are counted
+              </span>
+              <div className="space-y-2" data-testid="denominator-mode">
+                <label className="flex items-start gap-2">
+                  <input
+                    type="radio"
+                    name="denominatorMode"
+                    value="overdue"
+                    defaultChecked={settings.denominatorMode !== "cycle"}
+                    className="mt-0.5"
+                  />
+                  <span className="font-medium">Overdue only (what the client sees)</span>
+                </label>
+                <label className="flex items-start gap-2">
+                  <input
+                    type="radio"
+                    name="denominatorMode"
+                    value="cycle"
+                    defaultChecked={settings.denominatorMode === "cycle"}
+                    className="mt-0.5"
+                  />
+                  <span className="font-medium">Signed off this cycle (stricter, operator view)</span>
+                </label>
+              </div>
+              <p className="mt-1.5 text-[12px] text-hud-muted">
+                In "Overdue only", a continuous duty counts only when something live is running
+                against it. In "Signed off this cycle", every continuous duty counts until it has
+                been signed off for the period.
+              </p>
+              <p className="mt-1.5 text-[12px] text-status-red">
+                This is not a cosmetic setting: it changes your own view here in admin. It does not
+                change the figure the client sees on their Compliance Tracker home or on the CFO
+                statement, which always uses "Overdue only".
+              </p>
+            </div>
           </div>
           <div className="mt-3 flex items-center gap-3">
             <button

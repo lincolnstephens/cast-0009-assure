@@ -88,6 +88,18 @@ export const orgSettingsSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .default(null),
+  /**
+   * How the overall figure counts always-on duties. The client always sees
+   * "overdue"; "cycle" is the operator's stricter view, set here and shown
+   * only in admin.
+   */
+  denominatorMode: z.enum(["overdue", "cycle"]).default("overdue"),
+  /** When MITMARK expects to publish the first documents in each section. */
+  documentsTargetDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .default(null),
 });
 export type OrgSettings = z.infer<typeof orgSettingsSchema>;
 

@@ -52,7 +52,7 @@ export const LIBRARY_TASKS: LibraryTask[] = [
     defaultOffsetDays: 35,
   },
 
-  // -- Area 2, Data mapping and processing records --------------------------
+  // -- Area 2, Data tracker review -------------------------------------------
   {
     id: "a2-ropa-review",
     area: 2,
@@ -89,6 +89,34 @@ export const LIBRARY_TASKS: LibraryTask[] = [
     recurrence: "annual",
     defaultHours: 0,
     defaultOffsetDays: 10,
+  },
+  {
+    id: "a2-access-tracker-review",
+    area: 2,
+    phase: 4,
+    title: "Review the employee access tracker: who can reach what personal data, and whether they still need to.",
+    how: "MITMARK checks the access tracker against current staff and systems, and flags any access that should be removed.",
+    ownerType: "mitmark",
+    ownerRole: "",
+    recurrence: "quarterly",
+    defaultHours: 4,
+    defaultOffsetDays: 50,
+  },
+  {
+    // Moved here from area 4 at v1.2 (FRAGO 02 section 3). It was the initial
+    // exercise of identifying every transfer abroad; it is now the periodic
+    // review that keeps that register accurate. Id kept stable; hours dropped
+    // from 6 to 4 to reflect a review rather than a first mapping.
+    id: "a4-transfer-mapping",
+    area: 2,
+    phase: 4,
+    title: "Review the international transfers register: every transfer outside the UK, its mechanism and its risk assessment.",
+    how: "MITMARK checks the register of transfers abroad against what is actually happening, and updates any safeguard or risk rating that has changed.",
+    ownerType: "mitmark",
+    ownerRole: "",
+    recurrence: "annual",
+    defaultHours: 4,
+    defaultOffsetDays: 18,
   },
 
   // -- Area 3, Data retention ------------------------------------------------
@@ -129,30 +157,96 @@ export const LIBRARY_TASKS: LibraryTask[] = [
     defaultOffsetDays: 55,
   },
 
-  // -- Area 4, Cross-border data transfers -----------------------------------
+  // -- Area 4, Policy review --------------------------------------------------
+  // One task per policy in the pack (see server/scripts/policyPack.ts), plus a
+  // privacy notice review, replacing the single annual "policy suite refresh"
+  // that used to sit in area 3. Real codes and titles come from policyPack;
+  // hard-coded here rather than imported, because this shared package does
+  // not depend on the server's seed data, and the library test checks the
+  // two lists agree.
   {
-    id: "a4-transfer-mapping",
+    id: "a4-policy-review-dp-01",
     area: 4,
-    phase: 1,
-    title: "Identify every transfer outside the UK, its mechanism and its risk assessment.",
-    how: "MITMARK lists each transfer abroad, its safeguard and its risk level.",
+    phase: 2,
+    title: "Review the Data Protection Policy (DP-01) and reissue it if anything has changed.",
+    how: "MITMARK checks the policy against current practice and the law, and reissues it with sign-off.",
     ownerType: "mitmark",
     ownerRole: "",
     recurrence: "annual",
-    defaultHours: 6,
-    defaultOffsetDays: 18,
+    defaultHours: 2,
+    defaultOffsetDays: 30,
   },
   {
-    id: "a4-transfer-safeguards",
+    id: "a4-policy-review-is-01",
     area: 4,
-    phase: 3,
-    title: "Put the UK Addendum or IDTA in place for any new transfer before it starts.",
-    how: "MITMARK puts the correct transfer agreement in place before data leaves the UK.",
+    phase: 2,
+    title: "Review the Information Security Policy (IS-01) and reissue it if anything has changed.",
+    how: "MITMARK checks the policy against current practice and the law, and reissues it with sign-off.",
     ownerType: "mitmark",
     ownerRole: "",
-    recurrence: "always-on",
-    defaultHours: 4,
-    defaultOffsetDays: 0,
+    recurrence: "annual",
+    defaultHours: 2,
+    defaultOffsetDays: 32,
+  },
+  {
+    id: "a4-policy-review-cctv-01",
+    area: 4,
+    phase: 2,
+    title: "Review the CCTV Policy (CCTV-01) and reissue it if anything has changed.",
+    how: "MITMARK checks the policy against current practice and the law, and reissues it with sign-off.",
+    ownerType: "mitmark",
+    ownerRole: "",
+    recurrence: "annual",
+    defaultHours: 2,
+    defaultOffsetDays: 34,
+  },
+  {
+    id: "a4-policy-review-sar-01",
+    area: 4,
+    phase: 2,
+    title: "Review the Subject Access Request Procedure (SAR-01) and reissue it if anything has changed.",
+    how: "MITMARK checks the procedure against current practice and the law, and reissues it with sign-off.",
+    ownerType: "mitmark",
+    ownerRole: "",
+    recurrence: "annual",
+    defaultHours: 2,
+    defaultOffsetDays: 36,
+  },
+  {
+    id: "a4-policy-review-ret-01",
+    area: 4,
+    phase: 2,
+    title: "Review the Data Retention Schedule (RET-01) and reissue it if anything has changed.",
+    how: "MITMARK checks the schedule against current practice and the law, and reissues it with sign-off.",
+    ownerType: "mitmark",
+    ownerRole: "",
+    recurrence: "annual",
+    defaultHours: 2,
+    defaultOffsetDays: 38,
+  },
+  {
+    id: "a4-policy-review-au-01",
+    area: 4,
+    phase: 2,
+    title: "Review the Acceptable Use Policy (AU-01) and reissue it if anything has changed.",
+    how: "MITMARK checks the policy against current practice and the law, and reissues it with sign-off.",
+    ownerType: "mitmark",
+    ownerRole: "",
+    recurrence: "annual",
+    defaultHours: 2,
+    defaultOffsetDays: 40,
+  },
+  {
+    id: "a4-privacy-notice-review",
+    area: 4,
+    phase: 2,
+    title: "Review the privacy notice and reissue it if anything has changed.",
+    how: "MITMARK checks the privacy notice describes current practice correctly, and reissues it with sign-off.",
+    ownerType: "mitmark",
+    ownerRole: "",
+    recurrence: "annual",
+    defaultHours: 2,
+    defaultOffsetDays: 42,
   },
 
   // -- Area 5, Data protection impact assessments ----------------------------
@@ -269,6 +363,21 @@ export const LIBRARY_TASKS: LibraryTask[] = [
     defaultHours: 0,
     defaultOffsetDays: 0,
   },
+  {
+    // Moved here from area 4 at v1.2 (FRAGO 02 section 3). Title and hours
+    // unchanged: it is the safeguard that must be in place before a new
+    // transfer starts, which sits with the rest of vendor data risk.
+    id: "a4-transfer-safeguards",
+    area: 7,
+    phase: 3,
+    title: "Put the UK Addendum or IDTA in place for any new transfer before it starts.",
+    how: "MITMARK puts the correct transfer agreement in place before data leaves the UK.",
+    ownerType: "mitmark",
+    ownerRole: "",
+    recurrence: "always-on",
+    defaultHours: 4,
+    defaultOffsetDays: 0,
+  },
 
   // -- Area 8, Data breach and incident management -----------------------------
   {
@@ -359,8 +468,16 @@ export const LIBRARY_TASKS: LibraryTask[] = [
     defaultOffsetDays: 20,
   },
   {
+    // Retired at v1.2 (FRAGO 02 section 3): the single annual "policy suite
+    // refresh" is replaced by one task per policy in the pack, plus the
+    // privacy notice review, in area 4 above. This id is never deleted,
+    // because any organisation's existing tasks already created from it
+    // still point at it by `source`, and the store migration in
+    // `db/store.ts` moves those existing tasks to area 4. `retired: true`
+    // only stops `expandLibrary` from creating any new instance of it, so a
+    // fresh apply produces the seven replacement tasks instead.
     id: "a3-policy-refresh",
-    area: 3,
+    area: 4,
     phase: 2,
     title: "Annual policy suite refresh.",
     how: "MITMARK reviews and reissues the policy suite for the year.",
@@ -369,6 +486,7 @@ export const LIBRARY_TASKS: LibraryTask[] = [
     recurrence: "annual",
     defaultHours: 10,
     defaultOffsetDays: 42,
+    retired: true,
   },
 ];
 
@@ -403,14 +521,15 @@ export const AREA_OBLIGATIONS: Record<number, AreaObligation> = {
   },
   2: {
     obligation:
-      "Organisations must keep a written record of the personal data they hold, why they hold " +
-      "it, the legal basis for holding it, how long they keep it, and who they share it with. " +
-      "This record must be reviewed regularly and updated whenever a new system, supplier or " +
-      "activity starts processing personal data. It has to be detailed enough to show, at a " +
-      "glance, what personal data flows through the organisation and why. Without an accurate " +
-      "record, the organisation cannot show the regulator, or itself, that it understands and " +
-      "controls its own data.",
-    citation: "UK GDPR Article 30",
+      "Organisations must keep several registers accurate and up to date: the record of the " +
+      "personal data they hold and why, who inside the organisation can access it, and any " +
+      "transfer of personal data outside the UK. Each register needs reviewing on a regular " +
+      "cycle, not just creating once, so that it keeps matching what actually happens day to " +
+      "day. A new system, a new starter or leaver, or a new transfer abroad should be reflected " +
+      "in the relevant register promptly, not left until the next scheduled review finds it. " +
+      "Together these registers are how the organisation, and the regulator, can see at a " +
+      "glance what personal data it holds, who can reach it, and where it goes.",
+    citation: "UK GDPR Article 30; Articles 44 to 49",
   },
   3: {
     obligation:
@@ -425,14 +544,15 @@ export const AREA_OBLIGATIONS: Record<number, AreaObligation> = {
   },
   4: {
     obligation:
-      "Personal data may only be sent outside the United Kingdom where the receiving country, " +
-      "organisation or contract gives it a suitable level of protection. Organisations must " +
-      "identify every transfer of personal data abroad, work out which safeguard applies, and " +
-      "assess the risk before the transfer starts. New transfers need the correct legal " +
-      "mechanism in place in advance, not after the event. Failing to put safeguards in place " +
-      "before data leaves the country is one of the most commonly enforced failures by " +
-      "regulators.",
-    citation: "UK GDPR Articles 44 to 49",
+      "Organisations should hold a written policy for each of the main areas of data protection " +
+      "risk they face: how personal data is protected, how systems are kept secure, and how " +
+      "requests and incidents are handled. Each policy needs reviewing on a regular cycle and " +
+      "reissuing whenever the law, guidance or the way the organisation actually works changes, " +
+      "so it stays a true description of current practice rather than a document nobody follows. " +
+      "The privacy notice, which tells people outside the organisation what happens to their " +
+      "personal data, needs exactly the same regular review. Every reissued policy or notice " +
+      "should be formally approved, so there is a clear record of who signed it off and when.",
+    citation: "UK GDPR Article 5(2); Articles 13 and 14",
   },
   5: {
     obligation:
@@ -555,6 +675,11 @@ export function expandLibrary(
   const instances: LibraryInstance[] = [];
 
   for (const task of tasks) {
+    // A retired task (see `a3-policy-refresh` above) is kept in the library
+    // for existing tasks to resolve against, but a fresh apply must not
+    // create any new instance of it.
+    if (task.retired) continue;
+
     const base: Omit<LibraryInstance, "dueAt"> = {
       libraryId: task.id,
       area: task.area,

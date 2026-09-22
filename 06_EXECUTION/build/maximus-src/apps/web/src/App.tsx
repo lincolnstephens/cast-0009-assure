@@ -15,8 +15,14 @@ import { AdminReviewQueuePage } from "./pages/admin/ReviewQueue";
 import { AdminWorkplanPage } from "./pages/admin/Workplan";
 import { AreaPageView } from "./pages/client/Area";
 import { ClocksPage } from "./pages/client/Clocks";
+// DOCUMENTS lane: these two are not built yet as this file lands. Wired here
+// ahead of them (V12_BRIEF.md, task 7) - if the export name differs when
+// they arrive, only this import line needs adjusting.
+import { DocumentsPage } from "./pages/client/Documents";
+import { AdminDocumentsPage } from "./pages/admin/Documents";
 import { ExposurePage } from "./pages/client/Exposure";
 import { GuidePage } from "./pages/client/Guide";
+import { JobsPage } from "./pages/client/Jobs";
 import { PosturePage } from "./pages/client/Posture";
 import { TrackerPage } from "./pages/client/Tracker";
 import { ValuePage } from "./pages/client/Value";
@@ -60,6 +66,11 @@ export default function App() {
         <Route path="tracker" element={<TrackerPage />} />
         <Route path="guide" element={<GuidePage />} />
         <Route path="tracker/areas/:area" element={<AreaPageView />} />
+        <Route path="documents" element={<DocumentsPage />} />
+        <Route path="jobs" element={<JobsPage />} />
+        {/* Posture and Exposure keep their routes live (v1.1 links still
+            work) even though their menu items left the client nav at v1.2 -
+            Posture is now the "Areas by status" panel on the tracker. */}
         <Route path="posture" element={<PosturePage />} />
         <Route path="clocks" element={<ClocksPage />} />
         <Route path="exposure" element={<ExposurePage />} />
@@ -77,6 +88,12 @@ export default function App() {
       >
         <Route index element={<AdminReviewQueuePage />} />
         <Route path="workplan" element={<AdminWorkplanPage />} />
+        <Route path="documents" element={<AdminDocumentsPage />} />
+        {/* Jobs is genuinely read-write on the operator's side (edit,
+            reprioritise, close), which the client-facing Jobs page must
+            never offer, so /admin/jobs points at the existing Workplan page
+            rather than reusing that component (V12_BRIEF.md, task 7). */}
+        <Route path="jobs" element={<AdminWorkplanPage />} />
         <Route path="clocks" element={<AdminClocksPage />} />
         <Route path="procedures" element={<AdminProceduresPage />} />
         <Route path="policies" element={<AdminPoliciesPage />} />

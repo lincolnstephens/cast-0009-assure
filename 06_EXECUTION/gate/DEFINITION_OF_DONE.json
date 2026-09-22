@@ -1,6 +1,6 @@
 {
-  "iteration": "v1.1",
-  "written": "2026-09-16",
+  "iteration": "v1.2",
+  "written": "2026-09-22",
   "lines": [
     {
       "id": 1,
@@ -11,7 +11,7 @@
       "email_selector": "input[type='email']",
       "password_selector": "input[type='password']",
       "submit_selector": "button[type='submit']",
-      "success_selector": "[data-view='guide']",
+      "success_selector": "[data-view='tracker']",
       "timeout_ms": 5000,
       "applies_to": [
         "1920x1080",
@@ -21,18 +21,17 @@
     },
     {
       "id": 2,
-      "line": "Every client portal view loads and renders a heading: Policy Guide, requests and clocks, Value, Statement, posture, exposure.",
+      "line": "Every client portal view loads and renders a heading: Compliance Tracker, Compliance Documents, Jobs, requests and clocks, Value, Statement. Posture and exposure have left the client navigation.",
       "drive": "playwright",
       "check": "views_render",
       "pass": "Each nav element carrying data-view for the listed id is clickable and a non-empty heading appears after the click.",
       "views": [
-        "guide",
+        "tracker",
+        "documents",
+        "jobs",
         "request",
         "value",
-        "statement",
-        "posture",
-        "exposure",
-        "tracker"
+        "statement"
       ],
       "heading_selector": "h1, h2",
       "settle_ms": 400,
@@ -45,7 +44,7 @@
     },
     {
       "id": 3,
-      "line": "Signed in as the operator, every admin view loads and renders a heading: review queue, Record, clocks, policy pack, posture, alerts, exports, settings, audit, workplan, procedures.",
+      "line": "Signed in as the operator, every admin view loads and renders a heading: review queue, Record, clocks, policy pack, Documents, Jobs, posture, alerts, exports, settings, audit, workplan, procedures.",
       "drive": "playwright",
       "check": "views_render",
       "pass": "The operator account signs in and each nav element carrying data-view for the listed id is clickable and a non-empty heading appears.",
@@ -54,6 +53,8 @@
         "record",
         "clocks",
         "policies-admin",
+        "documents-admin",
+        "jobs-admin",
         "posture-admin",
         "alerts",
         "exports",
@@ -144,18 +145,17 @@
     },
     {
       "id": 8,
-      "line": "At 390 pixels wide, no view produces horizontal overflow.",
+      "line": "At 390 pixels wide, no view produces horizontal overflow, including the new client views.",
       "drive": "playwright",
       "check": "no_horizontal_overflow",
       "pass": "document.documentElement.scrollWidth does not exceed window.innerWidth + 1 on any listed view. \"area\" is a pseudo-view: an area page reached by clicking the first tile in area-tiles, since area pages have no nav data-view.",
       "views": [
-        "guide",
+        "tracker",
+        "documents",
+        "jobs",
         "request",
         "value",
         "statement",
-        "posture",
-        "exposure",
-        "tracker",
         "area"
       ],
       "settle_ms": 400,
@@ -212,10 +212,10 @@
     },
     {
       "id": 12,
-      "line": "Every task table shows the six questions, in order, and they are not renamed.",
+      "line": "Every task table shows the six questions, in order, and they are not renamed. Checked on an area page, on the client Jobs page and on the admin Workplan page.",
       "drive": "playwright",
       "check": "task_table_columns",
-      "pass": "Every [data-testid='task-table'] found on the client tracker, on an area page, and on the admin Workplan page has header cells reading exactly What, How, Who, When, Done, Status, in that order.",
+      "pass": "Every [data-testid='task-table'] found on an area page, on the client Jobs page, and on the admin Workplan page has header cells reading exactly What, How, Who, When, Done, Status, in that order.",
       "table_selector": "[data-testid='task-table']",
       "columns": [
         "What",
@@ -228,11 +228,11 @@
       "targets": [
         {
           "role": "client",
-          "view": "tracker"
+          "view": "area"
         },
         {
           "role": "client",
-          "view": "area"
+          "view": "jobs"
         },
         {
           "role": "admin",
@@ -279,10 +279,10 @@
     },
     {
       "id": 15,
-      "line": "The client can confirm a task assigned to them and can do nothing else to the workplan.",
+      "line": "The client can confirm a task assigned to them and can do nothing else to the workplan, on the tracker, on Jobs or on Documents.",
       "drive": "playwright",
       "check": "client_read_only_workplan",
-      "pass": "A [data-testid='confirm-task'] control exists inside [data-testid='for-you']. No button or link on the client tracker or on any area page has accessible text matching edit, delete, remove, reopen, reprioritise, change status or mark done. This is FRAGO section 12's stop condition made executable, so it is strict: every area tile is visited, not just one.",
+      "pass": "A [data-testid='confirm-task'] control exists inside [data-testid='for-you']. No button or link on the client tracker, on any area page, on the client Jobs page or on the client Documents page has accessible text matching edit, delete, remove, reopen, reprioritise, change status or mark done. This is FRAGO section 12's stop condition made executable, so it is strict: every area tile is visited, not just one, and the two new pages are scanned too.",
       "for_you_selector": "[data-testid='for-you']",
       "confirm_selector": "[data-testid='confirm-task']",
       "settle_ms": 400,
@@ -318,6 +318,111 @@
       "pass": "Every tile inside [data-testid='kpi-row'] renders non-empty text. A tile with nothing to count says \"No data yet\" (or equivalent); it never renders empty.",
       "kpi_row_selector": "[data-testid='kpi-row']",
       "kpi_tile_selector": "[data-testid='kpi-tile']",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 18,
+      "line": "The client's navigation is Lurong's, in her order.",
+      "drive": "playwright",
+      "check": "client_nav_order",
+      "pass": "The client nav elements carrying data-view, read in DOM order, read exactly tracker, documents, jobs, request, value, statement. Neither posture nor exposure appears anywhere in the client navigation. Order matters and is the point of the line.",
+      "nav_selector": "nav [data-view]",
+      "expected": [
+        "tracker",
+        "documents",
+        "jobs",
+        "request",
+        "value",
+        "statement"
+      ],
+      "forbidden": [
+        "posture",
+        "exposure"
+      ],
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 19,
+      "line": "The eight modules carry their v1.2 titles.",
+      "drive": "playwright",
+      "check": "module_titles_match_areas",
+      "pass": "On the tracker, the name in each [data-testid='area-tile-name'] and each [data-testid='module-nav-item'] matches AREAS in packages/shared/src/tracker.ts exactly, in id order. The expected names are read from that file at run time, not hardcoded, so the gate and the source cannot drift apart.",
+      "tile_selector": "[data-testid='area-tile-name']",
+      "subnav_selector": "[data-testid='module-nav-item']",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 20,
+      "line": "Compliance Documents shows the three sections and the client cannot write.",
+      "drive": "playwright",
+      "check": "documents_read_only",
+      "pass": "[data-testid='documents'] is present. Exactly three [data-testid='document-section'] blocks are present. No input[type='file'] exists anywhere on the page. No button or link anywhere on the page has accessible text matching upload, delete, remove, edit or replace.",
+      "page_selector": "[data-testid='documents']",
+      "section_selector": "[data-testid='document-section']",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 21,
+      "line": "Jobs shows every task in the three groups with the six questions.",
+      "drive": "playwright",
+      "check": "jobs_page",
+      "pass": "[data-testid='jobs'] is present. The group headings read Not started, In progress, Completed. Every [data-testid='task-table'] found on the page carries the six questions, in order. A [data-testid='confirm-task'] control exists for the client's own tasks.",
+      "page_selector": "[data-testid='jobs']",
+      "table_selector": "[data-testid='task-table']",
+      "confirm_selector": "[data-testid='confirm-task']",
+      "group_headings": [
+        "Not started",
+        "In progress",
+        "Completed"
+      ],
+      "group_heading_selector": "h2, h3",
+      "columns": [
+        "What",
+        "How",
+        "Who",
+        "When",
+        "Done",
+        "Status"
+      ],
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 22,
+      "line": "The overall figure says where the client stands.",
+      "drive": "playwright",
+      "check": "overall_status_wording",
+      "pass": "[data-testid='overall-status'] contains either the phrase \"Nothing overdue\" or a phrase matching \"N overdue or blocked\". If a percentage appears anywhere in that block, a fraction \"N of M\" appears with it.",
+      "status_selector": "[data-testid='overall-status']",
       "settle_ms": 400,
       "applies_to": [
         "1920x1080",

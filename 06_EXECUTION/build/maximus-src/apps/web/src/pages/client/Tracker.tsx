@@ -6,6 +6,7 @@ import { AreaTiles } from "../../components/tracker/AreaTiles";
 import { ForYouPanel } from "../../components/tracker/ForYouPanel";
 import { JourneyStrip } from "../../components/tracker/JourneyStrip";
 import { KpiRow } from "../../components/tracker/KpiRow";
+import { ModuleNav } from "../../components/tracker/ModuleNav";
 import { StatusBar } from "../../components/tracker/StatusBar";
 
 /**
@@ -85,6 +86,8 @@ export function TrackerPage() {
       </header>
 
       <StatusBar overall={data.overall} />
+
+      <ModuleNav />
 
       <JourneyStrip phases={data.phases} />
 

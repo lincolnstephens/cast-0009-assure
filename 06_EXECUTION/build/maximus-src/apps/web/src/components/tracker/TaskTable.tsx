@@ -33,9 +33,12 @@ export function TaskTable({ tasks }: { tasks: AreaTask[] }) {
   }
 
   return (
-    <div data-testid="task-table">
-      {/* sm and up: a table. */}
-      <table className="hidden w-full border-collapse text-[13px] sm:table">
+    <div>
+      {/* sm and up: a table carrying the six questions as header cells. */}
+      <table
+        data-testid="task-table"
+        className="hidden w-full border-collapse text-[13px] sm:table"
+      >
         <thead>
           <tr>
             {TASK_COLUMNS.map((c) => (
@@ -56,7 +59,8 @@ export function TaskTable({ tasks }: { tasks: AreaTask[] }) {
       </table>
 
       {/* Below sm: cards, the same six labels, no horizontal overflow. */}
-      <div className="space-y-3 sm:hidden">
+      {/* below sm: the same six labelled on every card. */}
+      <div data-testid="task-cards" className="space-y-3 sm:hidden">
         {tasks.map((t) => (
           <TaskCard key={t.id} task={t} expanded={expanded === t.id} onToggle={() => toggle(t.id)} />
         ))}

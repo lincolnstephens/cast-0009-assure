@@ -279,6 +279,33 @@ export interface TaskRecord {
   updatedAt: Iso;
 }
 
+/**
+ * One item in the Compliance Documents repository. The client reads and
+ * downloads; only the operator puts anything in. A file lives in the store
+ * under `blobKey`; anything too large to hold is kept as a link instead.
+ */
+export interface DocumentRecord {
+  id: string;
+  orgId: string;
+  section: 'policies' | 'procedures' | 'trackers';
+  /** The module it belongs to, or null when it spans all of them. */
+  area: number | null;
+  title: string;
+  /** A version for a policy, an as-at date for a register. Either may be empty. */
+  version: string;
+  asAt: string;
+  owner: string;
+  kind: 'file' | 'link' | 'policy';
+  blobKey: string | null;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  url: string;
+  published: boolean;
+  updatedAt: Iso;
+  updatedBy: string;
+}
+
 /** How MITMARK does the work in an area, for the client to read. */
 export interface ProcedureRecord {
   id: string;
@@ -362,6 +389,14 @@ export interface OrgSettings {
   clientRoles: string[];
   /** Shown on the empty portal while MITMARK prepares the workplan. */
   workplanTargetDate: string | null;
+  /**
+   * How the overall figure counts always-on duties. The client always sees
+   * "overdue"; "cycle" is the operator's stricter view, set here and shown
+   * only in admin.
+   */
+  denominatorMode: 'overdue' | 'cycle';
+  /** When MITMARK expects to publish the first documents in each section. */
+  documentsTargetDate: string | null;
 }
 
 /** Everything belonging to one organisation. One blob, one tenant. */
@@ -388,6 +423,7 @@ export interface OrgDoc {
   entries: EntryRecord[];
   tasks: TaskRecord[];
   procedures: ProcedureRecord[];
+  documents: DocumentRecord[];
 }
 
 export const DEFAULT_LINE_STATUS: Record<string, LineStatus> = {
@@ -426,6 +462,8 @@ export const DEFAULT_SETTINGS: OrgSettings = {
     'Board',
   ],
   workplanTargetDate: null,
+  denominatorMode: 'overdue',
+  documentsTargetDate: null,
 };
 
 export function emptyOrgDoc(id: string, name: string): OrgDoc {
@@ -451,5 +489,6 @@ export function emptyOrgDoc(id: string, name: string): OrgDoc {
     entries: [],
     tasks: [],
     procedures: [],
+    documents: [],
   };
 }

@@ -4,10 +4,16 @@
  * Two rules govern everything here.
  *
  * First, the denominator. The overall figure counts obligations that have
- * actually fallen due: tasks with a due date on or before today, plus always-on
- * duties, which are due continuously. A task due next month is not yet an
- * obligation to have met, and counting it would make the client look worse than
- * they are. Tasks marked not applicable are outside the count entirely.
+ * actually fallen due: tasks with a due date on or before today. A task due
+ * next month is not yet an obligation to have met, and counting it would make
+ * the client look worse than they are. Tasks marked not applicable are outside
+ * the count entirely.
+ *
+ * An always-on duty has no date and so can never be overdue. In the client's
+ * view it counts only when its module has something live running against it,
+ * because a duty with nothing against it is being kept up. The operator can
+ * switch to the stricter view, where every always-on duty counts until it has
+ * been signed off for the period. See `hasFallenDue`.
  *
  * Second, no figure without a basis. Every number returned from this file
  * carries the sentence that explains it and the date it was taken. Where there
@@ -27,6 +33,7 @@ import {
   type ForYouTask,
   type OverallStatus,
   type PhaseSummary,
+  type DenominatorMode,
   type Rag,
 } from "@maximus/shared";
 import type { ClockRecord, OrgDoc, TaskRecord } from "../db/model.ts";
@@ -46,10 +53,59 @@ export function formatDate(iso: string | null): string {
 export const isOpen = (t: TaskRecord): boolean =>
   t.status !== "done" && t.status !== "not_applicable";
 
-/** A task counts towards the overall figure once it has fallen due. */
-export function hasFallenDue(t: TaskRecord, asAt: string): boolean {
+/**
+ * Which modules have something live running against them right now.
+ *
+ * An always-on duty has no date, so it can never be overdue. Counting it as
+ * unmet whenever it has not been signed off for the period made a client who
+ * was entirely up to date open on a low number, which is not what the figure
+ * is for. It now counts only when there is something live in its module: an
+ * open statutory clock or a review item waiting on MITMARK. A duty with
+ * nothing running against it is being kept up, and reads that way.
+ */
+export function liveAreas(doc: OrgDoc): Set<number> {
+  const live = new Set<number>();
+  for (const c of doc.clocks) {
+    if (c.closedAt) continue;
+    live.add(CLOCK_AREA[c.kind] ?? 0);
+  }
+  for (const item of doc.review) {
+    if (item.state !== "pending") continue;
+    if (item.type === "intake") {
+      const intake = doc.intakes.find((i) => i.id === item.refId);
+      if (intake) live.add(intake.type === "breach" ? 8 : 6);
+      continue;
+    }
+    if (item.type === "task_confirmation") {
+      const task = doc.tasks.find((t) => t.id === item.refId);
+      if (task) live.add(task.area);
+    }
+  }
+  live.delete(0);
+  return live;
+}
+
+/** A data request belongs to module 6, a reported concern to module 8. */
+const CLOCK_AREA: Record<string, number> = { sar_1_month: 6, breach_72h: 8 };
+
+/**
+ * A task counts towards the overall figure once it has fallen due.
+ *
+ * In `overdue` mode, which is what the client sees, an always-on duty counts
+ * only when its module has something live against it. In `cycle` mode, the
+ * operator's stricter view, every always-on duty counts until it is closed.
+ */
+export function hasFallenDue(
+  t: TaskRecord,
+  asAt: string,
+  mode: DenominatorMode = "overdue",
+  live?: Set<number>,
+): boolean {
   if (t.status === "not_applicable") return false;
-  if (t.recurrence === "always-on") return true;
+  if (t.recurrence === "always-on") {
+    if (mode === "cycle") return true;
+    return live ? live.has(t.area) : false;
+  }
   if (!t.dueAt) return false;
   return t.dueAt <= asAt;
 }
@@ -94,16 +150,39 @@ export function worstRag(tasks: TaskRecord[], asAt: string): Rag {
 // Overall status
 // ---------------------------------------------------------------------------
 
-export const OVERALL_BASIS =
-  "Obligations due on or before today, plus duties that run continuously. " +
+export const OVERALL_BASIS_OVERDUE =
+  "Obligations due on or before today, plus continuous duties with something live running against them. " +
   "An obligation is met when the task is closed as done. Tasks marked not applicable are excluded.";
 
-export function overallStatus(doc: OrgDoc, now: Date = new Date()): OverallStatus {
+export const OVERALL_BASIS_CYCLE =
+  "Obligations due on or before today, plus every duty that runs continuously, whether or not anything is live against it. " +
+  "An obligation is met when the task is closed as done for the period. Tasks marked not applicable are excluded.";
+
+/** Kept under the old name so nothing that imported it breaks. */
+export const OVERALL_BASIS = OVERALL_BASIS_OVERDUE;
+
+/**
+ * The overall figure.
+ *
+ * The default is deliberately "overdue" and deliberately NOT the organisation's
+ * setting. The stricter "cycle" count is the operator's own view, and the order
+ * is explicit that it is not the client's. If the default read the setting, an
+ * operator flipping their toggle would silently change the number on the
+ * client's front page and on the CFO statement. A caller that wants the
+ * operator's view asks for it by name.
+ */
+export function overallStatus(
+  doc: OrgDoc,
+  now: Date = new Date(),
+  mode: DenominatorMode = "overdue",
+): OverallStatus {
   const asAt = today(now);
-  const due = doc.tasks.filter((t) => hasFallenDue(t, asAt));
+  const live = liveAreas(doc);
+  const due = doc.tasks.filter((t) => hasFallenDue(t, asAt, mode, live));
   const m = due.length;
   const n = due.filter((t) => t.status === "done").length;
   const pct = m === 0 ? 0 : Math.round((n / m) * 100);
+  const outstanding = m - n;
 
   const byArea = AREA_IDS.map((area) => {
     const rag = worstRag(
@@ -120,10 +199,28 @@ export function overallStatus(doc: OrgDoc, now: Date = new Date()): OverallStatu
   // whether it rests on two obligations or two hundred.
   const sentence =
     m === 0
-      ? `No obligations have fallen due yet, as at ${formatDate(asAt)}`
+      ? `Nothing overdue, as at ${formatDate(asAt)}`
       : `${n} of ${m} obligations met, ${pct}%, as at ${formatDate(asAt)}`;
 
-  return { n, m, pct, sentence, asAt, basis: OVERALL_BASIS, byArea, ragCounts };
+  // The line beneath says what the figure means in one phrase, because a
+  // fraction alone does not tell a reader whether to act.
+  const standing =
+    outstanding === 0
+      ? "Nothing overdue"
+      : `${outstanding} overdue or blocked`;
+
+  return {
+    n,
+    m,
+    pct,
+    sentence,
+    standing,
+    asAt,
+    basis: mode === "cycle" ? OVERALL_BASIS_CYCLE : OVERALL_BASIS_OVERDUE,
+    mode,
+    byArea,
+    ragCounts,
+  };
 }
 
 // ---------------------------------------------------------------------------

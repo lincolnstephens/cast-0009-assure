@@ -93,8 +93,22 @@ describe("the denominator rule", () => {
     expect(hasFallenDue(task({ dueAt: "2026-12-01" }), TODAY)).toBe(false);
   });
 
-  it("counts an always-on duty, which is due continuously", () => {
-    expect(hasFallenDue(task({ recurrence: "always-on", dueAt: null }), TODAY)).toBe(true);
+  it("does not count an always-on duty with nothing live against it", () => {
+    // A duty nobody has raised anything against is being kept up. Counting it
+    // as unmet made a client who was entirely up to date open on a low number.
+    const duty = task({ recurrence: "always-on", dueAt: null, area: 6 });
+    expect(hasFallenDue(duty, TODAY, "overdue", new Set())).toBe(false);
+  });
+
+  it("counts an always-on duty once its module has something live against it", () => {
+    const duty = task({ recurrence: "always-on", dueAt: null, area: 6 });
+    expect(hasFallenDue(duty, TODAY, "overdue", new Set([6]))).toBe(true);
+    expect(hasFallenDue(duty, TODAY, "overdue", new Set([8]))).toBe(false);
+  });
+
+  it("counts every always-on duty in the operator's stricter view", () => {
+    const duty = task({ recurrence: "always-on", dueAt: null, area: 6 });
+    expect(hasFallenDue(duty, TODAY, "cycle", new Set())).toBe(true);
   });
 
   it("excludes a task marked not applicable, however it is dated", () => {
@@ -102,7 +116,12 @@ describe("the denominator rule", () => {
       false,
     );
     expect(
-      hasFallenDue(task({ recurrence: "always-on", status: "not_applicable" }), TODAY),
+      hasFallenDue(
+        task({ recurrence: "always-on", status: "not_applicable", area: 6 }),
+        TODAY,
+        "cycle",
+        new Set([6]),
+      ),
     ).toBe(false);
   });
 
@@ -147,12 +166,70 @@ describe("overall status", () => {
     expect(o.pct).toBe(100);
   });
 
-  it("says plainly when nothing has fallen due, rather than showing nought per cent", () => {
+  it("says nothing is overdue rather than showing nought per cent", () => {
     const doc = docWith([task({ dueAt: "2026-12-01" })]);
     const o = overallStatus(doc, NOW);
     expect(o.m).toBe(0);
-    expect(o.sentence).toBe("No obligations have fallen due yet, as at 17 September 2026");
+    expect(o.sentence).toBe("Nothing overdue, as at 17 September 2026");
     expect(o.sentence).not.toMatch(/%/);
+    expect(o.standing).toBe("Nothing overdue");
+  });
+
+  it("says how many are outstanding when some are", () => {
+    const doc = docWith([
+      task({ dueAt: "2026-09-01", status: "done" }),
+      task({ dueAt: "2026-09-02" }),
+      task({ dueAt: "2026-09-03", status: "blocked" }),
+    ]);
+    const o = overallStatus(doc, NOW);
+    expect(o.standing).toBe("2 overdue or blocked");
+  });
+
+  it("an up to date client with only continuous duties reads as nothing overdue", () => {
+    // The case that drove the change: every duty is always-on, nothing is live
+    // against any of them, and the client is not behind on anything.
+    const doc = docWith([
+      task({ recurrence: "always-on", area: 5 }),
+      task({ recurrence: "always-on", area: 6 }),
+      task({ recurrence: "always-on", area: 7 }),
+    ]);
+    const o = overallStatus(doc, NOW);
+    expect(o.m).toBe(0);
+    expect(o.standing).toBe("Nothing overdue");
+
+    // The operator's stricter view still shows the work not yet signed off.
+    const strict = overallStatus(doc, NOW, "cycle");
+    expect(strict.m).toBe(3);
+    expect(strict.standing).toBe("3 overdue or blocked");
+    expect(strict.basis).not.toBe(o.basis);
+  });
+
+  it("an open data request makes module 6's continuous duty count", () => {
+    const doc = docWith(
+      [task({ recurrence: "always-on", area: 6 })],
+      [clock({ kind: "sar_1_month", closedAt: null })],
+    );
+    const o = overallStatus(doc, NOW);
+    expect(o.m).toBe(1);
+    expect(o.standing).toBe("1 overdue or blocked");
+  });
+
+  it("the operator's toggle cannot change what the client is shown", () => {
+    // The stricter count is the operator's own view. If it leaked into the
+    // default, flipping a setting in admin would silently move the number on
+    // the client's front page and on the statement sent to their CFO.
+    const doc = docWith([
+      task({ recurrence: "always-on", area: 5 }),
+      task({ recurrence: "always-on", area: 7 }),
+    ]);
+    doc.settings.denominatorMode = "cycle";
+    const asClientSeesIt = overallStatus(doc, NOW);
+    expect(asClientSeesIt.mode).toBe("overdue");
+    expect(asClientSeesIt.m).toBe(0);
+    expect(asClientSeesIt.standing).toBe("Nothing overdue");
+
+    // The operator still gets the stricter view by asking for it.
+    expect(overallStatus(doc, NOW, "cycle").m).toBe(2);
   });
 
   it("carries its basis and covers all eight areas", () => {

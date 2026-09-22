@@ -144,6 +144,13 @@ export function resetDriver(): void {
   driver = null;
 }
 
+/** Library tasks that changed module at v1.2, by their stable library id. */
+const TASK_AREA_MOVES: Record<string, number> = {
+  'a4-transfer-mapping': 2,
+  'a4-transfer-safeguards': 7,
+  'a3-policy-refresh': 4,
+};
+
 const orgKey = (orgId: string) => `orgs/${orgId}.json`;
 const USERS_KEY = 'users.json';
 export const exportKey = (exportId: string) => `exports/${exportId}.zip`;
@@ -165,6 +172,7 @@ export const exportKey = (exportId: string) => `exports/${exportId}.zip`;
 export function migrateOrg(doc: OrgDoc): OrgDoc {
   doc.tasks ??= [];
   doc.procedures ??= [];
+  doc.documents ??= [];
   doc.policies ??= [];
   doc.threads ??= [];
   doc.messages ??= [];
@@ -186,8 +194,19 @@ export function migrateOrg(doc: OrgDoc): OrgDoc {
   s.staffTrained = s.staffTrained === undefined ? null : s.staffTrained;
   s.clientRoles ??= [...DEFAULT_SETTINGS.clientRoles];
   s.workplanTargetDate = s.workplanTargetDate === undefined ? null : s.workplanTargetDate;
+  s.denominatorMode ??= 'overdue';
+  s.documentsTargetDate = s.documentsTargetDate === undefined ? null : s.documentsTargetDate;
   s.lineStatus ??= { ...DEFAULT_SETTINGS.lineStatus };
   doc.settings = s;
+
+  // v1.2 re-scoped two modules. Tasks move with their library id so nothing is
+  // lost and no task ends up in a module that no longer means what it did:
+  // the transfers register moved into the tracker review, the safeguard for a
+  // new transfer into vendor risk, and the policy refresh into policy review.
+  for (const t of doc.tasks) {
+    const moved = TASK_AREA_MOVES[t.source];
+    if (moved !== undefined) t.area = moved;
+  }
 
   // Two clock fields arrived with the tracker's KPI tiles. An older clock has
   // no answer to either question, and "not known" is null, never false.
@@ -312,4 +331,25 @@ export async function readExportBlob(exportId: string): Promise<Uint8Array | nul
 
 export async function writeExportBlob(exportId: string, bytes: Uint8Array): Promise<void> {
   await getDriver().setBytes(exportKey(exportId), bytes);
+}
+
+// ---------------------------------------------------------------------------
+// Compliance Documents binaries
+// ---------------------------------------------------------------------------
+//
+// Added by the DOCUMENTS lane (V12_BRIEF.md) through the same driver as the
+// export blobs above - same pattern, a new key prefix, nothing else touched.
+
+export const documentKey = (orgId: string, documentId: string) => `documents/${orgId}/${documentId}`;
+
+export async function readDocumentBlob(orgId: string, documentId: string): Promise<Uint8Array | null> {
+  return getDriver().getBytes(documentKey(orgId, documentId));
+}
+
+export async function writeDocumentBlob(orgId: string, documentId: string, bytes: Uint8Array): Promise<void> {
+  await getDriver().setBytes(documentKey(orgId, documentId), bytes);
+}
+
+export async function deleteDocumentBlob(orgId: string, documentId: string): Promise<void> {
+  await getDriver().del(documentKey(orgId, documentId));
 }

@@ -9,10 +9,46 @@ import {
   type LibraryTask,
 } from "@maximus/shared";
 import { describe, expect, it } from "vitest";
+import { policyPack } from "../scripts/policyPack.ts";
 
 // This lane owns the task library seed (`packages/shared/src/library.ts`)
 // and this test file only. It does not exercise the admin apply-library
 // route or the API lane's TaskRecord shape - those belong to other lanes.
+
+// The full set of ids as they stood in v1.1, before FRAGO 02's remap. Library
+// task ids are stable forever, so every one of these must still resolve to a
+// task in v1.2, even where it moved module (see TASK_AREA_MOVES in
+// db/store.ts) or was retired (a3-policy-refresh).
+const V1_1_LIBRARY_IDS = [
+  "a1-ico-registration",
+  "a1-dpo-appointment",
+  "a1-ico-fee-payment",
+  "a2-ropa-review",
+  "a2-ropa-new-system",
+  "a2-department-list",
+  "a3-retention-schedule-review",
+  "a3-scheduled-deletions",
+  "a3-deletion-verification",
+  "a4-transfer-mapping",
+  "a4-transfer-safeguards",
+  "a5-dpia-screening",
+  "a5-dpia-completion",
+  "a5-dpia-approval",
+  "a6-dsar-handling",
+  "a6-dsar-forwarding",
+  "a6-dsar-log-review",
+  "a7-vendor-assessment",
+  "a7-vendor-review",
+  "a7-vendor-notification",
+  "a8-incident-assessment",
+  "a8-breach-notification",
+  "a8-incident-reporting",
+  "a8-incident-response-test",
+  "a8-staff-training",
+  "a1-board-briefing",
+  "a8-monthly-report",
+  "a3-policy-refresh",
+];
 
 describe("LIBRARY_TASKS", () => {
   it("every task parses against libraryTaskSchema", () => {
@@ -58,9 +94,110 @@ describe("LIBRARY_TASKS", () => {
     }
   });
 
+  it("every module 1 to 8 has at least one non-retired task", () => {
+    for (const area of AREA_IDS) {
+      expect(LIBRARY_TASKS.some((t) => t.area === area && !t.retired)).toBe(true);
+    }
+  });
+
   it("every phase 1 to 5 is used at least once", () => {
     for (const phase of PHASE_IDS) {
       expect(LIBRARY_TASKS.some((t) => t.phase === phase)).toBe(true);
+    }
+  });
+});
+
+describe("v1.2 remap (FRAGO 02 section 3)", () => {
+  it("no id was lost between v1.1 and v1.2", () => {
+    const ids = new Set(LIBRARY_TASKS.map((t) => t.id));
+    for (const id of V1_1_LIBRARY_IDS) {
+      expect(ids.has(id)).toBe(true);
+    }
+  });
+
+  it("a4-transfer-mapping moved to module 2 as the transfers register review, 4 hours", () => {
+    const task = LIBRARY_TASKS.find((t) => t.id === "a4-transfer-mapping");
+    expect(task).toBeDefined();
+    expect(task?.area).toBe(2);
+    expect(task?.defaultHours).toBe(4);
+    expect(task?.recurrence).toBe("annual");
+    expect(task?.retired).toBeFalsy();
+  });
+
+  it("a4-transfer-safeguards moved to module 7 unchanged in title and hours", () => {
+    const task = LIBRARY_TASKS.find((t) => t.id === "a4-transfer-safeguards");
+    expect(task).toBeDefined();
+    expect(task?.area).toBe(7);
+    expect(task?.title).toBe("Put the UK Addendum or IDTA in place for any new transfer before it starts.");
+    expect(task?.defaultHours).toBe(4);
+  });
+
+  it("a3-policy-refresh moved to module 4 and is retired", () => {
+    const task = LIBRARY_TASKS.find((t) => t.id === "a3-policy-refresh");
+    expect(task).toBeDefined();
+    expect(task?.area).toBe(4);
+    expect(task?.retired).toBe(true);
+  });
+
+  it("module 2 has the employee access tracker review and the transfers register review", () => {
+    const accessReview = LIBRARY_TASKS.find((t) => t.id === "a2-access-tracker-review");
+    expect(accessReview).toBeDefined();
+    expect(accessReview?.area).toBe(2);
+    expect(accessReview?.recurrence).toBe("quarterly");
+    expect(accessReview?.defaultHours).toBe(4);
+    expect(accessReview?.phase).toBe(4);
+
+    const transfersReview = LIBRARY_TASKS.find((t) => t.id === "a4-transfer-mapping");
+    expect(transfersReview?.area).toBe(2);
+  });
+
+  it("expandLibrary skips retired tasks", () => {
+    const retiredTask: LibraryTask = {
+      id: "t-retired",
+      area: 4,
+      phase: 2,
+      title: "Retired task",
+      how: "Retired how",
+      ownerType: "mitmark",
+      ownerRole: "",
+      recurrence: "annual",
+      defaultHours: 2,
+      defaultOffsetDays: 10,
+      retired: true,
+    };
+    const out = expandLibrary([retiredTask], "2026-09-01");
+    expect(out).toHaveLength(0);
+  });
+
+  it("a fresh apply of the real library produces no instance of the retired policy refresh", () => {
+    const out = expandLibrary(LIBRARY_TASKS, "2026-09-01");
+    expect(out.some((i) => i.libraryId === "a3-policy-refresh")).toBe(false);
+  });
+
+  it("the six per-policy review tasks exist with the real codes and titles from the policy pack", () => {
+    expect(policyPack).toHaveLength(6);
+    for (const entry of policyPack) {
+      const id = `a4-policy-review-${entry.code.toLowerCase()}`;
+      const task = LIBRARY_TASKS.find((t) => t.id === id);
+      expect(task, `expected library task ${id} for policy ${entry.code}`).toBeDefined();
+      expect(task?.area).toBe(4);
+      expect(task?.phase).toBe(2);
+      expect(task?.recurrence).toBe("annual");
+      expect(task?.defaultHours).toBe(2);
+      expect(task?.retired).toBeFalsy();
+      expect(task?.title).toContain(entry.title);
+      expect(task?.title).toContain(entry.code);
+    }
+  });
+
+  it("module 4 has seven non-retired tasks: the six policies plus the privacy notice", () => {
+    const nonRetired = LIBRARY_TASKS.filter((t) => t.area === 4 && !t.retired);
+    expect(nonRetired).toHaveLength(7);
+    expect(nonRetired.every((t) => t.recurrence === "annual" && t.defaultHours === 2)).toBe(true);
+    const ids = nonRetired.map((t) => t.id);
+    expect(ids).toContain("a4-privacy-notice-review");
+    for (const entry of policyPack) {
+      expect(ids).toContain(`a4-policy-review-${entry.code.toLowerCase()}`);
     }
   });
 });
@@ -96,6 +233,23 @@ describe("AREA_OBLIGATIONS", () => {
     for (const area of AREA_IDS) {
       expect(AREA_OBLIGATIONS[area].obligation).not.toMatch(pattern);
     }
+  });
+
+  it("module 2's obligation is now about the registers, not just the RoPA", () => {
+    const { obligation, citation } = AREA_OBLIGATIONS[2];
+    expect(obligation.toLowerCase()).toMatch(/regist/);
+    expect(obligation.toLowerCase()).toContain("access");
+    expect(obligation.toLowerCase()).toMatch(/transfer/);
+    expect(citation.trim().length).toBeGreaterThan(0);
+    expect(obligation).not.toMatch(/\d\s*(article|section)|\b(article|section)\s*\d/i);
+  });
+
+  it("module 4's obligation is now about the policy pack and the privacy notice", () => {
+    const { obligation, citation } = AREA_OBLIGATIONS[4];
+    expect(obligation.toLowerCase()).toMatch(/polic/);
+    expect(obligation.toLowerCase()).toMatch(/privacy notice/);
+    expect(citation.trim().length).toBeGreaterThan(0);
+    expect(obligation).not.toMatch(/\d\s*(article|section)|\b(article|section)\s*\d/i);
   });
 });
 

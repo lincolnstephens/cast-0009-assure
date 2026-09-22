@@ -1,8 +1,8 @@
 ---
 document: BUILD_REPORT
 job: CAST-0009 ASSURE
-version: v1.1
-status: v1.1 BUILD COMPLETE, DEPLOYED, GATE PASSED
+version: v1.2
+status: v1.2 BUILD COMPLETE, DEPLOYED, GATE PASSED
 authority: Seagull, executed by the build session under T02 A6
 ---
 
@@ -193,3 +193,69 @@ Ten tasks wait on the client, so the "for you" panel and the confirm path can bo
 As specified in FRAGO 01 section 4.2 it is the latter, which is what is built. The effect is that a client who is entirely up to date still opens on a low figure until the operator has been round the always-on duties and closed each one for the period. If Rich wants the front page to reflect "nothing is overdue" rather than "nothing has been signed off this cycle", that is a one-line change to the denominator and a different sentence beneath it. It is his call, not the build's.
 
 After that, in order: Lurong authenticates the task library; MITMARK publishes the first procedures; and the Anthropic key is replaced.
+
+---
+
+# v1.2, the operator's structure
+
+**Live:** https://tessera-assure.netlify.app
+**Production deploy:** `6ab25725b4a60a16e14b0e06`, 2026-09-22
+**Gate:** PASS, 75 of 75, against the production URL
+**Spend:** £0
+**Built under:** `06_EXECUTION/FRAGO_02_LURONG.md`. Deadline was 23 Sep 18:00; met a day early.
+
+## What v1.2 adds
+
+The operator returned written feedback and Sunray adopted it. Her three benefits were the test for every change: **compliance overview, document repository, consolidated actions**, with the CFO statement quantifying the service.
+
+**The client portal is now her navigation, in her order:** Compliance Tracker, Compliance Documents, Jobs, Requests and clocks, Value, Statement for the CFO. Posture folded into the tracker's "Areas by status" panel, which was already there. Exposure moved to admin. The Policy Guide is no longer a menu item; it sits at the foot of Jobs, so questions and tasks are in one place, which is how she said she works.
+
+**Compliance Documents** is the repository, in three sections. Policies fills itself from the approved pack, current version with its history, and nobody uploads it. Procedures comes from the operator's Procedures page. Trackers holds the six registers. The client reads and downloads; she cannot upload, edit or delete, and there is no control on her side suggesting otherwise.
+
+**Jobs** is every task across all eight modules in one list, grouped in her words: Not started, In progress, Completed. A blocked task sits in In progress carrying a flag, because "blocked" is the word that gets it unblocked. Tasks marked not applicable are not listed but are counted, so nothing disappears silently.
+
+**Two modules were re-scoped** and nothing was lost. Module 2 is now Data tracker review: the record of processing plus the employee access and international transfers registers. Module 4 is now Policy review: the pack reviewed one policy at a time, plus the privacy notice. The old cross-border work moved into modules 2 and 7 where it belongs, carried by its library id.
+
+## The overall figure changed, and this was the point
+
+It now reads "Nothing overdue" or "{k} overdue or blocked" beneath the fraction.
+
+An always-on duty has no date and can never be overdue. Under v1.1 it counted as unmet until the operator signed it off for the period, so a client who was entirely up to date opened on a low number. That was the smallest next decision flagged at v1.1; Sunray took it. A continuous duty now counts only when something live is running against it: an open clock, or something waiting in the review queue.
+
+The stricter "signed off this cycle" count remains, as a toggle in admin. **It is the operator's view and cannot reach the client**, and that is enforced rather than intended: the default is the literal overdue count, so a caller that forgets to specify gets the safe answer.
+
+## What the build caught that the order could not have
+
+1. **The toggle would have leaked.** The first wiring defaulted to the organisation's setting, so flipping the admin switch would have moved the client's front page and the CFO statement. Section 6 forbids exactly that. A build lane read the spine against the order rather than against the code, and found it.
+2. **The client was shown a raw user id** beside every policy version, because the approver is stored as an id.
+3. **The six questions sat on the wrong element**, so at phone width a reader found a table with no headers.
+4. **The gate read prose as a control**, matching "removed" inside a task's own description. A check that cries wolf hides a real breach in the noise; it now only considers text short enough to be a label.
+
+## The file cap: a deviation from the order, stated plainly
+
+The order specifies a 10 MB cap per file. **It cannot be met, and the build does not pretend otherwise.**
+
+A Netlify function buffers its request body at 6 MB, and a file travels as base64, which inflates it by a third. Measured against the deployed site: a 6 MB body is refused with 413; 4 MB passes. The cap is therefore 4 MB, the shared constant says 4 MB rather than an unreachable 10, the operator's page states the real limit, and an oversized file is refused before it is encoded rather than failing halfway through an upload.
+
+The order already provides the answer for anything larger: it goes in as a link. That is usually better anyway, because a copied register goes stale the day it is uploaded.
+
+## What was deferred, and why
+
+- **Procedures are unpublished** for all eight modules; the client sees the "to be published" card with a target date of 15 October. Publishing them is MITMARK's content work.
+- **None of the six registers has been filed**, so each shows as "Not yet filed". That names the register set she should expect and is the truth.
+- **The module sub-navigation** sits on the tracker, not on each module page, because the module page component was owned by another lane this iteration. One click from the tracker rather than from anywhere.
+- **The Anthropic key** is still rejected with 401. Unchanged since v1.0 and still outstanding.
+
+## The demo organisation
+
+The migration ran against the real store and was checked either side: 54 tasks in, 54 out, none lost, three moved to their new modules. Applying the new library added 11 and skipped 53, leaving 65 tasks across the eight renamed modules. The front page reads "3 of 8 obligations met, 38%" with "5 overdue or blocked" beneath.
+
+The genuine client confirmation raised on 18 September is still there, waiting for the operator.
+
+## The smallest next decision for Sunray
+
+**Nothing in the product is waiting on a decision. The oldest open item is human: a client confirmation has been unanswered since 18 September.**
+
+The whole design rests on MITMARK answering promptly. If a confirmation sitting for five days becomes the pattern rather than the exception, the client sees a system that asks her for things and then ignores her, which is worse than not asking. Before Wednesday's boardroom, that one should be cleared.
+
+After that, in order: the operator authenticates the task library, now 36 tasks; MITMARK publishes the first procedure and files the first register, so the repository stops being all promises; and the Anthropic key is replaced.
