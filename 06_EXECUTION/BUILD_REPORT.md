@@ -314,3 +314,44 @@ There were 65 tasks before the deploy and 65 after, by module 7, 11, 9, 8, 3, 6,
 ## The smallest next decision for Sunray
 
 **Whether module tiles take a darker fill.** Everything else open is the operator's to do in the product: set the journey stage, write the introductions if she wants her own, and file the documents she has already shared. Each is a Settings or Documents action on her side, and the page is truthful until she does them.
+
+---
+
+# v1.4, tile contrast and view as client
+
+**Live:** https://tessera-assure.netlify.app
+**Production deploy:** `6aba7af60408911991163ecf`, 2026-09-28 15:34 BST
+**Gate:** PASS, 118 of 118, against the production URL
+**Spend:** no new money committed. Build-session time, local compute, and two deploys on the existing Netlify plan.
+**Built under:** `06_EXECUTION/FRAGO_04_CLIENT_VIEW.md`. **Deadline 15:00 BST; missed by 34 minutes.** The session started at 15:09 (DC-43).
+
+## What v1.4 adds
+
+**Every module tile is readable.** The fills are still the house status ramp. The text on each fill is whichever colour measures 4.5:1 or better against it: dark on green (9.08) and amber (7.24), white on red (4.64) and grey (4.83). There is no shadow. The gate measures the rendered tiles at all three widths.
+
+**The operator sees what the client sees.** "View as client" at the foot of the admin menu opens the client portal for the selected account: her six menu items and every page beneath them, under a bar reading "Viewing as the client's Information Officer. Read only. Return to admin." Her controls are visible but disabled. The server refuses every write from that view, and one audit entry records that the operator looked.
+
+## One deviation, stated plainly
+
+The order says grey tiles take dark text. Dark text on the house grey measures 3.04:1, which fails the 4.5:1 the same order sets. The order also says the rule is applied by measurement, so grey takes white, at 4.83:1 (DC-44). A grey tile means a module with nothing open; there is none in the demo today.
+
+## The design that makes a leak impossible rather than unlikely
+
+The obvious build was an admin endpoint returning the client's data with the admin fields removed. That approach fails the day someone adds a field and forgets to remove it.
+
+Instead, one guard sits on every client router. An operator carrying the marker is served **as the organisation's own client-seat user**, through the client's own handler, for reads only. There is no second code path, so there is nothing to keep in step (DC-45). The gate confirms it on the live site: 16 reads were compared byte for byte, with no field excused.
+
+## What building it caught
+
+- **The Guide wrote on every read.** Opening Quick questions rewrote the whole organisation document, even when nothing had changed. In client view that would have been a write made by a preview. It is now a pure read, and client view never creates the client's thread (DC-46).
+- **Document links would have failed in client view.** A plain download link cannot carry a header, so the links carry the same read-only marker as a query parameter.
+
+## What was deferred, and why
+
+- **The organisation switcher.** Excluded by the order. The preview already names its organisation explicitly, so a second client needs a second account and nothing else.
+
+## The smallest next decision for Sunray
+
+**None in the product.** Before the operator is sent the link, MITMARK should do two things this order left out:
+1. **Change the demo passwords and rotate `SESSION_SECRET`.** Anyone holding "demo" can now also open client view as the operator.
+2. **Answer the client confirmation raised on 18 September.**

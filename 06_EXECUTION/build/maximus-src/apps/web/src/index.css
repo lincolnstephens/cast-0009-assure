@@ -251,10 +251,3 @@ body {
     padding: 0 !important;
   }
 }
-
-/* v1.3 module tiles carry white text on the status ramp, as the operator
-   drew them. Green and amber are light, so a soft shadow keeps the white
-   name legible without changing the fill or adding a colour. */
-.module-tile {
-  text-shadow: 0 1px 2px rgb(0 0 0 / 0.55);
-}

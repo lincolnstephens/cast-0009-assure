@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { MitmarkLogo } from "../components/MitmarkLogo";
+import { endPreview } from "../lib/preview";
 import { useAdmin } from "../store/admin";
 import { useAuth } from "../store/auth";
 
@@ -21,6 +22,7 @@ const navItems = [
   { to: "/admin/exports", label: "Exports", view: "exports" },
   { to: "/admin/settings", label: "Settings", view: "settings" },
   { to: "/admin/audit", label: "Audit log", view: "audit" },
+  { to: "/admin/client-view", label: "View as client", view: "client-view" },
 ];
 
 export function AdminLayout() {
@@ -38,6 +40,12 @@ export function AdminLayout() {
   useEffect(() => {
     void loadAccounts();
   }, [loadAccounts]);
+
+  // Arriving in the admin workspace by any route ends "View as client", so
+  // the preview header never rides along on the operator's own work.
+  useEffect(() => {
+    endPreview();
+  }, []);
 
   return (
     <div className="admin-workspace flex h-full flex-col sm:flex-row">

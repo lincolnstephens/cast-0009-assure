@@ -1,6 +1,7 @@
 import type { ClientBranding, MeResponse, SessionUser } from "@maximus/shared";
 import { create } from "zustand";
 import { api, ApiError } from "../lib/api";
+import { endPreview } from "../lib/preview";
 
 interface AuthState {
   status: "loading" | "anonymous" | "authenticated";
@@ -10,6 +11,8 @@ interface AuthState {
   bootstrap: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Re-read the session, so the portal picks up (or drops) the previewed organisation's branding. */
+  refresh: () => Promise<void>;
 }
 
 export const useAuth = create<AuthState>((set) => ({
@@ -53,7 +56,18 @@ export const useAuth = create<AuthState>((set) => ({
     });
   },
 
+  refresh: async () => {
+    const me = await api<MeResponse>("/auth/me");
+    set({
+      status: "authenticated",
+      user: me.user,
+      officerName: me.officer?.displayName ?? null,
+      branding: me.branding,
+    });
+  },
+
   logout: async () => {
+    endPreview();
     try {
       await api("/auth/logout", { method: "POST" });
     } catch (err) {

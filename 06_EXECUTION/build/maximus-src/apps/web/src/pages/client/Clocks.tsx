@@ -3,6 +3,8 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { StatusLamp } from "../../components/StatusLamp";
 import { api, ApiError } from "../../lib/api";
 import { formatCountdown, formatLondon } from "../../lib/format";
+import { PREVIEW_READ_ONLY } from "../../lib/preview";
+import { usePreviewing } from "../../lib/usePreviewing";
 
 interface ClockItem {
   id: string;
@@ -277,6 +279,7 @@ function RaiseRequestModal({
   const [details, setDetails] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const previewing = usePreviewing();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -344,7 +347,8 @@ function RaiseRequestModal({
           </button>
           <button
             type="submit"
-            disabled={busy || details.trim().length === 0}
+            disabled={busy || previewing || details.trim().length === 0}
+            title={previewing ? PREVIEW_READ_ONLY : undefined}
             className="rounded bg-client-accent px-4 py-2 text-sm font-medium text-white hover:bg-client-accent/90 disabled:opacity-60"
           >
             {busy ? "Submitting…" : "Submit request"}

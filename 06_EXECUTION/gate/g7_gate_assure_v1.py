@@ -48,6 +48,18 @@ reason beside them; run_driven reports them as retired and does not count
 them. Lines with "drive": "static" run in the static section, once, not per
 resolution (line 30, check_restricted.py).
 
+v1.4 (FRAGO 04, tile contrast and "View as client"). Line 32 measures tile
+text against tile fill (WCAG relative luminance, 4.5:1) in every RAG state,
+using a probe tile for a state the live data does not show. Lines 33 to 35
+and 37 to 38 are API level, with a separate cookie jar per seat; they run
+once, at the first resolution, and prove that client view serves the client
+seat's own responses, refuses every write, is ignored for a client session,
+does not follow the admin toggle, and is audited once per session. Line 36
+drives the banner in the browser. Nothing is confirmed, posted or raised as
+the client, and the one setting changed (denominatorMode) is restored in a
+finally block. client-view is not added to line 3: it redirects out of the
+admin workspace, so line 36 covers it instead.
+
 Usage:
     python gate/g7_gate_assure_v1.py [url-or-path] [outdir]
 
@@ -72,7 +84,7 @@ import sys
 CONFIG = {
     # Identity of the run, for the report header.
     "codename": "ASSURE",
-    "iteration": "v1.3",
+    "iteration": "v1.4",
 
     # What is gated. Either a deployed URL or a path to a local artefact.
     # Passed on the command line; these are the defaults.
@@ -650,6 +662,17 @@ def _sign_in(page, cfg, role, target):
     """Sign out if signed in, then sign in as the account for `role`."""
     email, password = _credentials(cfg, role)
     page.goto(target.rstrip("/") + "/login", wait_until="domcontentloaded")
+    # v1.4: a "View as client" left in sessionStorage must not carry into
+    # the next sign-in. Clear it and reload so the app starts without it.
+    try:
+        held = page.evaluate(
+            "() => { try { const v = sessionStorage.getItem('assure.clientView');"
+            " sessionStorage.removeItem('assure.clientView'); return v !== null; }"
+            " catch (e) { return false; } }")
+    except Exception:
+        held = False
+    if held:
+        page.goto(target.rstrip("/") + "/login", wait_until="domcontentloaded")
     try:
         page.wait_for_selector("input[type='email']", timeout=6000)
     except Exception:
@@ -681,6 +704,11 @@ def _ensure_role(page, cfg, role, target):
     # v1.3: 'guide' is back in the client nav (Quick questions), but 'tracker'
     # is still the home and still the safer probe; unchanged.
     probe = "[data-view='queue']" if role == "admin" else "[data-view='tracker']"
+    # v1.4: in "View as client" the operator sees the client nav, so the
+    # tracker probe alone would take the operator's preview for the client
+    # seat. The banner marks the preview; with it present, sign in afresh.
+    if role == "client" and page.locator("[data-testid='client-view-banner']").count() > 0:
+        return _sign_in(page, cfg, role, target)
     if page.locator(probe).count() > 0:
         return True
     return _sign_in(page, cfg, role, target)
@@ -2326,6 +2354,528 @@ def drv_admin_value_page(page, cfg, line, res, errors):
                 if ok else "; ".join(problems))
 
 
+# --- v1.4 (FRAGO 04): tile contrast and "View as client". -----------------
+#
+# Lines 32 to 38. The contrast and banner lines drive the browser. The
+# response-identity, write-refusal, header, toggle and audit lines are API
+# level: they sign in over HTTP with a separate cookie jar per seat, so the
+# client seat and the operator seat never share a session. They run against
+# the live store, so none of them may leave a lasting change: nothing is
+# confirmed, posted or raised as the client, write probes carry an empty body
+# so a middleware fault would meet validation rather than create a record,
+# and the one setting the toggle line changes is put back in a finally block
+# and read again to prove it.
+
+PREVIEW_HEADER = "X-Assure-Preview"
+PREVIEW_READ_ONLY = "Read only in client view"
+PREVIEW_STORAGE_KEY = "assure.clientView"
+
+# The client GETs the gate already drives (FRAGO 04 section 3.3). The chat
+# thread is called as the client first everywhere, because the client's own
+# first visit is what creates the thread.
+PREVIEW_IDENTITY_PATHS = (
+    ["/tracker/home"]
+    + [f"/tracker/areas/{n}" for n in range(1, 9)]
+    + ["/tracker/documents", "/tracker/jobs", "/clocks", "/value/record",
+       "/value/statement", "/chat/thread", "/policies"]
+)
+
+
+class _ApiSeat:
+    """One signed-in seat over HTTP, with its own cookie jar."""
+
+    def __init__(self, cfg, role):
+        import http.cookiejar
+        import urllib.request
+        self.base = cfg["_target"].rstrip("/") + "/api"
+        self.jar = http.cookiejar.CookieJar()
+        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.jar))
+        self.user = None
+        email, password = _credentials(cfg, role)
+        status, body = self.call("POST", "/auth/login", {"email": email, "password": password})
+        if status != 200 or not isinstance(body, dict) or not body.get("user"):
+            raise RuntimeError(f"{role} API sign-in returned {status}")
+        self.user = body["user"]
+
+    def call(self, method, path, body=None, preview=None):
+        import urllib.error
+        import urllib.request
+        data = json.dumps(body).encode("utf-8") if body is not None else None
+        req = urllib.request.Request(self.base + path, data=data, method=method)
+        req.add_header("Accept", "application/json")
+        if data is not None:
+            req.add_header("Content-Type", "application/json")
+        if preview is not None:
+            req.add_header(PREVIEW_HEADER, f"client:{preview}")
+        try:
+            with self.opener.open(req, timeout=30) as resp:
+                status, raw = resp.status, resp.read()
+        except urllib.error.HTTPError as exc:
+            status, raw = exc.code, exc.read()
+        try:
+            return status, json.loads(raw.decode("utf-8") or "null")
+        except ValueError:
+            return status, {"_raw": raw[:200].decode("utf-8", "replace")}
+
+
+def _preview_org_id(operator):
+    """The first organisation in the operator's account list."""
+    status, body = operator.call("GET", "/admin/accounts")
+    accounts = (body or {}).get("accounts") or [] if status == 200 else []
+    if not accounts:
+        raise RuntimeError(f"GET /api/admin/accounts returned {status} with no accounts")
+    return accounts[0]["id"]
+
+
+def _json_diff_paths(a, b, path=""):
+    """Every path at which two JSON values differ. Dicts and equal-length
+    lists are walked; anything else that differs is reported at its path."""
+    if isinstance(a, dict) and isinstance(b, dict):
+        out = []
+        for k in sorted(set(a) | set(b), key=str):
+            p = f"{path}.{k}" if path else str(k)
+            if k not in a or k not in b:
+                out.append(p)
+            else:
+                out.extend(_json_diff_paths(a[k], b[k], p))
+        return out
+    if isinstance(a, list) and isinstance(b, list) and len(a) == len(b):
+        out = []
+        for i, (x, y) in enumerate(zip(a, b)):
+            out.extend(_json_diff_paths(x, y, f"{path}[{i}]"))
+        return out
+    return [] if a == b else [path or "(root)"]
+
+
+def _under(path, prefixes):
+    return any(path == p or path.startswith(p + ".") or path.startswith(p + "[") for p in prefixes)
+
+
+def _identity_against_client(client, other, paths, other_preview):
+    """For each path: two consecutive client-seat calls as a control, then
+    `other` (with `other_preview` as its marker, or none). Returns
+    (problems, volatile) where volatile maps path -> the fields that moved
+    between the two control calls and were therefore excluded. A top-level
+    "preview": true is allowed in the other response and nothing else."""
+    problems, volatile = [], {}
+    for p in paths:
+        s1, c1 = client.call("GET", p)
+        s2, c2 = client.call("GET", p)
+        if s1 != 200 or s2 != 200:
+            problems.append(f"{p}: client seat returned {s1}/{s2}")
+            continue
+        moving = _json_diff_paths(c1, c2)
+        if moving:
+            volatile[p] = moving
+        so, o = other.call("GET", p, preview=other_preview)
+        if so != 200:
+            problems.append(f"{p}: returned {so}")
+            continue
+        if isinstance(o, dict) and o.get("preview") is True:
+            o = {k: v for k, v in o.items() if k != "preview"}
+        diffs = [d for d in _json_diff_paths(c2, o) if not _under(d, moving)]
+        if diffs:
+            problems.append(f"{p}: differs at {', '.join(diffs[:4])}")
+    return problems, volatile
+
+
+def _volatile_note(volatile):
+    if not volatile:
+        return "no volatile fields excluded"
+    return "volatile fields excluded: " + "; ".join(
+        f"{p} {', '.join(v)}" for p, v in volatile.items())
+
+
+def _api_only_once(line, res):
+    """API-level lines do not depend on the viewport; they run at the first
+    resolution they name and report 'not repeated' at the others."""
+    return res["name"] == line.get("applies_to", [res["name"]])[0]
+
+
+_CONTRAST_JS = r"""
+(args) => {
+  const probeFor = args.probe;
+  const canvas = document.createElement('canvas');
+  canvas.width = 1; canvas.height = 1;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  // Any CSS colour (rgb, oklch, color-mix) to sRGB, text composited over
+  // the fill so a translucent colour is measured as it is seen.
+  const px = (fill, over) => {
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 1, 1);
+    ctx.fillStyle = fill; ctx.fillRect(0, 0, 1, 1);
+    if (over) { ctx.fillStyle = over; ctx.fillRect(0, 0, 1, 1); }
+    const d = ctx.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2]];
+  };
+  const lum = (rgb) => {
+    const c = rgb.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const alphaOf = (col) => { const m = /rgba?\(([^)]+)\)/.exec(col); if (!m) return 1; const p = m[1].split(/[ ,\/]+/).filter(Boolean); return p.length > 3 ? parseFloat(p[3]) : 1; };
+  const measure = (tile) => {
+    const tcs = getComputedStyle(tile);
+    const bgCol = tcs.backgroundColor;
+    const out = { rag: tile.getAttribute('data-rag'), bg: bgCol, spans: [], shadows: [], transparent: alphaOf(bgCol) === 0 };
+    const bg = px(bgCol);
+    if (tcs.textShadow && tcs.textShadow !== 'none') out.shadows.push('tile: ' + tcs.textShadow);
+    const spans = Array.from(tile.querySelectorAll('span')).filter((s) => (s.textContent || '').trim());
+    for (const s of spans) {
+      const cs = getComputedStyle(s);
+      const fg = px(bgCol, cs.color);
+      out.spans.push({ id: s.getAttribute('data-testid') || 'rag-label', color: cs.color, ratio: Math.round(ratio(fg, bg) * 100) / 100 });
+      if (cs.textShadow && cs.textShadow !== 'none') out.shadows.push((s.getAttribute('data-testid') || 'rag-label') + ': ' + cs.textShadow);
+    }
+    return out;
+  };
+  const tiles = Array.from(document.querySelectorAll("[data-testid='module-tile']"));
+  if (!probeFor) return tiles.map(measure);
+  const FILL = { green: 'bg-status-green', amber: 'bg-status-amber', red: 'bg-status-red', grey: 'bg-client-muted' };
+  const TEXT = { green: 'text-client-text', amber: 'text-client-text', red: 'text-white', grey: 'text-white' };
+  const src = tiles[0];
+  if (!src) return [];
+  const clone = src.cloneNode(true);
+  for (const c of Array.from(clone.classList)) {
+    if (/^bg-status-/.test(c) || c === 'bg-client-muted' || /^text-/.test(c)) clone.classList.remove(c);
+  }
+  clone.classList.add(FILL[probeFor], TEXT[probeFor]);
+  clone.setAttribute('data-rag', probeFor);
+  clone.setAttribute('data-testid', 'module-tile-probe');
+  clone.removeAttribute('href');
+  src.parentElement.appendChild(clone);
+  try {
+    const m = measure(clone);
+    m.probe = true;
+    return [m];
+  } finally {
+    clone.remove();
+  }
+}
+"""
+
+
+def drv_tile_contrast(page, cfg, line, res, errors):
+    """Line 32 (new at v1.4, FRAGO 04 section 3.1): every tile's three text
+    spans measure at least 4.5:1 against the tile's own fill, by WCAG
+    relative luminance, with no text shadow. States absent from the live
+    data are measured on a probe tile cloned from a real one, given that
+    state's fill and text classes, measured and removed."""
+    settle_ms = line.get("settle_ms", 400)
+    minimum = float(line.get("min_ratio", 4.5))
+    states = line.get("rag_values", ["green", "amber", "red", "grey"])
+    if _area_tile_count(page, cfg, settle_ms) == 0:
+        return False, "the client tracker's module tiles were not reachable"
+    measured = page.evaluate(_CONTRAST_JS, {"probe": None})
+    present = sorted({m["rag"] for m in measured}, key=lambda r: states.index(r) if r in states else 9)
+    for state in states:
+        if state not in present:
+            measured.extend(page.evaluate(_CONTRAST_JS, {"probe": state}))
+    problems, worst = [], {}
+    for m in measured:
+        label = f"{m['rag']}{' (probe)' if m.get('probe') else ''}"
+        if m.get("transparent"):
+            problems.append(f"{label}: tile background is transparent")
+        if len(m["spans"]) < 3:
+            problems.append(f"{label}: {len(m['spans'])} text spans, expected 3")
+        for s in m["spans"]:
+            worst[label] = min(worst.get(label, 99.0), s["ratio"])
+            if s["ratio"] < minimum:
+                problems.append(f"{label} {s['id']}: {s['ratio']}:1")
+        problems.extend(f"{label} text-shadow {sh}" for sh in m["shadows"])
+    missing = [s for s in states if not any(m["rag"] == s for m in measured)]
+    if missing:
+        problems.append(f"no measurement for {', '.join(missing)}")
+    summary = (f"present {', '.join(present) or 'none'}; lowest ratio per state: "
+               + ", ".join(f"{k} {v}" for k, v in worst.items()))
+    return (not problems), (summary if not problems else "; ".join(problems[:8]) + f" ({summary})")
+
+
+def drv_preview_response_identity(page, cfg, line, res, errors):
+    """Line 33 (new at v1.4, FRAGO 04 section 3.3): with the operator seat in
+    client view, every client GET is identical to the client seat's, allowing
+    only a top-level "preview": true."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    client = _ApiSeat(cfg, "client")
+    operator = _ApiSeat(cfg, "admin")
+    org = _preview_org_id(operator)
+    problems, volatile = _identity_against_client(client, operator, PREVIEW_IDENTITY_PATHS, org)
+    note = _volatile_note(volatile)
+    ok = not problems
+    return ok, (f"{len(PREVIEW_IDENTITY_PATHS)} GETs identical; {note}" if ok
+                else "; ".join(problems[:6]) + f" ({note})")
+
+
+def _client_task_state(client, task_id):
+    status, body = client.call("GET", "/tracker/jobs")
+    if status != 200:
+        return None
+    for g in (body or {}).get("groups", []):
+        for t in g.get("tasks", []):
+            if str(t.get("id")) == str(task_id):
+                return {"status": t.get("status"), "clientConfirmedAt": t.get("clientConfirmedAt")}
+    return None
+
+
+def drv_preview_writes_refused(page, cfg, line, res, errors):
+    """Line 34 (new at v1.4): in client view the confirm request, a Guide
+    message and a raised request are refused 403 "Read only in client view",
+    and the task is unchanged; an operator session without the marker is
+    refused on a client route. Write probes carry an empty body."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    client = _ApiSeat(cfg, "client")
+    operator = _ApiSeat(cfg, "admin")
+    org = _preview_org_id(operator)
+    problems = []
+
+    status, jobs = client.call("GET", "/tracker/jobs")
+    tasks = [t for g in (jobs or {}).get("groups", []) for t in g.get("tasks", [])] if status == 200 else []
+    open_for_you = [t for t in tasks if t.get("forYou") and not t.get("clientConfirmedAt")
+                    and t.get("status") not in ("done", "completed", "not_applicable")]
+    pick = (open_for_you or [t for t in tasks if t.get("forYou")] or tasks or [None])[0]
+    if pick is None:
+        return False, f"no task found on the client's Job management (GET /tracker/jobs {status})"
+    task_id = pick["id"]
+    before = _client_task_state(client, task_id)
+
+    probes = [
+        ("POST", f"/tracker/tasks/{task_id}/confirm", "confirm"),
+        ("POST", "/chat/messages", "Guide message"),
+        ("POST", "/requests", "raise request"),
+    ]
+    for method, path, label in probes:
+        s, body = operator.call(method, path, {}, preview=org)
+        err = (body or {}).get("error") if isinstance(body, dict) else None
+        if s != 403 or err != PREVIEW_READ_ONLY:
+            problems.append(f"{label}: {s} '{err}'")
+
+    after = _client_task_state(client, task_id)
+    if before is None or after != before:
+        problems.append(f"task {task_id} changed: {before} -> {after}")
+
+    s, _ = operator.call("GET", "/tracker/home")
+    if s != 403:
+        problems.append(f"operator without the marker on /tracker/home: {s}")
+
+    ok = not problems
+    which = "an open for-you task" if open_for_you else "a task (no open for-you row)"
+    return ok, (f"confirm on {which}, Guide message and request refused 403 '{PREVIEW_READ_ONLY}'; "
+                f"task state unchanged; unmarked operator refused 403" if ok else "; ".join(problems))
+
+
+def drv_preview_header_ignored_for_client(page, cfg, line, res, errors):
+    """Line 35 (new at v1.4): the client seat carrying the preview marker,
+    for its own organisation and for a bogus one, gets exactly what it gets
+    without it. GET only; the gate never writes as the client."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    client = _ApiSeat(cfg, "client")
+    operator = _ApiSeat(cfg, "admin")
+    org = _preview_org_id(operator)
+    bogus = line.get("bogus_org", "gate-no-such-org")
+    problems, notes = [], []
+    for marker in (org, bogus):
+        p, volatile = _identity_against_client(client, client, PREVIEW_IDENTITY_PATHS, marker)
+        which = "own org" if marker == org else "bogus org"
+        problems.extend(f"{which}: {x}" for x in p)
+        notes.append(f"{which}: {_volatile_note(volatile)}")
+    ok = not problems
+    return ok, ((f"{len(PREVIEW_IDENTITY_PATHS)} GETs unchanged with the marker; " if ok
+                 else "; ".join(problems[:6]) + " (") + " | ".join(notes) + ("" if ok else ")"))
+
+
+def drv_client_view_banner(page, cfg, line, res, errors):
+    """Line 36 (new at v1.4): the operator enters client view from the admin
+    nav; on the six client pages and module 1 the banner is present, visible
+    and inside the viewport; confirm, Ask and Submit request are disabled;
+    Return to admin lands in /admin with the banner gone. For the client
+    seat the banner is absent on the same pages."""
+    from urllib.parse import urlparse
+    settle_ms = line.get("settle_ms", 600)
+    banner_sel = line.get("banner_selector", "[data-testid='client-view-banner']")
+    return_sel = line.get("return_selector", "[data-testid='client-view-return']")
+    banner_text = line.get("banner_text", "Viewing as the client's Information Officer. Read only.")
+    return_text = line.get("return_text", "Return to admin.")
+    views = line.get("views", ["tracker", "documents", "jobs", "request", "statement", "guide"])
+    problems = []
+
+    def banner_ok(where):
+        if not _wait_for(page, banner_sel, 6000):
+            problems.append(f"{where}: banner absent")
+            return
+        b = page.locator(banner_sel).first
+        box = b.bounding_box()
+        vh = page.viewport_size["height"]
+        if not b.is_visible() or box is None or box["y"] < -1 or box["y"] + box["height"] > vh + 1:
+            problems.append(f"{where}: banner not visible in the viewport ({box})")
+        if banner_text not in _text(b):
+            problems.append(f"{where}: banner reads '{_text(b)[:80]}'")
+
+    def open_module_1():
+        if not _enter_view(page, "tracker", None, settle_ms):
+            return False
+        if not _wait_for(page, AREA_TILE_SELECTOR, 6000):
+            return False
+        page.locator(AREA_TILE_SELECTOR).first.click()
+        page.wait_for_timeout(settle_ms)
+        return _wait_for(page, "[data-testid='module-progress']", 6000)
+
+    try:
+        if not _sign_in(page, cfg, "admin", cfg["_target"]):
+            return False, "could not sign in as the operator"
+        if not _enter_view(page, "client-view", None, settle_ms, cfg, "admin"):
+            return False, "admin nav item data-view='client-view' not found"
+        if not _wait_for(page, banner_sel, 8000):
+            return False, "client view opened without the banner"
+        if urlparse(page.url).path.rstrip("/") != "":
+            problems.append(f"client view landed on '{urlparse(page.url).path}', expected /")
+        ret = page.locator(return_sel)
+        if ret.count() == 0 or _text(ret.first) != return_text:
+            problems.append(f"return control reads '{_text(ret.first) if ret.count() else ''}'")
+
+        for v in views:
+            if not _enter_view(page, v, None, settle_ms):
+                problems.append(f"{v}: client nav item missing in client view")
+                continue
+            banner_ok(v)
+            if v == "jobs":
+                confirms = page.locator("[data-testid='confirm-task']")
+                n = confirms.count()
+                enabled = sum(1 for i in range(n) if confirms.nth(i).is_enabled())
+                if enabled:
+                    problems.append(f"jobs: {enabled} of {n} confirm controls enabled")
+                if n and page.locator("[data-testid='preview-read-only']").count() == 0:
+                    problems.append("jobs: no preview-read-only note beside confirm")
+                if n and page.locator("[data-testid='preview-read-only']").count() and \
+                        PREVIEW_READ_ONLY not in _text(page.locator("[data-testid='preview-read-only']").first):
+                    problems.append("jobs: preview-read-only note wording")
+            if v in ("guide", "request"):
+                pattern = r"^\s*Ask\s*$" if v == "guide" else r"^\s*Submit request\s*$"
+                btns = page.locator("button").filter(has_text=re.compile(pattern))
+                if any(btns.nth(i).is_enabled() for i in range(btns.count())):
+                    problems.append(f"{v}: submit control enabled in client view")
+        if open_module_1():
+            banner_ok("module 1")
+        else:
+            problems.append("module 1: not reachable in client view")
+
+        if page.locator(return_sel).count():
+            page.locator(return_sel).first.click()
+            page.wait_for_timeout(settle_ms * 2)
+            path = urlparse(page.url).path.rstrip("/")
+            if not path.startswith("/admin"):
+                problems.append(f"return landed on '{path}'")
+            if page.locator(banner_sel).count():
+                problems.append("banner still present after return")
+        else:
+            problems.append("return control absent at the end")
+
+        # The real client seat: no banner anywhere.
+        _sign_in(page, cfg, "client", cfg["_target"])
+        _wait_for(page, "[data-view='tracker']", 6000)
+        for v in views:
+            if not _enter_view(page, v, None, settle_ms):
+                problems.append(f"client {v}: nav item missing")
+                continue
+            if page.locator(banner_sel).count():
+                problems.append(f"client {v}: banner present for the client seat")
+        if open_module_1():
+            if page.locator(banner_sel).count():
+                problems.append("client module 1: banner present for the client seat")
+        else:
+            problems.append("client module 1: not reachable")
+    finally:
+        # Leave the page as later lines expect: the client seat, no preview
+        # held in sessionStorage for a later operator sign-in to inherit.
+        was_previewing = page.locator(banner_sel).count() > 0
+        try:
+            page.evaluate(f"() => sessionStorage.removeItem('{PREVIEW_STORAGE_KEY}')")
+        except Exception:
+            pass
+        if was_previewing:
+            _sign_in(page, cfg, "client", cfg["_target"])
+
+    ok = not problems
+    return ok, (f"banner on {len(views)} client pages and module 1, writes disabled, "
+                f"return lands in /admin; absent for the client seat" if ok else "; ".join(problems[:8]))
+
+
+def drv_preview_ignores_admin_toggle(page, cfg, line, res, errors):
+    """Line 37 (new at v1.4): with denominatorMode set to the stricter
+    "cycle", client view's overall figure equals the client seat's. The
+    original value is read first and restored in a finally block, then read
+    again to prove the restore."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    client = _ApiSeat(cfg, "client")
+    operator = _ApiSeat(cfg, "admin")
+    org = _preview_org_id(operator)
+    mode = line.get("strict_mode", "cycle")
+    s, body = operator.call("GET", f"/admin/settings?org={org}")
+    if s != 200 or "denominatorMode" not in ((body or {}).get("settings") or {}):
+        return False, f"could not read denominatorMode (GET settings {s})"
+    original = body["settings"]["denominatorMode"]
+    problems = []
+    restored = None
+    try:
+        s, _ = operator.call("PUT", f"/admin/settings?org={org}", {"denominatorMode": mode})
+        if s != 200:
+            problems.append(f"PUT denominatorMode={mode} returned {s}")
+        s1, c1 = client.call("GET", "/tracker/home")
+        s2, c2 = client.call("GET", "/tracker/home")
+        sp, pv = operator.call("GET", "/tracker/home", preview=org)
+        if s1 != 200 or s2 != 200 or sp != 200:
+            problems.append(f"tracker home returned client {s1}/{s2}, preview {sp}")
+        else:
+            moving = _json_diff_paths((c1 or {}).get("overall"), (c2 or {}).get("overall"), "overall")
+            diffs = [d for d in _json_diff_paths(c2.get("overall"), pv.get("overall"), "overall")
+                     if not _under(d, moving)]
+            if diffs:
+                problems.append(f"preview overall differs from the client's at {', '.join(diffs[:4])}")
+    finally:
+        operator.call("PUT", f"/admin/settings?org={org}", {"denominatorMode": original})
+        s, body = operator.call("GET", f"/admin/settings?org={org}")
+        restored = ((body or {}).get("settings") or {}).get("denominatorMode") if s == 200 else None
+    if restored != original:
+        problems.append(f"denominatorMode not restored: was '{original}', now '{restored}'")
+    ok = not problems
+    return ok, (f"with denominatorMode '{mode}' the preview overall equals the client's; "
+                f"restored to '{original}'" if ok else "; ".join(problems))
+
+
+def drv_client_view_audit(page, cfg, line, res, errors):
+    """Line 38 (new at v1.4): a fresh operator session making three preview
+    GETs writes exactly one client_view.open entry, naming the operator."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    operator = _ApiSeat(cfg, "admin")
+    org = _preview_org_id(operator)
+    q = f"/admin/audit?accountId={org}&action=client_view.open"
+
+    def entries():
+        s, body = operator.call("GET", q)
+        if s != 200:
+            raise RuntimeError(f"GET audit returned {s}")
+        return [e for e in (body or {}).get("entries", []) if e.get("action") == "client_view.open"]
+
+    before = {e["id"] for e in entries()}
+    for p in ("/tracker/home", "/tracker/jobs", "/tracker/documents"):
+        s, _ = operator.call("GET", p, preview=org)
+        if s != 200:
+            return False, f"preview GET {p} returned {s}"
+    new = [e for e in entries() if e["id"] not in before]
+    problems = []
+    if len(new) != 1:
+        problems.append(f"{len(new)} new client_view.open entries, expected 1")
+    if new and str(new[0].get("actorId")) != str(operator.user.get("id")):
+        problems.append(f"entry actor '{new[0].get('actorId')}', expected the operator")
+    ok = not problems
+    return ok, ("three preview GETs wrote one client_view.open entry, actor the operator" if ok
+                else "; ".join(problems))
+
+
 DRIVERS = {
     "sign_in_lands_on_portal": drv_sign_in_lands_on_portal,
     "views_render": drv_views_render,
@@ -2361,6 +2911,14 @@ DRIVERS = {
     "quick_questions": drv_quick_questions,
     "old_module_names_absent": drv_old_module_names_absent,
     "admin_value_page": drv_admin_value_page,
+    # v1.4, tile contrast and "View as client" (FRAGO 04).
+    "tile_contrast": drv_tile_contrast,
+    "preview_response_identity": drv_preview_response_identity,
+    "preview_writes_refused": drv_preview_writes_refused,
+    "preview_header_ignored_for_client": drv_preview_header_ignored_for_client,
+    "client_view_banner": drv_client_view_banner,
+    "preview_ignores_admin_toggle": drv_preview_ignores_admin_toggle,
+    "client_view_audit": drv_client_view_audit,
 }
 
 

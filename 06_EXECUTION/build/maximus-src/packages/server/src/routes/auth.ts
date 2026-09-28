@@ -5,7 +5,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { OrgDoc, UserRecord } from "../db/model.ts";
 import { readOrg, readUsers } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
-import { requireAuth, type AppEnv } from "../lib/middleware.ts";
+import { previewOrgOf, requireAuth, type AppEnv } from "../lib/middleware.ts";
 import {
   createSession,
   decodeSessionCookie,
@@ -71,7 +71,10 @@ authRoutes.get("/session", async (c) => {
   const user = usersDoc.users.find((u) => u.id === authed.id);
   if (!user) return c.json({ user: null, officer: null, branding: null });
 
-  const org = user.orgId ? await readOrg(user.orgId) : null;
+  // As /me: in "View as client" the operator's session carries the
+  // previewed organisation's branding, so a reload keeps the client's look.
+  const brandingOrg = user.orgId ?? (user.role === "mitmark_admin" ? previewOrgOf(c) : null);
+  const org = brandingOrg ? await readOrg(brandingOrg) : null;
   const officer = usersDoc.users.find((u) => u.role === "mitmark_admin");
   return c.json({
     user: await toSessionUser(user),
@@ -108,8 +111,13 @@ authRoutes.get("/me", requireAuth, async (c) => {
 
   let clientAccountName: string | null = null;
   let branding: ClientBranding | null = null;
-  if (user.clientAccountId) {
-    const org = await readOrg(user.clientAccountId);
+  // In "View as client" the operator's portal carries the previewed
+  // organisation's name and branding, exactly as its client seat receives
+  // them. A client session ignores the header.
+  const previewOrg = user.role === "mitmark_admin" ? previewOrgOf(c) : null;
+  const orgForBranding = user.clientAccountId ?? previewOrg;
+  if (orgForBranding) {
+    const org = await readOrg(orgForBranding);
     clientAccountName = org?.name ?? null;
     branding = org ? toClientBranding(org) : null;
   }

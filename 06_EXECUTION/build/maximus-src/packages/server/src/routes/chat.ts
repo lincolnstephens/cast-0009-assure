@@ -1,14 +1,14 @@
 import { sendChatMessageSchema, type StoredCitation } from "@maximus/shared";
 import { Hono } from "hono";
 import type { ChatMessageRecord, ChatThreadRecord, EscalationRecord, OrgDoc } from "../db/model.ts";
-import { mutateOrg, newId, readUsers } from "../db/store.ts";
+import { mutateOrg, newId, readOrg, readUsers } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { buildCorpus } from "../lib/guide/corpus.ts";
 import { enforce, parseRawResult, type EnforcedReply } from "../lib/guide/enforce.ts";
 import { askLlm, GuideBusyError, GuideUnavailableError, isLlmConfigured } from "../lib/guide/llm.ts";
 import { askStub } from "../lib/guide/stub.ts";
 import { createIntakeWithClock } from "../lib/intakes.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireClientSeat, type AppEnv } from "../lib/middleware.ts";
 
 const BUSY_COPY = "The Guide is busy right now. Give me a few seconds and ask that again.";
 const EMPTY_CORPUS_COPY =
@@ -16,7 +16,7 @@ const EMPTY_CORPUS_COPY =
 const RATE_LIMIT_PER_MINUTE = 10;
 
 export const chatRoutes = new Hono<AppEnv>();
-chatRoutes.use("*", requireAuth, requireRole("client"));
+chatRoutes.use("*", requireAuth, requireClientSeat);
 
 /** The user's thread (created on first visit) with full message history. */
 chatRoutes.get("/thread", async (c) => {
@@ -25,13 +25,27 @@ chatRoutes.get("/thread", async (c) => {
   const orgId = user.clientAccountId;
 
   const officerName = await officerDisplayName();
-  const result = await mutateOrg(orgId, (doc) => {
-    const thread = getOrCreateThread(doc, user.id);
-    const messages = doc.messages
+  const threadOf = (doc: OrgDoc, thread: ChatThreadRecord) => ({
+    threadId: thread.id,
+    messages: doc.messages
       .filter((m) => m.threadId === thread.id)
-      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
-    return { threadId: thread.id, messages };
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)),
   });
+
+  // Reading an existing thread is a read, not a write. Only the client's own
+  // first visit creates the thread; the operator's client view never does
+  // (FRAGO 04 3.2), and shows an empty conversation until the client has one.
+  const current = await readOrg(orgId);
+  if (!current) return c.json({ error: "No organisation" }, 404);
+  const existing = current.threads.find((t) => t.userId === user.id);
+  let result: { threadId: string; messages: ChatMessageRecord[] };
+  if (existing) {
+    result = threadOf(current, existing);
+  } else if (c.get("preview")) {
+    result = { threadId: "", messages: [] };
+  } else {
+    result = await mutateOrg(orgId, (doc) => threadOf(doc, getOrCreateThread(doc, user.id)));
+  }
 
   return c.json({
     threadId: result.threadId,

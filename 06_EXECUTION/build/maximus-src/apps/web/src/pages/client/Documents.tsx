@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ComplianceDocument, DocumentsResponse } from "@maximus/shared";
 import { areaName } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
+import { apiHref } from "../../lib/preview";
 import { formatDateGB } from "../../lib/format";
 import { PolicyPanel } from "../../components/PolicyPanel";
 
@@ -117,7 +118,7 @@ function OpenControl({ item }: { item: ComplianceDocument }) {
     return (
       <a
         className="text-[12px] font-medium text-client-accent hover:underline"
-        href={`/api/tracker/documents/${item.id}/download`}
+        href={apiHref(`/tracker/documents/${item.id}/download`)}
       >
         Download
       </a>
@@ -126,7 +127,7 @@ function OpenControl({ item }: { item: ComplianceDocument }) {
   return (
     <a
       className="text-[12px] font-medium text-client-accent hover:underline"
-      href={`/api/tracker/documents/${item.id}/download`}
+      href={apiHref(`/tracker/documents/${item.id}/download`)}
       target="_blank"
       rel="noreferrer"
     >

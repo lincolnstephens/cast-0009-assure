@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { readOrg } from "../db/store.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireClientSeat, type AppEnv } from "../lib/middleware.ts";
 import { findPolicyAnywhere, latestApprovedPolicies, parsePolicyDocument } from "../lib/policies.ts";
 
 export const policyRoutes = new Hono<AppEnv>();
-policyRoutes.use("*", requireAuth, requireRole("client"));
+policyRoutes.use("*", requireAuth, requireClientSeat);
 
 /** Latest approved version of each policy - the client's whole policy pack. */
 policyRoutes.get("/", async (c) => {

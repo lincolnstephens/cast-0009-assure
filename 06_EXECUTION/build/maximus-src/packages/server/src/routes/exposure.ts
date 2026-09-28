@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { readOrg, readUsers } from "../db/store.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireClientSeat, type AppEnv } from "../lib/middleware.ts";
 
 export const exposureRoutes = new Hono<AppEnv>();
-exposureRoutes.use("*", requireAuth, requireRole("client"));
+exposureRoutes.use("*", requireAuth, requireClientSeat);
 
 function byCreatedDesc<T extends { createdAt: string }>(a: T, b: T): number {
   return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0;

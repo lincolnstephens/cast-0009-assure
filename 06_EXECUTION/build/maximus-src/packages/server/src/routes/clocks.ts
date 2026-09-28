@@ -10,10 +10,10 @@ import {
   createIntakeWithClock,
   findClockGlobally,
 } from "../lib/intakes.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireClientSeat, type AppEnv } from "../lib/middleware.ts";
 
 export const clockRoutes = new Hono<AppEnv>();
-clockRoutes.use("*", requireAuth, requireRole("client"));
+clockRoutes.use("*", requireAuth, requireClientSeat);
 
 /** Newest-started first, mirroring the previous `orderBy(desc(startsAt))`. */
 function byStartedDesc(a: ClockRecord, b: ClockRecord): number {
@@ -100,7 +100,7 @@ clockRoutes.get("/:id", async (c) => {
 });
 
 export const requestRoutes = new Hono<AppEnv>();
-requestRoutes.use("*", requireAuth, requireRole("client"));
+requestRoutes.use("*", requireAuth, requireClientSeat);
 
 /**
  * "Raise a request" - the client portal's two intakes (data request, report a

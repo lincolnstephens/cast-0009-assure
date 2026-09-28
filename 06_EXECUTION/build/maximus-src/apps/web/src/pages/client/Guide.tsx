@@ -4,6 +4,8 @@ import { PolicyPanel } from "../../components/PolicyPanel";
 import { StatusLamp } from "../../components/StatusLamp";
 import { api, ApiError } from "../../lib/api";
 import { formatLondon } from "../../lib/format";
+import { PREVIEW_READ_ONLY } from "../../lib/preview";
+import { usePreviewing } from "../../lib/usePreviewing";
 
 interface ChatMessage {
   id: string;
@@ -31,6 +33,7 @@ export function GuidePage() {
   const [notice, setNotice] = useState<{ text: string; retryBody: string | null } | null>(null);
   const [panel, setPanel] = useState<{ policyId: string; sectionRef: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const previewing = usePreviewing();
 
   const loadThread = useCallback(async () => {
     try {
@@ -148,7 +151,8 @@ export function GuidePage() {
         />
         <button
           type="submit"
-          disabled={sending || draft.trim().length === 0}
+          disabled={sending || previewing || draft.trim().length === 0}
+          title={previewing ? PREVIEW_READ_ONLY : undefined}
           className="rounded bg-client-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-client-accent/90 disabled:opacity-50"
         >
           Ask

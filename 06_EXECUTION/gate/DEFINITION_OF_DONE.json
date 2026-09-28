@@ -1,5 +1,5 @@
 {
-  "iteration": "v1.3",
+  "iteration": "v1.4",
   "written": "2026-09-28",
   "lines": [
     {
@@ -660,6 +660,128 @@
         "390x844"
       ],
       "role": "admin"
+    },
+    {
+      "id": 32,
+      "line": "Module tile text reads at 4.5:1 or better against the tile fill in every RAG state, with no shadow.",
+      "drive": "playwright",
+      "check": "tile_contrast",
+      "pass": "On the client tracker at each width, for every module-tile, the computed color of each of its three text spans (module-tile-name, module-tile-count, the RAG label) measures at least 4.5:1 against the tile's computed background-color by WCAG relative luminance, and no tile or span carries a text-shadow other than none. Any of green, amber, red, grey not present in the live data is measured on a probe: a clone of a real tile given that state's fill class (bg-status-green, bg-status-amber, bg-status-red, bg-client-muted) and text class (text-client-text on green and amber, text-white on red and grey), appended to the same grid, measured and removed. The detail names the states present and the lowest ratio per state.",
+      "min_ratio": 4.5,
+      "rag_values": [
+        "green",
+        "amber",
+        "red",
+        "grey"
+      ],
+      "expected_ratios": {
+        "green": 9.08,
+        "amber": 7.24,
+        "red": 4.64,
+        "grey": 4.83
+      },
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client",
+      "new_v1_4": "FRAGO 04 section 3.1 (DC-42a)."
+    },
+    {
+      "id": 33,
+      "line": "In client view the operator receives exactly the client seat's responses.",
+      "drive": "api",
+      "check": "preview_response_identity",
+      "pass": "With an operator session carrying X-Assure-Preview: client:<orgId> (orgId the first of GET /api/admin/accounts), every client GET (tracker home, modules 1 to 8, documents, jobs, clocks, value record, value statement, chat thread, policies) returns JSON equal to the client seat's, allowing only a top-level preview: true. Two consecutive client-seat calls are the control; any path that differs between them is volatile, excluded, and named in the detail. The client seat calls the chat thread first.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_4": "FRAGO 04 section 3.3. API level, run once at the first resolution."
+    },
+    {
+      "id": 34,
+      "line": "In client view every write is refused and the task is unchanged.",
+      "drive": "api",
+      "check": "preview_writes_refused",
+      "pass": "With the operator's preview marker, POST /api/tracker/tasks/<id>/confirm (an open for-you task from the client's Job management, or any task if none), POST /api/chat/messages and POST /api/requests each return 403 with error 'Read only in client view', and the task's status and clientConfirmedAt read by the client seat are unchanged. An operator session without the marker gets 403 on GET /api/tracker/home. Write probes carry an empty body; nothing is ever sent as the client.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_4": "FRAGO 04 section 3.3. API level, run once at the first resolution."
+    },
+    {
+      "id": 35,
+      "line": "For the client seat the preview marker does nothing.",
+      "drive": "api",
+      "check": "preview_header_ignored_for_client",
+      "pass": "The client seat carrying X-Assure-Preview for its own organisation, and for a bogus organisation id, gets the same JSON on every GET in line 33 as without it, with the same control and volatile exclusions. GET only.",
+      "bogus_org": "gate-no-such-org",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_4": "FRAGO 04 section 3.3. API level, run once at the first resolution."
+    },
+    {
+      "id": 36,
+      "line": "The client-view banner shows on every client page for the operator and never for the client.",
+      "drive": "playwright",
+      "check": "client_view_banner",
+      "pass": "Signed in as the operator, data-view='client-view' in the admin nav opens the client portal at / with client-view-banner reading 'Viewing as the client's Information Officer. Read only.' and client-view-return reading 'Return to admin.'. On tracker, documents, jobs, request, statement, guide and module 1 the banner is present, visible and inside the viewport. On jobs every confirm-task is disabled with preview-read-only reading 'Read only in client view' beside it (when rows exist); the Ask and Submit request buttons, where rendered, are disabled. Return lands on /admin and the banner is gone. Signed in as the client, the banner is absent on the same seven pages.",
+      "banner_selector": "[data-testid='client-view-banner']",
+      "return_selector": "[data-testid='client-view-return']",
+      "banner_text": "Viewing as the client's Information Officer. Read only.",
+      "return_text": "Return to admin.",
+      "views": [
+        "tracker",
+        "documents",
+        "jobs",
+        "request",
+        "statement",
+        "guide"
+      ],
+      "settle_ms": 600,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "admin",
+      "new_v1_4": "FRAGO 04 sections 3.2 and 3.3. Also the only coverage of the client-view admin nav item, which is not in line 3 because it redirects out of the admin workspace."
+    },
+    {
+      "id": 37,
+      "line": "The admin denominator toggle does not change the client-view tracker figure.",
+      "drive": "api",
+      "check": "preview_ignores_admin_toggle",
+      "pass": "The operator's denominatorMode is read from GET /api/admin/settings?org=<orgId>, set to 'cycle' by PUT, and the preview's /api/tracker/home overall equals the client seat's overall. The original value is restored in a finally block and read back; a failed restore is a fail.",
+      "strict_mode": "cycle",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_4": "FRAGO 04 section 3.3. API level, run once at the first resolution."
+    },
+    {
+      "id": 38,
+      "line": "Entering client view writes one audit entry per session.",
+      "drive": "api",
+      "check": "client_view_audit",
+      "pass": "A fresh operator session counts client_view.open entries via GET /api/admin/audit?accountId=<orgId>&action=client_view.open, makes three preview GETs, and finds exactly one new entry whose actorId is the operator's.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_4": "FRAGO 04 section 3.3. API level, run once at the first resolution."
     }
   ]
 }

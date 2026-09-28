@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { AreaPage } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
+import { apiHref } from "../../lib/preview";
 import { formatDateGB, formatLondon } from "../../lib/format";
 import { PolicyPanel } from "../../components/PolicyPanel";
 import { ModuleNav } from "../../components/tracker/ModuleNav";
@@ -92,7 +93,7 @@ export function AreaPageView() {
                 ) : (
                   <a
                     data-testid="module-doc"
-                    href={`/api/tracker/documents/${d.id}/download`}
+                    href={apiHref(`/tracker/documents/${d.id}/download`)}
                     target="_blank"
                     rel="noreferrer"
                     className="text-client-accent underline"

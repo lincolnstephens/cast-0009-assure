@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { ClientLogo } from "../components/ClientLogo";
 import { ClientPoweredBy } from "../components/ClientPoweredBy";
+import { ClientViewBanner } from "../components/ClientViewBanner";
 import { useAuth } from "../store/auth";
 
 // `view` is the identifier the gate drives the product by. The label is what
@@ -35,10 +36,12 @@ export function ClientLayout() {
 
   return (
     <div
-      className="client-portal flex min-h-full w-full flex-col bg-client-bg text-client-text sm:flex-row"
+      className="client-portal flex min-h-full w-full flex-col bg-client-bg text-client-text"
       data-theme="day"
       style={theme ? brandingStyle(theme) : undefined}
     >
+      <ClientViewBanner />
+      <div className="flex min-h-0 w-full flex-1 flex-col sm:flex-row">
       <aside className="flex w-full shrink-0 flex-col border-b border-client-line bg-client-surface sm:w-44 sm:border-b-0 sm:border-r md:w-56">
         <div className="border-b border-client-line px-4 py-4 sm:px-5 sm:py-5">
           {theme ? (
@@ -105,6 +108,7 @@ export function ClientLayout() {
           <Outlet />
           {theme && <ClientPoweredBy text={theme.poweredByText} />}
         </main>
+      </div>
       </div>
     </div>
   );

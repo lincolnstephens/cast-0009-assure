@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { ExportRecord } from "../db/model.ts";
 import { listOrgIds, mutateOrg, newId, readExportBlob, readOrg } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireClientSeat, type AppEnv } from "../lib/middleware.ts";
 
 export const exportRoutes = new Hono<AppEnv>();
 exportRoutes.use("*", requireAuth);
@@ -23,7 +23,7 @@ async function findExportAnywhere(id: string): Promise<{ orgId: string; row: Exp
 }
 
 /** Client's export requests for their account. */
-exportRoutes.get("/", requireRole("client"), async (c) => {
+exportRoutes.get("/", requireClientSeat, async (c) => {
   const user = c.get("user");
   if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
   const doc = await readOrg(user.clientAccountId);
@@ -40,7 +40,7 @@ exportRoutes.get("/", requireRole("client"), async (c) => {
 });
 
 /** Request a defence-file export - creates a review item for officer approval. */
-exportRoutes.post("/", requireRole("client"), async (c) => {
+exportRoutes.post("/", requireClientSeat, async (c) => {
   const user = c.get("user");
   if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
   const orgId = user.clientAccountId;

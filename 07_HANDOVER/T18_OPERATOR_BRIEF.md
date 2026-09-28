@@ -1,8 +1,8 @@
 ---
 document: OPERATOR_BRIEF
 job: CAST-0009 ASSURE
-product: Tessera Assure v1.3
-version: v1.3
+product: Tessera Assure v1.4
+version: v1.4
 status: FOR THE MITMARK OPERATOR
 authority: Seagull, written by the build session under T02 A6
 register_id: T18
@@ -224,6 +224,22 @@ The stricter view is still yours. **Settings** has a toggle: "Signed off this cy
 **Value** is now on your side. The admin menu item "Value" opens the Record with a link to the rates in Settings, because together they are the input to the statement. The client keeps the **Statement for the CFO**, which links at its foot to "The record behind this statement".
 
 **Quick questions** is the Policy Guide under your name for it. It says what it does: answers come from the approved policies and procedures, and anything they do not answer goes to MITMARK. There is still no working API key, so it answers by matching the approved text, and the wording is true either way.
+
+## 5i. View as client (v1.4)
+
+**What it is for:** seeing exactly what the Information Officer sees before you send her anything, or when she asks about something on her screen.
+
+**How to open it:** choose the client account at the top of the admin workspace, then choose **View as client** at the foot of the menu. The client portal opens with her six menu items and every page beneath them, built from her data by the same code that serves her. A dark bar across the top reads "Viewing as the client's Information Officer. Read only." Choose **Return to admin** in that bar to go back. Going to any admin page also ends the view.
+
+**It is read only.** Her confirm buttons, the Guide's Ask button and the request form's Submit are shown, so you can see they exist, but they are disabled and marked "Read only in client view". The server refuses any change made from this view, whatever the screen shows.
+
+**It is logged.** Opening client view writes one entry to the organisation's audit log with your name, once per sign-in session, not once per page.
+
+**Two things you may notice:**
+- If she has never opened Quick questions, you see an empty conversation there, because she has none yet.
+- The overall figure is always her figure. Your "Signed off this cycle" setting does not change what you see here, because it does not change what she sees.
+
+**Module tile colours changed at v1.4.** Green and amber tiles now carry dark text and red tiles white text, so every tile is readable (4.5:1 or better). A grey tile, for a module with nothing open, also carries white text.
 
 ## 6. Importing the v0.1 export
 

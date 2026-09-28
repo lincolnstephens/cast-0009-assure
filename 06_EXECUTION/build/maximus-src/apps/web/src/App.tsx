@@ -11,6 +11,7 @@ import { AdminPosturePage } from "./pages/admin/Posture";
 import { AdminProceduresPage } from "./pages/admin/Procedures";
 import { AdminRecordPage } from "./pages/admin/Record";
 import { AdminValuePage } from "./pages/admin/Value";
+import { AdminClientViewPage } from "./pages/admin/ClientView";
 import { AdminSettingsPage } from "./pages/admin/Settings";
 import { AdminReviewQueuePage } from "./pages/admin/ReviewQueue";
 import { AdminWorkplanPage } from "./pages/admin/Workplan";
@@ -78,6 +79,17 @@ export default function App() {
         <Route path="value" element={<ValuePage />} />
         <Route path="value/statement" element={<StatementPage />} />
       </Route>
+
+      {/* Outside AdminLayout on purpose: the admin workspace ends client
+          view when it mounts, and this route is the one that starts it. */}
+      <Route
+        path="/admin/client-view"
+        element={
+          <RequireRole role="mitmark_admin">
+            <AdminClientViewPage />
+          </RequireRole>
+        }
+      />
 
       <Route
         path="/admin"

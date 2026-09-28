@@ -18,7 +18,7 @@ import type { EntryRecord, TaskRecord } from "../db/model.ts";
 import { mutateOrg, newId, readDocumentBlob, readOrg } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { buildDocumentsResponse } from "../lib/documents.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireClientSeat, type AppEnv } from "../lib/middleware.ts";
 import {
   areaSummaries,
   forYou,
@@ -44,7 +44,7 @@ import { policyForArea } from "../lib/workplan.ts";
  * reprioritises or closes a task.
  */
 export const trackerRoutes = new Hono<AppEnv>();
-trackerRoutes.use("*", requireAuth, requireRole("client"));
+trackerRoutes.use("*", requireAuth, requireClientSeat);
 
 /** Ascending compare with nulls last - the "soonest due first" ordering. */
 function ascNullsLast(a: string | null, b: string | null): number {

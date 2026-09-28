@@ -9,7 +9,7 @@ import {
   obligationsLine,
   totalsOf,
 } from "../lib/record.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireClientSeat, type AppEnv } from "../lib/middleware.ts";
 
 /**
  * The client portal's Value section: the Record, read only, and the Statement.
@@ -18,7 +18,7 @@ import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
  * the response says so and the portal shows the banner.
  */
 export const valueRoutes = new Hono<AppEnv>();
-valueRoutes.use("*", requireAuth, requireRole("client"));
+valueRoutes.use("*", requireAuth, requireClientSeat);
 
 function periodParam(raw: string | undefined, available: string[]): string {
   if (raw && raw !== "all" && available.includes(raw)) return raw;

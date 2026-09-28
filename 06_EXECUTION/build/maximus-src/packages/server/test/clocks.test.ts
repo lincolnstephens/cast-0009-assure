@@ -44,6 +44,14 @@ vi.mock("../src/lib/middleware.ts", () => ({
     if (!user || user.role !== role) return c.json({ error: "Forbidden" }, 403);
     await next();
   },
+  // v1.4: the client routers use the client-seat guard. These fake users are
+  // never in client view, so it reduces to the client role check; the
+  // preview paths are tested against the real middleware in clientView.test.ts.
+  requireClientSeat: async (c: Context, next: Next) => {
+    const user = c.get("user") as FakeUser | undefined;
+    if (!user || user.role !== "client") return c.json({ error: "Forbidden" }, 403);
+    await next();
+  },
 }));
 
 // The audit module writes straight to the organisation document, so the real

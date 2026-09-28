@@ -1,6 +1,8 @@
 // All API calls use relative /api paths only - the site and functions are
 // same-origin behind Netlify.
 
+import { PREVIEW_HEADER, previewOrg } from "./preview";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -11,10 +13,14 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (init?.body) headers["content-type"] = "application/json";
+  const org = previewOrg();
+  if (org) headers[PREVIEW_HEADER] = `client:${org}`;
   const res = await fetch(`/api${path}`, {
     credentials: "same-origin",
-    headers: init?.body ? { "content-type": "application/json" } : undefined,
     ...init,
+    headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
   });
   if (!res.ok) {
     let message = "Something went wrong. Please try again.";

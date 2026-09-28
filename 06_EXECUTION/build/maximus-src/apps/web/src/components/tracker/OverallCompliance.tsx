@@ -17,6 +17,24 @@ const TILE_FILL: Record<Rag, string> = {
   grey: "bg-client-muted",
 };
 
+/**
+ * Text on each fill, chosen by measured contrast (FRAGO 04 3.1, DC-42a): the
+ * colour that clears 4.5:1 against that fill. Measured against the house
+ * tokens, dark text (#1f2937) / white:
+ *   green #2ee6a6  9.08 / 1.62  -> dark
+ *   amber #f5a623  7.24 / 2.03  -> dark
+ *   red   #d63a3a  3.16 / 4.64  -> white
+ *   grey  #6b7280  3.04 / 4.83  -> white
+ * The gate re-measures the rendered tiles, so a token change that breaks
+ * this fails there rather than shipping.
+ */
+const TILE_TEXT: Record<Rag, string> = {
+  green: "text-client-text",
+  amber: "text-client-text",
+  red: "text-white",
+  grey: "text-white",
+};
+
 export const OVERALL_EXPLAINER =
   "There are eight compliance modules under the data protection function. The score reflects their overall status. Open a module to see its tasks, documents and status.";
 
@@ -74,7 +92,7 @@ export function OverallCompliance({
             to={`/tracker/areas/${a.area}`}
             data-testid="module-tile"
             data-rag={a.rag}
-            className={`module-tile block rounded-lg p-4 text-white shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-client-text ${TILE_FILL[a.rag]}`}
+            className={`module-tile block rounded-lg p-4 shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-client-text ${TILE_FILL[a.rag]} ${TILE_TEXT[a.rag]}`}
           >
             <span data-testid="module-tile-name" className="block text-[15px] font-semibold leading-snug">
               {a.name}

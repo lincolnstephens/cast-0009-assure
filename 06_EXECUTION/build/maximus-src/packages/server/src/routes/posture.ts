@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { readOrg } from "../db/store.ts";
 import { domainsForOrg, historyForDomain } from "../lib/posture.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireClientSeat, type AppEnv } from "../lib/middleware.ts";
 
 export const postureRoutes = new Hono<AppEnv>();
-postureRoutes.use("*", requireAuth, requireRole("client"));
+postureRoutes.use("*", requireAuth, requireClientSeat);
 
 /** Read-only posture dashboard for the signed-in client's organisation. */
 postureRoutes.get("/", async (c) => {
