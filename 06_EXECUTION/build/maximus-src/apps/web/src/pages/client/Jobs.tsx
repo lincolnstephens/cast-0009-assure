@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ForYouTask, JobsResponse } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
+import { formatDateGB } from "../../lib/format";
 import { ForYouPanel } from "../../components/tracker/ForYouPanel";
-import { TaskTable } from "../../components/tracker/TaskTable";
-import { GuidePage } from "./Guide";
+import { RagMark } from "../../components/tracker/RagMark";
 
 type JobTask = JobsResponse["groups"][number]["tasks"][number];
 
 /**
- * Jobs: every task across all eight modules in one list, grouped the way
- * the operator speaks about them (FRAGO section 4). The client's tasks sit in their own
- * panel at the top, exactly as on the Compliance Tracker, because confirming
- * is the client's only action anywhere in this portal - there is no edit,
- * delete, reopen or status control on this page. The Policy Guide sits at
- * the foot as "Ask a question", so a question and a task are in one place.
+ * Job management (FRAGO 03 section 3.5): every task across all eight modules
+ * as a board of three columns, Not started, In progress, Completed. The
+ * client's own tasks sit above the board as "Waiting on you", because
+ * confirming is the client's only action anywhere in this portal. There is
+ * no create, edit, drag, reorder, close or delete control on this page; the
+ * filters narrow the view and write nothing. Quick questions has its own
+ * menu item now, so the Guide no longer sits at the foot.
  */
 export function JobsPage() {
   const [data, setData] = useState<JobsResponse | null>(null);
@@ -73,15 +74,15 @@ export function JobsPage() {
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
           Compliance Tracker
         </p>
-        <h1 className="text-lg font-semibold">Jobs</h1>
+        <h1 className="text-lg font-semibold">Job management</h1>
         <p className="mt-0.5 text-[13px] text-client-muted">
-          Every task across all eight modules, in one list, grouped by where it stands.
+          Every task across all eight modules, by where it stands.
         </p>
       </header>
 
       <ForYouPanel
         tasks={forYouTasks}
-        emptyMessage="Nothing needs your action. MITMARK is working the rest."
+        emptyMessage={data.forYouEmptyMessage}
       />
 
       <section aria-label="Filters" className="flex flex-wrap items-end gap-3">
@@ -139,17 +140,31 @@ export function JobsPage() {
         </label>
       </section>
 
-      {data.groups.map((group) => (
-        <section key={group.id} aria-label={group.name}>
-          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
-            <span data-testid="job-group-name">{group.name}</span> &middot;{" "}
-            {group.tasks.length}
-          </p>
-          <div className="mt-2">
-            <TaskTable tasks={group.tasks} />
+      <section aria-label="Job board" data-testid="job-board" className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {data.groups.map((group) => (
+          <div
+            key={group.id}
+            data-testid="job-column"
+            className="flex min-w-0 flex-col rounded border border-client-line bg-client-surface/60"
+          >
+            <h2 className="flex items-baseline justify-between border-b border-client-line px-3 py-2.5 text-[14px] font-semibold">
+              <span data-testid="job-column-name">{group.name}</span>
+              <span className="font-mono text-[12px] font-normal text-client-muted">
+                {group.tasks.length}
+              </span>
+            </h2>
+            {group.tasks.length === 0 ? (
+              <p className="px-3 py-4 text-[13px] text-client-muted">None.</p>
+            ) : (
+              <ul className="space-y-2 p-2">
+                {group.tasks.map((t) => (
+                  <JobCard key={t.id} task={t} />
+                ))}
+              </ul>
+            )}
           </div>
-        </section>
-      ))}
+        ))}
+      </section>
 
       <p className="text-[12px] text-client-muted">
         {data.notApplicableCount === 0
@@ -157,18 +172,33 @@ export function JobsPage() {
           : `${data.notApplicableCount} task${data.notApplicableCount === 1 ? "" : "s"} marked not applicable, not shown here.`}
       </p>
 
-      <section aria-label="Ask a question" className="border-t border-client-line pt-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
-          Ask a question
-        </p>
-        <p className="mt-1 text-[13px] text-client-muted">
-          Scoped to all approved policies, so a question and a task sit in the same place.
-        </p>
-        <div className="mt-3 h-[560px] rounded border border-client-line bg-client-surface">
-          <GuidePage />
-        </div>
-      </section>
     </div>
+  );
+}
+
+function JobCard({ task }: { task: JobTask }) {
+  return (
+    <li
+      data-testid="job-card"
+      className="rounded border border-client-line bg-client-surface p-3 shadow-sm"
+    >
+      <p className="text-[13px] font-medium leading-snug text-client-text">{task.title}</p>
+      <p className="mt-1 text-[12px] text-client-muted">{task.areaName}</p>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <span className="font-mono text-[12px] text-client-muted">
+          {task.dueAt ? formatDateGB(task.dueAt) : "no date"}
+        </span>
+        <RagMark rag={task.rag} label={task.ragLabel} />
+      </div>
+      {task.blocked && (
+        <p
+          data-testid="job-blocked"
+          className="mt-2 inline-block rounded border border-status-red px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-status-red"
+        >
+          Blocked
+        </p>
+      )}
+    </li>
   );
 }
 

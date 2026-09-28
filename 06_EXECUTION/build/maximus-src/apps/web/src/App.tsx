@@ -10,6 +10,7 @@ import { AdminPoliciesPage } from "./pages/admin/Policies";
 import { AdminPosturePage } from "./pages/admin/Posture";
 import { AdminProceduresPage } from "./pages/admin/Procedures";
 import { AdminRecordPage } from "./pages/admin/Record";
+import { AdminValuePage } from "./pages/admin/Value";
 import { AdminSettingsPage } from "./pages/admin/Settings";
 import { AdminReviewQueuePage } from "./pages/admin/ReviewQueue";
 import { AdminWorkplanPage } from "./pages/admin/Workplan";
@@ -99,6 +100,7 @@ export default function App() {
         <Route path="policies" element={<AdminPoliciesPage />} />
         <Route path="posture" element={<AdminPosturePage />} />
         <Route path="record" element={<AdminRecordPage />} />
+        <Route path="value" element={<AdminValuePage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="alerts" element={<AdminAlertsPage />} />
         <Route path="exports" element={<AdminExportsPage />} />

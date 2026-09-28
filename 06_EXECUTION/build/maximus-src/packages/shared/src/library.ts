@@ -52,7 +52,7 @@ export const LIBRARY_TASKS: LibraryTask[] = [
     defaultOffsetDays: 35,
   },
 
-  // -- Area 2, Data tracker review -------------------------------------------
+  // -- Area 2, Data tracker compliance ---------------------------------------
   {
     id: "a2-ropa-review",
     area: 2,
@@ -119,7 +119,7 @@ export const LIBRARY_TASKS: LibraryTask[] = [
     defaultOffsetDays: 18,
   },
 
-  // -- Area 3, Data retention ------------------------------------------------
+  // -- Area 3, Data retention practice ---------------------------------------
   {
     id: "a3-retention-schedule-review",
     area: 3,
@@ -379,7 +379,7 @@ export const LIBRARY_TASKS: LibraryTask[] = [
     defaultOffsetDays: 0,
   },
 
-  // -- Area 8, Data breach and incident management -----------------------------
+  // -- Area 8, Data breach and incident response -------------------------------
   {
     id: "a8-incident-assessment",
     area: 8,

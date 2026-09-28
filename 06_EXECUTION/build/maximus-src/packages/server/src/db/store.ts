@@ -197,6 +197,9 @@ export function migrateOrg(doc: OrgDoc): OrgDoc {
   s.denominatorMode ??= 'overdue';
   s.documentsTargetDate = s.documentsTargetDate === undefined ? null : s.documentsTargetDate;
   s.lineStatus ??= { ...DEFAULT_SETTINGS.lineStatus };
+  s.journeyPhase = s.journeyPhase === undefined ? null : s.journeyPhase;
+  s.journeyNote ??= '';
+  s.moduleIntroductions ??= {};
   doc.settings = s;
 
   // v1.2 re-scoped two modules. Tasks move with their library id so nothing is

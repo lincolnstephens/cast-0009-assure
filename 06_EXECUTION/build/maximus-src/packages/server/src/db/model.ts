@@ -397,6 +397,12 @@ export interface OrgSettings {
   denominatorMode: 'overdue' | 'cycle';
   /** When MITMARK expects to publish the first documents in each section. */
   documentsTargetDate: string | null;
+  /** The journey's current stage, 1 to 5. Null means work it out from the tasks. */
+  journeyPhase: number | null;
+  /** The sentence beneath the journey stage. Empty means the default. */
+  journeyNote: string;
+  /** Per-module introductions keyed "1" to "8". Empty means the default. */
+  moduleIntroductions: Record<string, string>;
 }
 
 /** Everything belonging to one organisation. One blob, one tenant. */
@@ -464,6 +470,9 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   workplanTargetDate: null,
   denominatorMode: 'overdue',
   documentsTargetDate: null,
+  journeyPhase: null,
+  journeyNote: '',
+  moduleIntroductions: {},
 };
 
 export function emptyOrgDoc(id: string, name: string): OrgDoc {

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import {
   AREA_IDS,
   AREA_OBLIGATIONS,
+  DEFAULT_MODULE_INTRODUCTIONS,
   JOB_GROUP_LABEL,
   JURISDICTION_LABEL,
   JURISDICTION_REGULATION,
@@ -22,12 +23,14 @@ import {
   areaSummaries,
   forYou,
   isOpen,
+  journey,
   kpis,
   overallStatus,
   ownerLabel,
   phaseSummaries,
   taskRag,
   today,
+  upcoming,
   worstRag,
 } from "../lib/tracker.ts";
 import { policyForArea } from "../lib/workplan.ts";
@@ -94,6 +97,8 @@ trackerRoutes.get("/home", async (c) => {
     areas: areaSummaries(doc, now),
     forYou: forYou(doc, now),
     forYouEmptyMessage: `Nothing needs your action. MITMARK is working ${openMitmarkCount} items.`,
+    journey: journey(doc),
+    upcoming: upcoming(doc, now),
   });
 });
 
@@ -159,9 +164,31 @@ trackerRoutes.get("/areas/:area", async (c) => {
   const { obligation, citation } = AREA_OBLIGATIONS[area];
   const areaRag = worstRag(areaTasks, asAt);
 
+  // The same counting as the module's tile on the tracker: not applicable is
+  // outside the count, done is met.
+  const counted = areaTasks.filter((t) => t.status !== "not_applicable");
+  const done = counted.filter((t) => t.status === "done").length;
+  const total = counted.length;
+
+  // Only what the client can actually open: the current approved version of a
+  // policy (its history stays on Compliance Documents) and anything published.
+  // A register not yet filed is not listed here; the module says "None filed
+  // yet" rather than offering a link that goes nowhere.
+  const documents = buildDocumentsResponse(doc)
+    .sections.flatMap((section) => section.items)
+    .filter((d) => d.area === area && d.published)
+    .filter((d) => !(d.kind === "policy" && d.title.endsWith("(earlier version)")))
+    .map((d) => ({ id: d.id, title: d.title, section: d.section, kind: d.kind, url: d.url }));
+
+  const introduction =
+    doc.settings.moduleIntroductions?.[String(area)]?.trim() || DEFAULT_MODULE_INTRODUCTIONS[area];
+
   return c.json({
     area,
     name: areaName(area),
+    introduction,
+    documents,
+    progress: { done, total, pct: total === 0 ? 0 : Math.round((done / total) * 100) },
     obligation,
     citation,
     status: {
@@ -322,7 +349,10 @@ trackerRoutes.get("/jobs", async (c) => {
     tasks: filtered.filter((t) => jobGroupOf(t.status) === id).map((t) => jobTaskOf(t, asAt)),
   }));
 
-  return c.json({ groups, notApplicableCount, modules, owners });
+  const openMitmarkCount = doc.tasks.filter((t) => t.ownerType === "mitmark" && isOpen(t)).length;
+  const forYouEmptyMessage = `Nothing needs your action. MITMARK is working ${openMitmarkCount} items.`;
+
+  return c.json({ groups, notApplicableCount, modules, owners, forYouEmptyMessage });
 });
 
 // ---------------------------------------------------------------------------

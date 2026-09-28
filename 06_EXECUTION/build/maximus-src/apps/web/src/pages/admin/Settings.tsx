@@ -1,5 +1,13 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { JURISDICTION_LABEL, jurisdictionSchema, lineStatusSchema } from "@maximus/shared";
+import {
+  AREAS,
+  DEFAULT_JOURNEY_NOTE,
+  DEFAULT_MODULE_INTRODUCTIONS,
+  JURISDICTION_LABEL,
+  PHASES,
+  jurisdictionSchema,
+  lineStatusSchema,
+} from "@maximus/shared";
 import type { Jurisdiction, LineStatus, OrgSettings as BaseOrgSettings } from "@maximus/shared";
 import { LINES } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
@@ -27,6 +35,9 @@ interface TrackerFields {
   workplanTargetDate: string | null;
   denominatorMode: "overdue" | "cycle";
   documentsTargetDate: string | null;
+  journeyPhase: number | null;
+  journeyNote: string;
+  moduleIntroductions: Record<string, string>;
 }
 
 type OrgSettings = BaseOrgSettings & TrackerFields;
@@ -47,6 +58,8 @@ export function AdminSettingsPage() {
   const [accentError, setAccentError] = useState<string | null>(null);
   const [trackerSaved, setTrackerSaved] = useState(false);
   const [trackerError, setTrackerError] = useState<string | null>(null);
+  const [journeySaved, setJourneySaved] = useState(false);
+  const [journeyError, setJourneyError] = useState<string | null>(null);
   const [newRole, setNewRole] = useState("");
   const [rolesError, setRolesError] = useState<string | null>(null);
 
@@ -125,6 +138,29 @@ export function AdminSettingsPage() {
       setTimeout(() => setTrackerSaved(false), 2000);
     } catch (err) {
       setTrackerError(err instanceof ApiError ? err.message : "Unable to save these settings.");
+    }
+  }
+
+  async function submitJourney(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!settings) return;
+    const form = new FormData(e.currentTarget);
+    const phaseRaw = String(form.get("journeyPhase") ?? "");
+    const moduleIntroductions: Record<string, string> = {};
+    for (const a of AREAS) {
+      moduleIntroductions[String(a.id)] = String(form.get(`intro-${a.id}`) ?? "").trim();
+    }
+    try {
+      await saveSettings({
+        journeyPhase: phaseRaw === "" ? null : Number(phaseRaw),
+        journeyNote: String(form.get("journeyNote") ?? "").trim(),
+        moduleIntroductions,
+      });
+      setJourneyError(null);
+      setJourneySaved(true);
+      setTimeout(() => setJourneySaved(false), 2000);
+    } catch (err) {
+      setJourneyError(err instanceof ApiError ? err.message : "Unable to save these settings.");
     }
   }
 
@@ -308,6 +344,74 @@ export function AdminSettingsPage() {
         </div>
       </div>
 
+      <form
+        onSubmit={submitJourney}
+        data-testid="journey-settings"
+        className="mt-4 rounded border border-hud-line bg-hud-panel/60 p-4"
+      >
+        <h2 className="text-sm font-semibold">Journey and module introductions</h2>
+        <p className="mt-1 text-[12px] text-hud-muted">
+          What the client reads at the top of the Compliance Tracker and of each module page. Leave
+          a field blank and the default shown beneath it is used.
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <F label="Current stage of the journey">
+            <select
+              name="journeyPhase"
+              defaultValue={settings.journeyPhase ?? ""}
+              className="w-full rounded border border-hud-line bg-hud-bg px-2 py-1.5 text-[13px]"
+            >
+              <option value="">Derive from tasks (the phase with the earliest open due date)</option>
+              {PHASES.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.id}. {p.name}
+                </option>
+              ))}
+            </select>
+          </F>
+          <F label="Sentence beneath the stage">
+            <textarea
+              name="journeyNote"
+              rows={3}
+              maxLength={300}
+              defaultValue={settings.journeyNote ?? ""}
+              className="w-full rounded border border-hud-line bg-hud-bg px-2 py-1.5 text-[13px]"
+            />
+            <span className="mt-1 block text-[11px] text-hud-muted">Default: {DEFAULT_JOURNEY_NOTE}</span>
+          </F>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {AREAS.map((a) => (
+            <F key={a.id} label={`${a.id}. ${a.name}`}>
+              <textarea
+                name={`intro-${a.id}`}
+                rows={3}
+                maxLength={600}
+                defaultValue={settings.moduleIntroductions?.[String(a.id)] ?? ""}
+                className="w-full rounded border border-hud-line bg-hud-bg px-2 py-1.5 text-[13px]"
+              />
+              <span className="mt-1 block text-[11px] text-hud-muted">
+                Default: {DEFAULT_MODULE_INTRODUCTIONS[a.id]}
+              </span>
+            </F>
+          ))}
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            type="submit"
+            className="rounded bg-hud-accent px-3 py-1.5 text-[13px] font-medium text-white hover:bg-hud-accent/90"
+          >
+            Save journey and introductions
+          </button>
+          {journeySaved && <span className="text-[12px] text-status-green">Saved</span>}
+        </div>
+        {journeyError && (
+          <p className="mt-2 border-l-2 border-status-red pl-3 text-[13px] text-status-red" role="alert">
+            {journeyError}
+          </p>
+        )}
+      </form>
+
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <form onSubmit={submitTracker} className="rounded border border-hud-line bg-hud-panel/60 p-4">
           <h2 className="text-sm font-semibold">Compliance Tracker</h2>
@@ -349,8 +453,8 @@ export function AdminSettingsPage() {
               />
             </F>
             <p className="-mt-1 text-[12px] text-hud-muted">
-              Leave either figure blank and the client's training tile shows "not recorded" until
-              both are set.
+              Kept for your record. Since v1.3 the client's tracker no longer shows a training
+              figure.
             </p>
             <F label="Workplan target date, shown on the client's empty portal">
               <input

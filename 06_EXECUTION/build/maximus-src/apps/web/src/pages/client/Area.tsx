@@ -3,21 +3,25 @@ import { Link, useParams } from "react-router-dom";
 import type { AreaPage } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { formatDateGB, formatLondon } from "../../lib/format";
+import { PolicyPanel } from "../../components/PolicyPanel";
+import { ModuleNav } from "../../components/tracker/ModuleNav";
 import { RagMark } from "../../components/tracker/RagMark";
 import { TaskTable } from "../../components/tracker/TaskTable";
 
 /**
- * One area's sub-page, same skeleton for all eight (FRAGO §5): the
- * obligation in plain words with its citation at the foot, status with its
- * basis and as-at date, the task table, how the area is delivered (the
- * approved policy and the procedure, or a clearly marked waiting card), a
- * link through to the Policy Guide, and history. Prints as a clean document
- * via the house `@media print` rules already in index.css.
+ * One module's page, same skeleton for all eight (FRAGO 03 section 3.4): the
+ * name, a short introduction, the relevant documents and trackers, the
+ * compliance status as a fraction and a percentage, the task table, then the
+ * module sub-navigation so the reader can move on without going back. Below
+ * that sits what v1.2 already carried: the obligation with its citation, how
+ * the module is delivered, and history. Prints as a clean document via the
+ * house `@media print` rules already in index.css.
  */
 export function AreaPageView() {
   const { area } = useParams<{ area: string }>();
   const [data, setData] = useState<AreaPage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openPolicyId, setOpenPolicyId] = useState<string | null>(null);
 
   const load = useCallback(async (id: string) => {
     try {
@@ -60,25 +64,64 @@ export function AreaPageView() {
       </p>
       <h1 className="mt-1 text-lg font-semibold">{data.name}</h1>
 
-      <section className="mt-4" data-testid="obligation">
-        <p className="max-w-[75ch] text-[14px] leading-relaxed text-client-text">
-          {data.obligation}
-        </p>
-        {data.citation && (
-          <p className="mt-2 text-[12px] text-client-muted">{data.citation}</p>
+      <p data-testid="module-intro" className="mt-2 max-w-[75ch] text-[14px] leading-relaxed text-client-text">
+        {data.introduction}
+      </p>
+
+      <section data-testid="module-documents" className="mt-5" aria-labelledby="module-documents-heading">
+        <h2 id="module-documents-heading" className="text-[14px] font-semibold">
+          Relevant documents and trackers
+        </h2>
+        {data.documents.length === 0 ? (
+          <p data-testid="module-documents-empty" className="mt-1.5 text-[13px] text-client-muted">
+            None filed yet
+          </p>
+        ) : (
+          <ul className="mt-1.5 space-y-1">
+            {data.documents.map((d) => (
+              <li key={d.id} className="text-[13px]">
+                {d.kind === "policy" ? (
+                  <button
+                    type="button"
+                    data-testid="module-doc"
+                    onClick={() => setOpenPolicyId(d.id)}
+                    className="text-left text-client-accent underline"
+                  >
+                    {d.title}
+                  </button>
+                ) : (
+                  <a
+                    data-testid="module-doc"
+                    href={`/api/tracker/documents/${d.id}/download`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-client-accent underline"
+                  >
+                    {d.title}
+                  </a>
+                )}{" "}
+                <span className="ml-2 text-[11px] uppercase tracking-wider text-client-muted">
+                  {SECTION_LABEL[d.section] ?? d.section}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
       <section
-        data-testid="area-status"
+        data-testid="module-progress-card"
         className="mt-5 rounded border border-client-line bg-client-surface p-4"
       >
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
-          Status
-        </p>
-        <div className="mt-1.5">
+        <p
+          data-testid="module-progress"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] font-semibold text-client-text"
+        >
+          <span>
+            Compliance status: {data.progress.done} of {data.progress.total} done, {data.progress.pct}%
+          </span>{" "}
           <RagMark rag={data.status.rag} label={data.status.ragLabel} />
-        </div>
+        </p>
         <p className="mt-1.5 text-[12px] text-client-muted">{data.status.basis}</p>
         <p className="mt-0.5 text-[12px] text-client-muted">
           As at {formatDateGB(data.status.asAt)}
@@ -92,6 +135,22 @@ export function AreaPageView() {
         <div className="mt-2">
           <TaskTable tasks={data.tasks} />
         </div>
+      </section>
+
+      <div className="mt-8">
+        <ModuleNav />
+      </div>
+
+      <section className="mt-10 border-t border-client-line pt-6" data-testid="obligation">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
+          What the law asks
+        </p>
+        <p className="mt-2 max-w-[75ch] text-[14px] leading-relaxed text-client-text">
+          {data.obligation}
+        </p>
+        {data.citation && (
+          <p className="mt-2 text-[12px] text-client-muted">{data.citation}</p>
+        )}
       </section>
 
       <section id="how-we-do-it" className="mt-8 scroll-mt-4">
@@ -183,7 +242,7 @@ export function AreaPageView() {
           to="/guide"
           className="inline-block rounded border border-client-accent px-3 py-1.5 text-[13px] text-client-accent hover:bg-client-accent hover:text-white"
         >
-          Ask the Guide about {data.name}
+          Ask a quick question about {data.name}
         </Link>
       </section>
 
@@ -210,6 +269,16 @@ export function AreaPageView() {
           </ul>
         )}
       </section>
+
+      {openPolicyId && (
+        <PolicyPanel policyId={openPolicyId} onClose={() => setOpenPolicyId(null)} />
+      )}
     </div>
   );
 }
+
+const SECTION_LABEL: Record<string, string> = {
+  policies: "Policy",
+  procedures: "Procedure",
+  trackers: "Tracker",
+};

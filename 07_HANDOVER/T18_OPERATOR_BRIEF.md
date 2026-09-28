@@ -1,8 +1,8 @@
 ---
 document: OPERATOR_BRIEF
 job: CAST-0009 ASSURE
-product: Tessera Assure v1.2
-version: v1.2
+product: Tessera Assure v1.3
+version: v1.3
 status: FOR THE MITMARK OPERATOR
 authority: Seagull, written by the build session under T02 A6
 register_id: T18
@@ -19,8 +19,8 @@ For the MITMARK data compliance officer who runs the client's DPO contract, and 
 
 Tessera Assure is the record of what MITMARK does under the retained contract, and the statement that record produces. It has two sides.
 
-- The **client portal** is what the Information Officer sees, in six places: Compliance Tracker, Compliance Documents, Jobs, Requests and clocks, Value, and Statement for the CFO. Her front page is the **Compliance Tracker**: where she stands overall, the five phases of the journey, six measures, the eight areas of the work, and anything waiting on her. Beneath it sit the eight area pages, the Policy Guide, the two intakes she already had, the policy pack, the posture, and the **Value** section, which is the Record and the Statement.
-- The **admin workspace** is yours: the **Workplan**, **Jobs**, **Documents**, the review queue, the statutory clocks, the policies, the **Procedures**, the posture, the exposure alerts, the **Record** and the **Settings**.
+- The **client portal** is what the Information Officer sees, in six places, in your order: Compliance Tracker, Compliance Documents, Job management, Requests and clocks, Statement for the CFO, and Quick questions. Her front page is the **Compliance Tracker**, in three sections: **Journey**, **Overall compliance status** (the score and the eight module tiles) and **Upcoming**. Each tile opens its module page. Anything waiting on her is at the top of **Job management**. The Statement links to the record behind it.
+- The **admin workspace** is yours: the **Workplan**, **Jobs**, **Documents**, the review queue, the statutory clocks, the policies, the **Procedures**, the posture, the exposure alerts, **Value** (the Record, with the way to the rates), the **Record** and the **Settings**.
 
 The product does not deliver the service. It records it, and now it also plans it, so that the Information Officer can see what she is getting, what is still to do, and what it is worth to her CFO.
 
@@ -177,7 +177,7 @@ Tasks marked **not applicable** are not listed to the client, but the count is s
 
 The tasks waiting on the client sit at the top of her page with the confirm control. The rest she reads. The same six columns as everywhere else.
 
-The **Policy Guide sits at the foot of this page** as "Ask a question". Questions and tasks are in one place, which is how she said she works.
+*Changed at v1.3: see 5h. The page is now a three-column board called Job management, and the Guide has its own menu item, Quick questions.*
 
 ## 5f. What changed in the modules at v1.2
 
@@ -199,6 +199,31 @@ It now reads **"Nothing overdue"** or **"{k} overdue or blocked"** beneath the f
 The change is in how continuous duties count. A duty like "handle every request within one month" has no date, so it can never be overdue. Before, it counted as unmet until you signed it off for the period, which meant a client who was entirely up to date still opened on a low number. Now it counts only when there is something live against it: an open clock, or something waiting in your review queue.
 
 The stricter view is still yours. **Settings** has a toggle: "Signed off this cycle" counts every continuous duty until you close it. Use it to see what you have not yet signed off. The client always sees the overdue view.
+
+## 5h. What changed at v1.3 (your second round of feedback)
+
+**Four things to do once, in Settings, under "Journey and module introductions".** Each has a sensible default, so the page is truthful even if you do none of them.
+
+1. **Set the current stage of the journey.** Your deck says *Implementation*. Until you choose, the stage is worked out from the tasks: it is the phase holding the earliest open due date. Today that gives *Assessment and discovery*, because an early-phase task is still open. Choose "derive from tasks" to go back to that at any time. The client cannot change it.
+2. **Check the sentence beneath the stage.** The default is: "This shows where the organisation is on its data protection journey. The stage reflects the year's deliverables and is adjusted as they are met."
+3. **Write an introduction for each module**, one or two sentences. Each field shows its default beneath it. Leave it blank to keep the default.
+4. **File the documents you have already shared.** They were not in the job folder, so nothing has been uploaded. Each document filed against a module under Documents appears on that module page under "Relevant documents and trackers". Until then the page says "None filed yet".
+
+**The tracker is three sections.** The six measures, the areas panel and "For you" have gone from the front page.
+
+- **Journey:** the five phases as a path. Done phases are green, the current one is amber and marked "Current", and future phases are grey.
+- **Overall compliance status:** "Compliance score: 38% (3 of 8 obligations met)", then the date, the basis and the overdue line, as before. The percentage never appears without its fraction. Then the eight modules as coloured tiles, each showing "{done} of {total} done".
+- **Upcoming:** the next eight open MITMARK tasks that are due today or later. **To put an activity here** (an awareness session, the ICO renewal), add it to the Workplan with a due date. There is no second list to keep. Overdue tasks are not shown here because they are not "planned". They are in the overdue count and on Job management.
+
+**Module names.** Three modules have your wording: 2 is *Data tracker compliance*, 3 is *Data retention practice* and 8 is *Data breach and incident response*. Tasks carry the module number, not the name, so nothing moved. There were 65 tasks before and 65 after, in the same modules.
+
+**Module pages** now open with the introduction, the relevant documents, and "Compliance status: {done} of {total} done, {pct}%". The task table follows, then links to the other seven modules. What the law asks, how we do it, and the history sit below those links.
+
+**Job management** has three columns: Not started, In progress and Completed. Each card shows the task, its module, its due date and its status. A blocked task sits in In progress with a "Blocked" flag. **Waiting on you** sits above the board with the confirm control, which is still the only thing the client can do anywhere in the portal.
+
+**Value** is now on your side. The admin menu item "Value" opens the Record with a link to the rates in Settings, because together they are the input to the statement. The client keeps the **Statement for the CFO**, which links at its foot to "The record behind this statement".
+
+**Quick questions** is the Policy Guide under your name for it. It says what it does: answers come from the approved policies and procedures, and anything they do not answer goes to MITMARK. There is still no working API key, so it answers by matching the approved text, and the wording is true either way.
 
 ## 6. Importing the v0.1 export
 

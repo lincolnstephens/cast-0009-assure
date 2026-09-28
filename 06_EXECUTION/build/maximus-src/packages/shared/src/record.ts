@@ -100,6 +100,12 @@ export const orgSettingsSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .default(null),
+  /** The journey's current stage, 1 to 5. Null means work it out from the tasks. */
+  journeyPhase: z.coerce.number().int().min(1).max(5).nullable().default(null),
+  /** The sentence beneath the stage. Empty means the default sentence. */
+  journeyNote: z.string().trim().max(300).default(""),
+  /** Per-module introductions keyed "1" to "8". Empty means the default. */
+  moduleIntroductions: z.record(z.string(), z.string().trim().max(600)).default({}),
 });
 export type OrgSettings = z.infer<typeof orgSettingsSchema>;
 

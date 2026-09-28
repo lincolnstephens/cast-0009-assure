@@ -2,17 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import type { TrackerHome } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { formatDateGB, formatLondon } from "../../lib/format";
-import { AreaTiles } from "../../components/tracker/AreaTiles";
-import { ForYouPanel } from "../../components/tracker/ForYouPanel";
-import { JourneyStrip } from "../../components/tracker/JourneyStrip";
-import { KpiRow } from "../../components/tracker/KpiRow";
-import { ModuleNav } from "../../components/tracker/ModuleNav";
-import { StatusBar } from "../../components/tracker/StatusBar";
+import { JourneyPath } from "../../components/tracker/JourneyPath";
+import { OverallCompliance } from "../../components/tracker/OverallCompliance";
+import { Upcoming } from "../../components/tracker/Upcoming";
 
 /**
- * The Compliance Tracker home page. Every element on it derives from
- * `TrackerHome` as the API sends it - nothing here is decorated or
- * invented. When the operator has not applied a workplan yet, the page is a
+ * The Compliance Tracker home page, in three sections only (FRAGO 03 section
+ * 3.2): Journey, Overall compliance status, Upcoming. Every element derives
+ * from `TrackerHome` as the API sends it. The client's own tasks are on Job
+ * management. When the operator has not applied a workplan yet, the page is a
  * single waiting card and nothing else.
  */
 export function TrackerPage() {
@@ -66,7 +64,7 @@ export function TrackerPage() {
   }
 
   return (
-    <div className="max-w-6xl space-y-8">
+    <div className="max-w-6xl space-y-10">
       <header data-testid="tracker-header">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
           {data.header.clientName}
@@ -85,17 +83,11 @@ export function TrackerPage() {
         </p>
       </header>
 
-      <StatusBar overall={data.overall} />
+      <JourneyPath journey={data.journey} />
 
-      <ModuleNav />
+      <OverallCompliance overall={data.overall} areas={data.areas} />
 
-      <JourneyStrip phases={data.phases} />
-
-      <KpiRow kpis={data.kpis} />
-
-      <AreaTiles areas={data.areas} />
-
-      <ForYouPanel tasks={data.forYou} emptyMessage={data.forYouEmptyMessage} />
+      <Upcoming items={data.upcoming} />
     </div>
   );
 }

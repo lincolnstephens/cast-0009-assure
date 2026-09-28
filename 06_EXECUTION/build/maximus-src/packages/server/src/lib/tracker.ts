@@ -23,6 +23,7 @@
 
 import {
   AREA_IDS,
+  DEFAULT_JOURNEY_NOTE,
   PHASE_IDS,
   RAG_LABEL,
   TASK_STATUS_LABEL,
@@ -31,6 +32,8 @@ import {
   type AreaSummary,
   type Figure,
   type ForYouTask,
+  type Journey,
+  type UpcomingItem,
   type OverallStatus,
   type PhaseSummary,
   type DenominatorMode,
@@ -230,17 +233,7 @@ export function overallStatus(
 export function phaseSummaries(doc: OrgDoc, now: Date = new Date()): PhaseSummary[] {
   const asAt = today(now);
 
-  // The current phase is the one holding the earliest open due date. A phase
-  // with only always-on duties has no date and cannot claim it.
-  let currentPhase: number | null = null;
-  let earliest: string | null = null;
-  for (const t of doc.tasks) {
-    if (!isOpen(t) || !t.dueAt) continue;
-    if (earliest === null || t.dueAt < earliest) {
-      earliest = t.dueAt;
-      currentPhase = t.phase;
-    }
-  }
+  const currentPhase = doc.settings.journeyPhase ?? derivedPhase(doc);
 
   return PHASE_IDS.map((phase) => {
     const of = doc.tasks.filter((t) => t.phase === phase);
@@ -255,6 +248,72 @@ export function phaseSummaries(doc: OrgDoc, now: Date = new Date()): PhaseSummar
       current: phase === currentPhase,
     };
   });
+}
+
+/**
+ * The phase holding the earliest open due date, or null when no open task
+ * carries a date. A phase with only always-on duties cannot claim it.
+ */
+export function derivedPhase(doc: OrgDoc): number | null {
+  let currentPhase: number | null = null;
+  let earliest: string | null = null;
+  for (const t of doc.tasks) {
+    if (!isOpen(t) || !t.dueAt) continue;
+    if (earliest === null || t.dueAt < earliest) {
+      earliest = t.dueAt;
+      currentPhase = t.phase;
+    }
+  }
+  return currentPhase;
+}
+
+/**
+ * The journey path. The operator sets the stage in Settings; until she does,
+ * it is worked out from the tasks exactly as the v1.2 strip did. Phases before
+ * the current one read as done, the current one as current, the rest as
+ * future. With no stage at all, every node is future and the page says so.
+ */
+export function journey(doc: OrgDoc): Journey {
+  const set = doc.settings.journeyPhase;
+  const current = set ?? derivedPhase(doc);
+  return {
+    currentPhase: current,
+    currentName: current === null ? null : phaseName(current),
+    source: set !== null && set !== undefined ? "operator" : "derived",
+    note: doc.settings.journeyNote?.trim() || DEFAULT_JOURNEY_NOTE,
+    nodes: PHASE_IDS.map((phase) => ({
+      phase,
+      name: phaseName(phase),
+      state:
+        current === null || phase > current
+          ? ("future" as const)
+          : phase === current
+            ? ("current" as const)
+            : ("done" as const),
+    })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Upcoming
+// ---------------------------------------------------------------------------
+
+/**
+ * The next dated open tasks across all modules, soonest first, at most eight.
+ * "Planned to roll out" means today or later: an overdue task is already in
+ * the overdue count and on Job management, and listing it here as planned
+ * would misdescribe it. Tasks waiting on the client are on Job management.
+ */
+export function upcoming(doc: OrgDoc, now: Date = new Date(), limit = 8): UpcomingItem[] {
+  const asAt = today(now);
+  return doc.tasks
+    .filter(
+      (t): t is TaskRecord & { dueAt: string } =>
+        isOpen(t) && t.ownerType !== "client" && t.dueAt !== null && t.dueAt >= asAt,
+    )
+    .sort((a, b) => (a.dueAt < b.dueAt ? -1 : a.dueAt > b.dueAt ? 1 : 0))
+    .slice(0, limit)
+    .map((t) => ({ id: t.id, area: t.area, areaName: areaName(t.area), title: t.title, dueAt: t.dueAt }));
 }
 
 // ---------------------------------------------------------------------------

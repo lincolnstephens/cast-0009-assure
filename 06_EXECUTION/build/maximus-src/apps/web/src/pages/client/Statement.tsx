@@ -6,7 +6,9 @@ import { StatementDocument } from "../../components/StatementDocument";
 
 /**
  * The CFO statement: a plain, forwardable document built from the same
- * reviewed, non-illustrative entries as the Record. Print uses the browser
+ * reviewed, non-illustrative entries as the Record. At v1.3 Value left the
+ * client menu, so the statement links to its record at the foot (T02 A3: a
+ * figure stays traceable to the record behind it). Print uses the browser
  * print path against the print stylesheet; "download as PDF" is the same
  * dialogue, honestly labelled.
  */
@@ -46,20 +48,6 @@ export function StatementPage() {
 
   return (
     <div className="max-w-5xl">
-      <div className="mb-4 flex gap-1 text-sm print:hidden" role="tablist" aria-label="Value">
-        <Link
-          role="tab"
-          aria-selected="false"
-          to="/value"
-          className="rounded-t border border-b-0 border-transparent px-3 py-1.5 text-client-muted hover:text-client-text"
-        >
-          Record
-        </Link>
-        <span role="tab" aria-selected="true" className="rounded-t border border-b-0 border-client-accent bg-client-surface px-3 py-1.5 font-medium text-client-accent">
-          CFO statement
-        </span>
-      </div>
-
       <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted print:hidden">
         Forwardable
       </p>
@@ -107,6 +95,16 @@ export function StatementPage() {
       ) : (
         !error && <p className="mt-4 text-sm text-client-muted">Loading…</p>
       )}
+
+      <p className="mt-8 border-t border-client-line pt-4 text-[13px] print:hidden">
+        <Link
+          to="/value"
+          data-testid="statement-record-link"
+          className="text-client-accent underline"
+        >
+          The record behind this statement
+        </Link>
+      </p>
     </div>
   );
 }

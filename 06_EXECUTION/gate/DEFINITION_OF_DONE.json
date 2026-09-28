@@ -1,13 +1,13 @@
 {
-  "iteration": "v1.2",
-  "written": "2026-09-22",
+  "iteration": "v1.3",
+  "written": "2026-09-28",
   "lines": [
     {
       "id": 1,
       "line": "Sign-in succeeds and lands on the client portal.",
       "drive": "playwright",
       "check": "sign_in_lands_on_portal",
-      "pass": "The sign-in form accepts the Information Officer's demo account and the client portal's Policy Guide nav is present within 5 seconds.",
+      "pass": "The sign-in form accepts the Information Officer's demo account and the client portal's Compliance Tracker nav item (data-view='tracker') is present within 5 seconds.",
       "email_selector": "input[type='email']",
       "password_selector": "input[type='password']",
       "submit_selector": "button[type='submit']",
@@ -17,11 +17,12 @@
         "1920x1080",
         "1366x768",
         "390x844"
-      ]
+      ],
+      "changed_v1_3": "Pass wording only: it named the Policy Guide nav, which the check has not used since v1.2."
     },
     {
       "id": 2,
-      "line": "Every client portal view loads and renders a heading: Compliance Tracker, Compliance Documents, Jobs, requests and clocks, Value, Statement. Posture and exposure have left the client navigation.",
+      "line": "Every client portal view loads and renders a heading: Compliance Tracker, Compliance Documents, Job management, Requests and clocks, Statement for the CFO, Quick questions.",
       "drive": "playwright",
       "check": "views_render",
       "pass": "Each nav element carrying data-view for the listed id is clickable and a non-empty heading appears after the click.",
@@ -30,8 +31,8 @@
         "documents",
         "jobs",
         "request",
-        "value",
-        "statement"
+        "statement",
+        "guide"
       ],
       "heading_selector": "h1, h2",
       "settle_ms": 400,
@@ -40,11 +41,12 @@
         "1366x768",
         "390x844"
       ],
-      "role": "client"
+      "role": "client",
+      "changed_v1_3": "FRAGO 03 section 3.1: Value leaves the client nav, Quick questions (guide) returns."
     },
     {
       "id": 3,
-      "line": "Signed in as the operator, every admin view loads and renders a heading: review queue, Record, clocks, policy pack, Documents, Jobs, posture, alerts, exports, settings, audit, workplan, procedures.",
+      "line": "Signed in as the operator, every admin view loads and renders a heading: review queue, Record, clocks, policy pack, Documents, Jobs, posture, alerts, exports, settings, audit, workplan, procedures, Value.",
       "drive": "playwright",
       "check": "views_render",
       "pass": "The operator account signs in and each nav element carrying data-view for the listed id is clickable and a non-empty heading appears.",
@@ -61,7 +63,8 @@
         "settings",
         "audit",
         "workplan",
-        "procedures"
+        "procedures",
+        "value-admin"
       ],
       "heading_selector": "h1, h2",
       "settle_ms": 400,
@@ -70,14 +73,15 @@
         "1366x768",
         "390x844"
       ],
-      "role": "admin"
+      "role": "admin",
+      "changed_v1_3": "FRAGO 03 section 3.6: the admin nav gains Value (value-admin)."
     },
     {
       "id": 4,
-      "line": "The Record table in the Value view renders at least one row.",
+      "line": "The Record table behind the Statement renders at least one row.",
       "drive": "playwright",
       "check": "record_table_has_rows",
-      "pass": "The Record table contains at least one entry row. The table's empty-state row does not count.",
+      "pass": "Reached as the client through the Statement's 'The record behind this statement' link (Value is no longer a nav item), the Record table contains at least one entry row. The table's empty-state row does not count.",
       "view": "value",
       "table_selector": "[data-testid='record-table']",
       "row_selector": "tbody tr[data-testid='record-row']",
@@ -87,7 +91,8 @@
         "1366x768",
         "390x844"
       ],
-      "role": "client"
+      "role": "client",
+      "changed_v1_3": "FRAGO 03 section 3.6: /value is reached by the Statement's link, not the nav."
     },
     {
       "id": 5,
@@ -148,21 +153,23 @@
       "line": "At 390 pixels wide, no view produces horizontal overflow, including the new client views.",
       "drive": "playwright",
       "check": "no_horizontal_overflow",
-      "pass": "document.documentElement.scrollWidth does not exceed window.innerWidth + 1 on any listed view. \"area\" is a pseudo-view: an area page reached by clicking the first tile in area-tiles, since area pages have no nav data-view.",
+      "pass": "document.documentElement.scrollWidth does not exceed window.innerWidth + 1 on any listed view. \"value\" is the client Value page reached by the Statement's link; \"area\" is module 1's page, reached by clicking its module tile.",
       "views": [
         "tracker",
         "documents",
         "jobs",
         "request",
-        "value",
         "statement",
+        "guide",
+        "value",
         "area"
       ],
       "settle_ms": 400,
       "applies_to": [
         "390x844"
       ],
-      "role": "client"
+      "role": "client",
+      "changed_v1_3": "View list follows the v1.3 client nav, plus the Value page behind the Statement link."
     },
     {
       "id": 9,
@@ -190,17 +197,22 @@
     },
     {
       "id": 11,
-      "line": "The client's home is the Compliance Tracker and answers the six questions.",
+      "line": "The client's home is the Compliance Tracker in its three sections.",
       "drive": "playwright",
       "check": "tracker_home_elements",
-      "pass": "Signed in as the client, data-view='tracker' is reachable, and every one of tracker-header, overall-status, journey-strip, kpi-row, area-tiles and for-you is present. A missing test id is a fail, not a skip.",
+      "pass": "Signed in as the client, data-view='tracker' is reachable and every listed test id is present. A missing test id is a fail, not a skip.",
       "testids": [
         "tracker-header",
-        "overall-status",
-        "journey-strip",
-        "kpi-row",
-        "area-tiles",
-        "for-you"
+        "tracker-journey",
+        "tracker-overall",
+        "tracker-upcoming",
+        "journey-current",
+        "journey-note",
+        "overall-sentence",
+        "overall-asat",
+        "overall-basis",
+        "overall-standing",
+        "overall-explainer"
       ],
       "settle_ms": 400,
       "applies_to": [
@@ -208,14 +220,15 @@
         "1366x768",
         "390x844"
       ],
-      "role": "client"
+      "role": "client",
+      "changed_v1_3": "FRAGO 03 section 3.2: overall-status, journey-strip, kpi-row, area-tiles and for-you are removed from the tracker; the three sections' ids replace them. Their absence is line 23."
     },
     {
       "id": 12,
-      "line": "Every task table shows the six questions, in order, and they are not renamed. Checked on an area page, on the client Jobs page and on the admin Workplan page.",
+      "line": "Every task table shows the six questions, in order, and they are not renamed. Checked on an area page and on the admin Workplan page.",
       "drive": "playwright",
       "check": "task_table_columns",
-      "pass": "Every [data-testid='task-table'] found on an area page, on the client Jobs page, and on the admin Workplan page has header cells reading exactly What, How, Who, When, Done, Status, in that order.",
+      "pass": "Every [data-testid='task-table'] found on module 1's page and on the admin Workplan page has header cells reading exactly What, How, Who, When, Done, Status, in that order.",
       "table_selector": "[data-testid='task-table']",
       "columns": [
         "What",
@@ -231,10 +244,6 @@
           "view": "area"
         },
         {
-          "role": "client",
-          "view": "jobs"
-        },
-        {
           "role": "admin",
           "view": "workplan"
         }
@@ -244,21 +253,40 @@
         "1920x1080",
         "1366x768",
         "390x844"
-      ]
+      ],
+      "changed_v1_3": "Jobs target retired: FRAGO 03 section 3.5 replaces the Jobs task tables with a card board, so there is no table there (line 21 checks none remains)."
     },
     {
       "id": 13,
-      "line": "No percentage is shown without its fraction beside it.",
+      "line": "No percentage is shown without its fraction beside it, anywhere on the client side.",
       "drive": "playwright",
       "check": "percentage_has_fraction",
-      "pass": "On the client tracker and on an area page, every rendered N% has an \"N of M\" fraction in the same element's text or its parent's text. Offending text is reported quoted; it is rendered UI copy, not restricted data.",
+      "pass": "On every client nav view, the Value page behind the Statement's link and all eight module pages, every rendered N% has an \"N of M\" fraction in the same element's text or its parent's text. Offending text is reported quoted; it is rendered UI copy, not restricted data.",
       "settle_ms": 400,
       "applies_to": [
         "1920x1080",
         "1366x768",
         "390x844"
       ],
-      "role": "client"
+      "role": "client",
+      "views": [
+        "tracker",
+        "documents",
+        "jobs",
+        "request",
+        "statement",
+        "guide",
+        "value",
+        "area:1",
+        "area:2",
+        "area:3",
+        "area:4",
+        "area:5",
+        "area:6",
+        "area:7",
+        "area:8"
+      ],
+      "changed_v1_3": "FRAGO 03 section 3.9: extended from the tracker and one area page to the whole client side."
     },
     {
       "id": 14,
@@ -279,11 +307,11 @@
     },
     {
       "id": 15,
-      "line": "The client can confirm a task assigned to them and can do nothing else to the workplan, on the tracker, on Jobs or on Documents.",
+      "line": "The client can confirm a task assigned to them and can do nothing else to the workplan, on Job management, the tracker, any module page or Documents.",
       "drive": "playwright",
       "check": "client_read_only_workplan",
-      "pass": "A [data-testid='confirm-task'] control exists inside [data-testid='for-you']. No button or link on the client tracker, on any area page, on the client Jobs page or on the client Documents page has accessible text matching edit, delete, remove, reopen, reprioritise, change status or mark done. This is FRAGO section 12's stop condition made executable, so it is strict: every area tile is visited, not just one, and the two new pages are scanned too.",
-      "for_you_selector": "[data-testid='for-you']",
+      "pass": "Inside [data-testid='waiting-on-you'] on Job management there is a [data-testid='confirm-task'] control, or, when no row is open, the for-you-empty or for-you-confirmed state (the detail says which). No button or link on Job management, the tracker, any of the eight module pages or Documents has label text matching edit, delete, remove, reopen, reprioritise, change status or mark done.",
+      "for_you_selector": "[data-testid='waiting-on-you']",
       "confirm_selector": "[data-testid='confirm-task']",
       "settle_ms": 400,
       "applies_to": [
@@ -291,16 +319,18 @@
         "1366x768",
         "390x844"
       ],
-      "role": "client"
+      "role": "client",
+      "for_you_view": "jobs",
+      "changed_v1_3": "FRAGO 03 section 3.5: the for-you rows and confirm move from the tracker to Job management."
     },
     {
       "id": 16,
       "line": "An area page prints as a clean document.",
       "drive": "playwright",
       "check": "area_print_clean",
-      "pass": "With media emulated as print, header and nav are not visible, and the obligation text and the task table are visible. Media is reset to screen explicitly afterwards, as line 7 already does.",
+      "pass": "With media emulated as print, header and nav are not visible, and the module introduction and the task table are visible. Media is reset to screen explicitly afterwards.",
       "chrome_selector": "header, nav",
-      "obligation_selector": "[data-testid='obligation']",
+      "obligation_selector": "[data-testid='module-intro']",
       "table_selector": "[data-testid='task-table']",
       "settle_ms": 400,
       "applies_to": [
@@ -308,7 +338,8 @@
         "1366x768",
         "390x844"
       ],
-      "role": "client"
+      "role": "client",
+      "changed_v1_3": "FRAGO 03 section 3.4 puts the module introduction at the top of the page; the obligation block is not in the v1.3 page contract, so the introduction is what must print."
     },
     {
       "id": 17,
@@ -324,26 +355,29 @@
         "1366x768",
         "390x844"
       ],
-      "role": "client"
+      "role": "client",
+      "status": "retired",
+      "retired_reason": "FRAGO 03 section 3.2 removes KpiRow from the tracker, so there are no KPI tiles. The never-blank rule moves to the module tile counts, line 25."
     },
     {
       "id": 18,
-      "line": "The client's navigation is Lurong's, in her order.",
+      "line": "The client's navigation is the operator's six items, in her order, with her labels.",
       "drive": "playwright",
       "check": "client_nav_order",
-      "pass": "The client nav elements carrying data-view, read in DOM order, read exactly tracker, documents, jobs, request, value, statement. Neither posture nor exposure appears anywhere in the client navigation. Order matters and is the point of the line.",
+      "pass": "The client nav elements carrying data-view, read in DOM order, read exactly tracker, documents, jobs, request, statement, guide, and their labels read exactly Compliance Tracker, Compliance Documents, Job management, Requests and clocks, Statement for the CFO, Quick questions. None of posture, exposure or value is in the client nav.",
       "nav_selector": "nav [data-view]",
       "expected": [
         "tracker",
         "documents",
         "jobs",
         "request",
-        "value",
-        "statement"
+        "statement",
+        "guide"
       ],
       "forbidden": [
         "posture",
-        "exposure"
+        "exposure",
+        "value"
       ],
       "settle_ms": 400,
       "applies_to": [
@@ -351,15 +385,24 @@
         "1366x768",
         "390x844"
       ],
-      "role": "client"
+      "role": "client",
+      "expected_labels": [
+        "Compliance Tracker",
+        "Compliance Documents",
+        "Job management",
+        "Requests and clocks",
+        "Statement for the CFO",
+        "Quick questions"
+      ],
+      "changed_v1_3": "FRAGO 03 section 3.1: new list and labels; value becomes forbidden in the client nav."
     },
     {
       "id": 19,
-      "line": "The eight modules carry their v1.2 titles.",
+      "line": "The eight modules carry their v1.3 titles.",
       "drive": "playwright",
       "check": "module_titles_match_areas",
-      "pass": "On the tracker, the name in each [data-testid='area-tile-name'] and each [data-testid='module-nav-item'] matches AREAS in packages/shared/src/tracker.ts exactly, in id order. The expected names are read from that file at run time, not hardcoded, so the gate and the source cannot drift apart.",
-      "tile_selector": "[data-testid='area-tile-name']",
+      "pass": "On the tracker, each [data-testid='module-tile-name'], and on module 1's page each [data-testid='module-nav-item'], matches AREAS in packages/shared/src/tracker.ts exactly, in id order, read from that file at run time. The static section separately checks AREAS against FRAGO 03 section 3.3's names.",
+      "tile_selector": "[data-testid='module-tile-name']",
       "subnav_selector": "[data-testid='module-nav-item']",
       "settle_ms": 400,
       "applies_to": [
@@ -367,7 +410,8 @@
         "1366x768",
         "390x844"
       ],
-      "role": "client"
+      "role": "client",
+      "changed_v1_3": "The tiles are module-tile-name now (area-tiles removed); module-nav moves off the tracker onto the module pages (FRAGO 03 section 3.4)."
     },
     {
       "id": 20,
@@ -387,26 +431,123 @@
     },
     {
       "id": 21,
-      "line": "Jobs shows every task in the three groups with the six questions.",
+      "line": "Job management is a three-column board, and confirm is the client's only write on it.",
       "drive": "playwright",
       "check": "jobs_page",
-      "pass": "[data-testid='jobs'] is present. The group headings read Not started, In progress, Completed. Every [data-testid='task-table'] found on the page carries the six questions, in order. A [data-testid='confirm-task'] control exists for the client's own tasks.",
+      "pass": "[data-testid='jobs'] is present with one h1 reading 'Job management'. [data-testid='waiting-on-you'] carries the heading 'Waiting on you' and for-you rows or its empty or confirmed state. [data-testid='job-board'] holds exactly three [data-testid='job-column'] whose [data-testid='job-column-name'] read Not started, In progress, Completed, in that order. Every job-card carries a module name and a RAG label; any job-blocked card is in In progress. No task-table or task-cards, no Guide (quick-questions-intro or a textarea) on the page. Inside the page container every button is confirm-task, inputs are only text or checkbox, and nothing is draggable or contenteditable. Selects are allowed: they are view filters.",
       "page_selector": "[data-testid='jobs']",
-      "table_selector": "[data-testid='task-table']",
-      "confirm_selector": "[data-testid='confirm-task']",
-      "group_headings": [
+      "strip_selector": "[data-testid='waiting-on-you']",
+      "board_selector": "[data-testid='job-board']",
+      "column_selector": "[data-testid='job-column']",
+      "column_name_selector": "[data-testid='job-column-name']",
+      "card_selector": "[data-testid='job-card']",
+      "blocked_selector": "[data-testid='job-blocked']",
+      "confirm_testid": "confirm-task",
+      "title": "Job management",
+      "strip_heading": "Waiting on you",
+      "column_names": [
         "Not started",
         "In progress",
         "Completed"
       ],
-      "group_heading_selector": "h2, h3",
-      "columns": [
-        "What",
-        "How",
-        "Who",
-        "When",
-        "Done",
-        "Status"
+      "allowed_input_types": [
+        "text",
+        "search",
+        "checkbox",
+        ""
+      ],
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client",
+      "changed_v1_3": "Rewritten for FRAGO 03 section 3.5: grouped task tables become a card board, the Guide leaves the page, and the only write control is confirm."
+    },
+    {
+      "id": 22,
+      "line": "The overall figure says where the client stands, in the order's words.",
+      "drive": "playwright",
+      "check": "overall_status_wording",
+      "pass": "overall-sentence reads 'Compliance score: {pct}% ({n} of {m} obligations met)' with pct agreeing with n of m to within rounding, or 'Compliance score: nothing has fallen due yet'. overall-asat reads 'as at {date}'. overall-basis is not empty. overall-standing reads 'Nothing overdue' or '{k} overdue or blocked'. overall-explainer reads the order's fixed text exactly. The five parts are in that document order.",
+      "explainer_text": "There are eight compliance modules under the data protection function. The score reflects their overall status. Open a module to see its tasks, documents and status.",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client",
+      "changed_v1_3": "FRAGO 03 section 3.2: overall-status is split into named parts with fixed wording; the standing rule (DC-25) and the fraction rule are kept."
+    },
+    {
+      "id": 23,
+      "line": "The Compliance Tracker has three sections only.",
+      "drive": "playwright",
+      "check": "tracker_three_sections",
+      "pass": "Exactly three h2 on the tracker, reading Journey, Overall compliance status, Upcoming, one inside each of tracker-journey, tracker-overall, tracker-upcoming, in that order. None of the listed removed test ids is on the page. Upcoming shows at most eight upcoming-item, or upcoming-empty reading 'Nothing scheduled yet.'.",
+      "sections": [
+        [
+          "tracker-journey",
+          "Journey"
+        ],
+        [
+          "tracker-overall",
+          "Overall compliance status"
+        ],
+        [
+          "tracker-upcoming",
+          "Upcoming"
+        ]
+      ],
+      "absent_testids": [
+        "kpi-row",
+        "kpi-tile",
+        "area-tiles",
+        "area-tile",
+        "for-you",
+        "for-you-row",
+        "confirm-task",
+        "module-nav",
+        "journey-strip"
+      ],
+      "max_upcoming": 8,
+      "upcoming_empty_text": "Nothing scheduled yet.",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 24,
+      "line": "The Journey shows the current stage in words and the five phases as a path.",
+      "drive": "playwright",
+      "check": "journey_section",
+      "pass": "journey-current reads 'Current stage: {phase}' or 'Current stage: not yet set'; journey-note is not empty; five journey-node in PHASES order (read from tracker.ts), each data-state done, current or future, running done then at most one current then future; the current node is the named phase and carries the word 'Current' in text; no other node does.",
+      "unset_text": "not yet set",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 25,
+      "line": "The eight module tiles exist and each links to its module.",
+      "drive": "playwright",
+      "check": "module_tiles_link",
+      "pass": "Exactly eight module-tile, all inside tracker-overall, each an <a> with href /tracker/areas/{1..8} in id order, data-rag green, amber, red or grey, module-tile-name equal to AREAS, and module-tile-count reading '{done} of {total} done'. Each tile is clicked and lands on /tracker/areas/N with the module name in an h1.",
+      "rag_values": [
+        "green",
+        "amber",
+        "red",
+        "grey"
       ],
       "settle_ms": 400,
       "applies_to": [
@@ -417,12 +558,12 @@
       "role": "client"
     },
     {
-      "id": 22,
-      "line": "The overall figure says where the client stands.",
+      "id": 26,
+      "line": "Every module page carries its name, introduction, documents, status, tasks and module navigation, in that order.",
       "drive": "playwright",
-      "check": "overall_status_wording",
-      "pass": "[data-testid='overall-status'] contains either the phrase \"Nothing overdue\" or a phrase matching \"N overdue or blocked\". If a percentage appears anywhere in that block, a fraction \"N of M\" appears with it.",
-      "status_selector": "[data-testid='overall-status']",
+      "check": "module_page_structure",
+      "pass": "On all eight module pages: h1 equals the module name; module-intro is not empty; module-documents holds module-doc links or module-documents-empty reading 'None filed yet'; module-progress reads 'Compliance status: {done} of {total} done, {pct}%' with a RAG label in text, pct agreeing with the fraction and done/total agreeing with the module's tile; module-nav holds eight module-nav-item links; h1, intro, documents, progress, task table and module-nav are in that document order.",
+      "documents_empty_text": "None filed yet",
       "settle_ms": 400,
       "applies_to": [
         "1920x1080",
@@ -430,6 +571,95 @@
         "390x844"
       ],
       "role": "client"
+    },
+    {
+      "id": 27,
+      "line": "The Statement links to the record behind it.",
+      "drive": "playwright",
+      "check": "statement_record_link",
+      "pass": "statement-record-link has href /value and reads 'The record behind this statement'; no role='tablist' remains on the Statement page; following the link lands on /value and the Record table renders.",
+      "link_selector": "[data-testid='statement-record-link']",
+      "link_text": "The record behind this statement",
+      "href": "/value",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 28,
+      "line": "Quick questions says plainly what it does.",
+      "drive": "playwright",
+      "check": "quick_questions",
+      "pass": "On the guide view the only h1 reads 'Quick questions' and quick-questions-intro reads the order's sentence exactly.",
+      "title": "Quick questions",
+      "intro_text": "Answers come from the approved policies and procedures. Where they do not answer, the question goes to MITMARK.",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 29,
+      "line": "The old module names appear nowhere on the client side.",
+      "drive": "playwright",
+      "check": "old_module_names_absent",
+      "pass": "On every client nav view, the Value page behind the Statement's link and all eight module pages, the page text (text nodes outside script and style, plus title, aria-label and alt) contains none of 'Data tracker review', 'Data breach and incident management', or 'Data retention' not followed by ' practice'. Case-sensitive, so the policy title 'Data Retention Schedule' does not match.",
+      "views": [
+        "tracker",
+        "documents",
+        "jobs",
+        "request",
+        "statement",
+        "guide",
+        "value",
+        "area:1",
+        "area:2",
+        "area:3",
+        "area:4",
+        "area:5",
+        "area:6",
+        "area:7",
+        "area:8"
+      ],
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "client"
+    },
+    {
+      "id": 30,
+      "line": "check_restricted.py passes.",
+      "drive": "static",
+      "check": "check_restricted_passes",
+      "pass": "06_EXECUTION/gate/check_restricted.py, run over the job folder, exits 0. Exit 2 (names not readable) is a fail. Only its summary count is reported; no name or path is echoed.",
+      "script": "06_EXECUTION/gate/check_restricted.py",
+      "timeout_s": 600
+    },
+    {
+      "id": 31,
+      "line": "Value sits on the operator's side, with the inputs to the statement one click away.",
+      "drive": "playwright",
+      "check": "admin_value_page",
+      "pass": "Signed in as the operator, data-view='value-admin' opens a page where the Record table renders and value-settings-link points to /admin/settings. Settings carries a heading 'Journey and module introductions' and a select offering 'derive from tasks'.",
+      "settings_section_heading": "Journey and module introductions",
+      "derive_option_text": "derive from tasks",
+      "settle_ms": 400,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "admin"
     }
   ]
 }

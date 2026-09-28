@@ -9,6 +9,10 @@ import { useAuth } from "../store/auth";
 // the Information Officer reads; the two are deliberately not the same
 // string.
 //
+// v1.3 (FRAGO 03 section 3.1): six items in the operator's order. Value left
+// the menu; /value still routes and the Statement links to it. The Policy
+// Guide is back on the menu as Quick questions.
+//
 // v1.2 (FRAGO 02 section 4): the client navigation follows the operator's structure.
 // Posture is folded into the tracker as its "Areas by status" panel, and the
 // Policy Guide is no longer a menu item - it sits at the foot of Jobs and
@@ -18,10 +22,10 @@ import { useAuth } from "../store/auth";
 const navItems = [
   { to: "/", label: "Compliance Tracker", view: "tracker", end: true },
   { to: "/documents", label: "Compliance Documents", view: "documents" },
-  { to: "/jobs", label: "Jobs", view: "jobs" },
+  { to: "/jobs", label: "Job management", view: "jobs" },
   { to: "/clocks", label: "Requests and clocks", view: "request" },
-  { to: "/value", label: "Value", view: "value", end: true },
   { to: "/value/statement", label: "Statement for the CFO", view: "statement" },
+  { to: "/guide", label: "Quick questions", view: "guide" },
 ];
 
 export function ClientLayout() {

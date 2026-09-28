@@ -91,10 +91,10 @@ export function GuidePage() {
   return (
     <div className="flex h-full max-w-3xl flex-col">
       <div>
-        <h1 className="text-lg font-semibold">Policy Guide</h1>
-        <p className="mt-0.5 text-sm text-client-muted">
-          Plain-English answers from your approved policies - anything unclear goes straight
-          to {officerName}.
+        <h1 className="text-lg font-semibold">Quick questions</h1>
+        <p data-testid="quick-questions-intro" className="mt-0.5 text-sm text-client-muted">
+          Answers come from the approved policies and procedures. Where they do not answer, the
+          question goes to MITMARK.
         </p>
         <div className="mt-1.5 h-px w-12 bg-client-line" />
       </div>
@@ -116,7 +116,7 @@ export function GuidePage() {
         ))}
         {sending && (
           <p className="text-sm text-client-muted" role="status">
-            The Guide is checking your policies…
+            Checking the policies…
           </p>
         )}
         {notice && (
@@ -143,7 +143,7 @@ export function GuidePage() {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={ASK_HINT}
-          aria-label="Ask the Policy Guide"
+          aria-label="Ask a quick question"
           className="flex-1 rounded border border-client-line bg-client-surface px-3 py-2.5 text-sm outline-none placeholder:text-client-muted/70 focus:border-client-accent"
         />
         <button
@@ -203,7 +203,7 @@ function MessageBubble({
             </span>
           ) : (
             <span className="text-[11px] uppercase tracking-wider text-client-muted">
-              Policy Guide
+              From the policies
             </span>
           )}
           {message.status && <StatusLamp status={message.status} />}

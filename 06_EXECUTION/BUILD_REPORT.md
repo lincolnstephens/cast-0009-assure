@@ -259,3 +259,58 @@ The genuine client confirmation raised on 18 September is still there, waiting f
 The whole design rests on MITMARK answering promptly. If a confirmation sitting for five days becomes the pattern rather than the exception, the client sees a system that asks her for things and then ignores her, which is worse than not asking. Before Wednesday's boardroom, that one should be cleared.
 
 After that, in order: the operator authenticates the task library, now 36 tasks; MITMARK publishes the first procedure and files the first register, so the repository stops being all promises; and the Anthropic key is replaced.
+
+---
+
+# v1.3, the operator's dashboard
+
+**Live:** https://tessera-assure.netlify.app
+**Production deploy:** `6aba2719e5118b5c586c6971`, 2026-09-28
+**Gate:** PASS, 97 of 97, against the production URL
+**Spend:** no new money committed. Build-session time, local compute, and four deploys on the existing Netlify plan.
+**Built under:** `06_EXECUTION/FRAGO_03_LURONG_DASHBOARD.md`. Deadline was 28 Sep 18:00 BST; live before 10:00.
+
+## What v1.3 adds
+
+The operator sent a second round of feedback, an email and a five-slide deck, and Sunray adopted it in full (DC-32). It simplifies what the client sees. Her three benefits are still the test: compliance overview, document repository, consolidated actions.
+
+**The client menu has six items, in her order:** Compliance Tracker, Compliance Documents, Job management, Requests and clocks, Statement for the CFO, Quick questions. Value has left the menu. `/value` still works and the Statement links to it at its foot as "The record behind this statement", so every figure on the statement stays traceable to its record.
+
+**The Compliance Tracker has three sections.**
+
+- **Journey:** the current stage in words, one sentence, and the five phases drawn as a path. Done phases are green, the current one is amber and says "Current", and future phases are grey.
+- **Overall compliance status:** "Compliance score: 38% (3 of 8 obligations met)", then the date, the basis, the overdue line and one fixed sentence, then the eight modules as tiles filled with their RAG colour. Each tile opens its module.
+- **Upcoming:** the next eight dated open MITMARK tasks.
+
+The six measures, the areas panel, the module strip and "For you" have left the front page.
+
+**Module pages** open with an introduction, the relevant documents and trackers, and "Compliance status: {done} of {total} done, {pct}%". The task table follows, then links to every module, which closes the v1.2 deferral. The obligation, how we do it, and the history stay below.
+
+**Job management** is a three-column board, Not started, In progress and Completed, with Waiting on you above it. The client's confirm is unchanged and is still her only write anywhere.
+
+**Value** is on the operator's side, as an admin menu item that opens the Record with the way to the rates. **Quick questions** is the Guide under her name for it, and says plainly what it does.
+
+**Three modules have her names:** Data tracker compliance, Data retention practice, and Data breach and incident response.
+
+## Three calls the order left to the build
+
+1. **Upcoming shows today onwards.** "Planned to roll out" cannot describe a task that is already late. Overdue work is in the overdue count and on Job management (DC-34).
+2. **The module page keeps its record.** The order says what goes at the top and does not say remove the rest. The citation and the history are the record behind the module, so they stay below the module links (DC-35).
+3. **The journey stage is the operator's to set.** Her deck says Implementation. The product shows the derived stage until she sets it, because setting it for her would put a claim on the client's page that nobody at MITMARK has made in the product (DC-38).
+
+## What the gate caught that reading the code did not
+
+The journey node, the tiles and the document list ran their words together with no space in the markup. A sighted reader never sees it. A screen reader, or anything that reads the page's text, got "Assessment and discoveryCurrent". The gate reads text content, not pixels, and failed on it.
+
+## What was deferred, and why
+
+- **Filling Compliance Documents.** The operator's files were not in the folder, so nothing was uploaded or invented (DC-39).
+- **Tile contrast.** White on the house green and amber falls below WCAG AA contrast. A darker fill for tiles is a design decision, not a build one (DC-37).
+
+## The demo organisation
+
+There were 65 tasks before the deploy and 65 after, by module 7, 11, 9, 8, 3, 6, 4, 17 both times. The rename moved nothing, because tasks carry the module id. The front page reads "Compliance score: 38% (3 of 8 obligations met)" with "5 overdue or blocked".
+
+## The smallest next decision for Sunray
+
+**Whether module tiles take a darker fill.** Everything else open is the operator's to do in the product: set the journey stage, write the introductions if she wants her own, and file the documents she has already shared. Each is a Settings or Documents action on her side, and the page is truthful until she does them.

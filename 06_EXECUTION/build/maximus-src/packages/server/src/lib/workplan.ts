@@ -31,12 +31,12 @@ import { latestApprovedPolicies } from "./policies.ts";
  * (FRAGO_01_TRACKER.md), the client-owned 0h tasks excluded:
  *   1 DPO registration and ICO:            1h, 1h            -> 1
  *   2 Data mapping and processing records:  8h, 2h            -> 4 (rounded down from 5)
- *   3 Data retention:                      10h, 2h            -> 6
+ *   3 Data retention practice:             10h, 2h            -> 6
  *   4 Cross-border data transfers:          6h, 4h            -> 5
  *   5 Data protection impact assessments:   2h, 16h           -> 8 (rounded down from 9)
  *   6 Data subject requests:                6h, 2h            -> 4
  *   7 Vendor data risk:                     5h, 8h            -> 6 (rounded down from 6.5)
- *   8 Data breach and incident management:  8h, 6h, 6h        -> 6 (rounded down from 6.67)
+ *   8 Data breach and incident response:    8h, 6h, 6h        -> 6 (rounded down from 6.67)
  */
 export const AREA_DEFAULT_HOURS: Record<AreaId, number> = {
   1: 1,

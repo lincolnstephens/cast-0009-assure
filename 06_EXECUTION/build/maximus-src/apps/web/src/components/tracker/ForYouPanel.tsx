@@ -5,8 +5,9 @@ import { formatDateGB } from "../../lib/format";
 import { RagMark } from "./RagMark";
 
 /**
- * Tasks whose owner is a client role, soonest due first. The client's only
- * action anywhere in the tracker lives here: confirm, with an optional
+ * Tasks whose owner is a client role, soonest due first. At v1.3 it sits at
+ * the top of Job management as "Waiting on you". The client's only
+ * action anywhere in the portal lives here: confirm, with an optional
  * evidence link. Confirming does not change the task's status - the operator
  * accepts it separately - so a confirmed row shows "Sent to MITMARK to
  * accept" and nothing pretends the work is done.
@@ -14,15 +15,17 @@ import { RagMark } from "./RagMark";
 export function ForYouPanel({
   tasks,
   emptyMessage,
+  title = "Waiting on you",
+  testId = "waiting-on-you",
 }: {
   tasks: ForYouTask[];
   emptyMessage: string;
+  title?: string;
+  testId?: string;
 }) {
   return (
-    <section aria-label="For you" data-testid="for-you" data-panel="for-you-panel">
-      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
-        For you
-      </p>
+    <section aria-label={title} data-testid={testId} data-panel="for-you-panel">
+      <h2 className="text-base font-semibold">{title}</h2>
       {tasks.length === 0 ? (
         <p
           data-testid="for-you-empty"

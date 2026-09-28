@@ -24,17 +24,38 @@ import { z } from "zod";
  * review of the trackers the client keeps, and module 4 became policy review,
  * with the old cross-border work moved into modules 2 and 7 where it belongs.
  * Nothing was deleted; existing tasks were moved by id.
+ *
+ * v1.3 renamed modules 2, 3 and 8 in the operator's words. Tasks and documents
+ * carry the id, never the name, so a rename here is the whole migration.
  */
 export const AREAS = [
   { id: 1, name: "DPO registration" },
-  { id: 2, name: "Data tracker review" },
-  { id: 3, name: "Data retention" },
+  { id: 2, name: "Data tracker compliance" },
+  { id: 3, name: "Data retention practice" },
   { id: 4, name: "Policy review" },
   { id: 5, name: "Data protection impact assessment" },
   { id: 6, name: "Data subject requests" },
   { id: 7, name: "Vendor data risk" },
-  { id: 8, name: "Data breach and incident management" },
+  { id: 8, name: "Data breach and incident response" },
 ] as const;
+
+/**
+ * What each module covers, in one or two plain sentences. Shown at the top of
+ * the module page until the operator writes her own in Settings.
+ */
+export const DEFAULT_MODULE_INTRODUCTIONS: Record<number, string> = {
+  1: "Registration with the Information Commissioner's Office and the appointment of a data protection officer, kept current each year.",
+  2: "The registers the organisation keeps about its data: the record of processing, employee access and international transfers, reviewed so they stay accurate.",
+  3: "How long each kind of data is kept and how it is deleted when that time is up, checked against the retention schedule.",
+  4: "The data protection policies and the privacy notice, reviewed one at a time and reissued when anything changes.",
+  5: "Impact assessments for processing that is likely to carry high risk to people, carried out before the processing starts.",
+  6: "Requests from people exercising their rights over their data, answered inside the statutory month.",
+  7: "The suppliers that handle the organisation's data, assessed before they start and reviewed while they work.",
+  8: "Suspected breaches, recorded and assessed within 72 hours, and reported to the ICO where the law requires it.",
+};
+
+export const DEFAULT_JOURNEY_NOTE =
+  "This shows where the organisation is on its data protection journey. The stage reflects the year's deliverables and is adjusted as they are met.";
 
 export type AreaId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export const AREA_IDS: AreaId[] = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -355,6 +376,35 @@ export const forYouTaskSchema = z.object({
 });
 export type ForYouTask = z.infer<typeof forYouTaskSchema>;
 
+/** One step on the journey path. */
+export const journeyNodeSchema = z.object({
+  phase: z.number().int(),
+  name: z.string(),
+  state: z.enum(["done", "current", "future"]),
+});
+export type JourneyNode = z.infer<typeof journeyNodeSchema>;
+
+export const journeySchema = z.object({
+  /** Null when the operator has not set it and no open task carries a date. */
+  currentPhase: z.number().int().nullable(),
+  currentName: z.string().nullable(),
+  /** Whether the operator set the stage or it was worked out from the tasks. */
+  source: z.enum(["operator", "derived"]),
+  note: z.string(),
+  nodes: z.array(journeyNodeSchema),
+});
+export type Journey = z.infer<typeof journeySchema>;
+
+/** A dated open task, for the Upcoming list. */
+export const upcomingItemSchema = z.object({
+  id: z.string(),
+  area: z.number().int(),
+  areaName: z.string(),
+  title: z.string(),
+  dueAt: z.string(),
+});
+export type UpcomingItem = z.infer<typeof upcomingItemSchema>;
+
 export const trackerHomeSchema = z.object({
   header: z.object({
     clientName: z.string(),
@@ -374,6 +424,8 @@ export const trackerHomeSchema = z.object({
   areas: z.array(areaSummarySchema),
   forYou: z.array(forYouTaskSchema),
   forYouEmptyMessage: z.string(),
+  journey: journeySchema,
+  upcoming: z.array(upcomingItemSchema),
 });
 export type TrackerHome = z.infer<typeof trackerHomeSchema>;
 
@@ -384,6 +436,19 @@ export type TrackerHome = z.infer<typeof trackerHomeSchema>;
 export const areaPageSchema = z.object({
   area: z.number().int(),
   name: z.string(),
+  /** One or two sentences, the operator's or the default. */
+  introduction: z.string(),
+  /** The Compliance Documents items filed against this module. */
+  documents: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      section: z.string(),
+      kind: z.string(),
+      url: z.string(),
+    }),
+  ),
+  progress: z.object({ done: z.number().int(), total: z.number().int(), pct: z.number().int() }),
   /** Three to five plain sentences. No citations in the body. */
   obligation: z.string(),
   /** The one line at the foot naming the article or section. */
@@ -589,6 +654,8 @@ export const jobsResponseSchema = z.object({
   notApplicableCount: z.number().int(),
   modules: z.array(z.object({ id: z.number().int(), name: z.string() })),
   owners: z.array(z.string()),
+  /** The Waiting on you strip's empty state, the same words the tracker used. */
+  forYouEmptyMessage: z.string(),
 });
 export type JobsResponse = z.infer<typeof jobsResponseSchema>;
 

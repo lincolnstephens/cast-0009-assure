@@ -39,6 +39,15 @@ Structural changes made against the standing template, and why:
     illustrative-off state, print behaviour, mobile overflow at 390px,
     console cleanliness and noindex.
 
+v1.3 (FRAGO 03, the operator's dashboard). The client nav becomes six items
+(Value leaves it, Quick questions returns), the tracker is reduced to three
+sections, Jobs becomes a three-column Job management board, modules 2, 3 and
+8 are renamed, and Value gains an admin menu item. Lines the order
+invalidates carry "status": "retired" in DEFINITION_OF_DONE.json with the
+reason beside them; run_driven reports them as retired and does not count
+them. Lines with "drive": "static" run in the static section, once, not per
+resolution (line 30, check_restricted.py).
+
 Usage:
     python gate/g7_gate_assure_v1.py [url-or-path] [outdir]
 
@@ -63,7 +72,7 @@ import sys
 CONFIG = {
     # Identity of the run, for the report header.
     "codename": "ASSURE",
-    "iteration": "v1.2",
+    "iteration": "v1.3",
 
     # What is gated. Either a deployed URL or a path to a local artefact.
     # Passed on the command line; these are the defaults.
@@ -253,7 +262,8 @@ def check_banned_terms(text, cfg, where):
 
 def check_em_dashes(sources, cfg):
     """House rule: no em dash anywhere we wrote."""
-    hits = [str(p.relative_to(cfg["root"])) for p, t in sources.items() if "—" in t]
+    # v1.3: the character is written as an escape so this file carries none.
+    hits = [str(p.relative_to(cfg["root"])) for p, t in sources.items() if "\u2014" in t]
     return check("static: no em dash in source", not hits, ", ".join(hits[:5]))
 
 
@@ -341,18 +351,34 @@ def check_task_columns_contract(sources, cfg):
 # v1.2. AREAS lives in the same file as TASK_COLUMNS. This check is the
 # opposite way round from line 19, driven: line 19 reads AREAS at run time so
 # the gate cannot drift from the source; this static check hardcodes the
-# eight names from FRAGO 02 section 3 on purpose, because here the point is
-# that the source agrees with the order the order itself sets out, not that
-# the gate reads its own contract back to itself.
+# eight names from the order on purpose, because here the point is that the
+# source agrees with the order the order itself sets out, not that the gate
+# reads its own contract back to itself.
+# v1.3: the names are now FRAGO 03 section 3.3's (modules 2, 3 and 8 renamed).
 FRAGO_AREA_NAMES_EXPECTED = [
     "DPO registration",
-    "Data tracker review",
-    "Data retention",
+    "Data tracker compliance",
+    "Data retention practice",
     "Policy review",
     "Data protection impact assessment",
     "Data subject requests",
     "Vendor data risk",
-    "Data breach and incident management",
+    "Data breach and incident response",
+]
+
+# v1.3. The three retired module names, which must appear nowhere on the
+# client side (line 29). Matched case-sensitively, on purpose: the policy
+# pack carries a real policy titled "Data Retention Schedule" (capital R),
+# which a case-insensitive match on "Data retention" would flag. The old
+# module 3 name is matched as "Data retention" NOT followed by " practice",
+# so the new name "Data retention practice" does not trip it either. Known
+# limit: ordinary prose that begins a sentence "Data retention ..." (lower
+# case r, any word but "practice") would be flagged; on the client side that
+# wording is the old module name in all but name, so it is treated as a hit.
+OLD_AREA_NAME_PATTERNS = [
+    ("Data tracker review", re.compile(r"Data tracker review")),
+    ("Data breach and incident management", re.compile(r"Data breach and incident management")),
+    ("Data retention (not followed by ' practice')", re.compile(r"Data retention(?! practice)")),
 ]
 
 
@@ -363,8 +389,8 @@ def _find_areas_array(text):
 
 
 def check_area_names_match_frago(sources, cfg):
-    """The eight module names in tracker.ts match FRAGO 02 section 3 exactly,
-    in order."""
+    """The eight module names in tracker.ts match FRAGO 03 section 3.3
+    exactly, in order."""
     target = cfg["root"] / TASK_COLUMNS_SOURCE
     text = None
     for p, t in sources.items():
@@ -380,7 +406,7 @@ def check_area_names_match_frago(sources, cfg):
                       "AREAS declaration not found in tracker.ts")
     found = re.findall(r'name:\s*"([^"]*)"', body)
     ok = found == FRAGO_AREA_NAMES_EXPECTED
-    return check("static: the eight module names match FRAGO 02 section 3, in order",
+    return check("static: the eight module names match FRAGO 03 section 3.3, in order",
                  ok, "matches exactly" if ok else f"found {found}")
 
 
@@ -440,6 +466,66 @@ def check_no_file_writes_outside_store(sources, cfg):
                  ok, "no hits" if ok else "; ".join(hits[:8]))
 
 
+# v1.3. FRAGO 03 section 3.9: check_restricted.py passes. The script is
+# called as it stands, not copied, so the gate and the pre-commit check cannot
+# disagree about what counts as a hit. It reads the names itself at run time;
+# this function never sees them. Its output is captured and only its closing
+# summary line (a count of terms, files and hits, no name and no path) is
+# kept, because its HIT lines carry paths, which are not echoed here.
+CHECK_RESTRICTED_SCRIPT = "06_EXECUTION/gate/check_restricted.py"
+
+
+def sdrv_check_restricted_passes(cfg, line):
+    import subprocess
+    rel = line.get("script", CHECK_RESTRICTED_SCRIPT)
+    script = cfg["root"] / rel
+    if not script.is_file():
+        return False, f"{rel} not found"
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(script), str(cfg["root"])],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=line.get("timeout_s", 600),
+        )
+    except Exception as exc:
+        return False, f"check_restricted.py did not complete: {type(exc).__name__}"
+    summary = next((ln.strip() for ln in reversed(proc.stdout.splitlines())
+                    if "restricted terms checked" in ln), "")
+    if proc.returncode == 0:
+        return True, summary or "exit 0"
+    if proc.returncode == 2:
+        return False, "the restricted names could not be read (exit 2); an absent list is not a pass"
+    return False, (summary or "no summary line") + f" (exit {proc.returncode})"
+
+
+STATIC_DRIVERS = {
+    "check_restricted_passes": sdrv_check_restricted_passes,
+}
+
+
+def run_static_dod_lines(cfg):
+    """v1.3. Run the definition-of-done lines whose drive is "static". They
+    run once, here, not once per resolution, because they read files, not
+    the page. A static line with no registered driver fails; it does not skip."""
+    dod = load_dod(cfg)
+    if dod is None:
+        check("static: definition of done present", False, cfg["dod_file"])
+        return
+    for line in dod.get("lines", []):
+        if line.get("drive") != "static" or line.get("status") == "retired":
+            continue
+        name = f"L{line['id']} static: {line['line'][:70]}"
+        driver = STATIC_DRIVERS.get(line.get("check"))
+        if driver is None:
+            check(name, False, f"no static driver registered for check '{line.get('check')}'", line["id"])
+            continue
+        try:
+            ok, detail = driver(cfg, line)
+        except Exception as exc:
+            ok, detail = False, f"{type(exc).__name__}: {exc}"
+        check(name, ok, detail, line["id"])
+
+
 def run_static(cfg):
     print("\n--- static ---")
     sources = read_source(cfg)
@@ -459,6 +545,7 @@ def run_static(cfg):
     check_task_columns_contract(sources, cfg)
     check_area_names_match_frago(sources, cfg)
     check_no_file_writes_outside_store(sources, cfg)
+    run_static_dod_lines(cfg)
 
     # A static check for a bare percentage in a template literal was
     # considered for v1.1 and deliberately left out. See
@@ -506,6 +593,9 @@ def run_driven(cfg, target):
         check("driven: definition of done present", False, cfg["dod_file"])
         return "HARNESS"
     check("driven: definition of done present", True, f"{len(dod.get('lines', []))} lines")
+    for line in dod.get("lines", []):
+        if line.get("status") == "retired":
+            print(f"RETIRED L{line['id']}: {line.get('retired_reason', 'no reason given')}")
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
@@ -518,6 +608,10 @@ def run_driven(cfg, target):
             page.goto(target, wait_until="load")
 
             for line in dod.get("lines", []):
+                # v1.3: a retired line is reported once, above, and never
+                # driven; a static line has already run in the static section.
+                if line.get("status") == "retired" or line.get("drive") == "static":
+                    continue
                 if res["name"] not in line.get("applies_to", [res["name"]]):
                     continue
                 name = f"L{line['id']} @{res['name']}: {line['line'][:70]}"
@@ -584,10 +678,20 @@ def _ensure_role(page, cfg, role, target):
     # a top-level client nav item in v1.1. It no longer is (FRAGO 02 section
     # 4: it moves to the foot of Jobs), so the probe now uses 'tracker',
     # which is the client's home in both v1.1 and v1.2 and was never removed.
+    # v1.3: 'guide' is back in the client nav (Quick questions), but 'tracker'
+    # is still the home and still the safer probe; unchanged.
     probe = "[data-view='queue']" if role == "admin" else "[data-view='tracker']"
     if page.locator(probe).count() > 0:
         return True
     return _sign_in(page, cfg, role, target)
+
+
+def _text(locator):
+    """v1.3. An element's textContent with whitespace collapsed. Used where
+    the gate compares words the order fixes (names, headings, labels), so a
+    CSS text-transform or a line break in the markup cannot change the
+    reading."""
+    return " ".join((locator.text_content() or "").split())
 
 
 def _wait_for(page, selector, timeout_ms=8000):
@@ -631,42 +735,92 @@ def _enter_view(page, view_id, admin_entry_selector, settle_ms, cfg=None, role=N
 # v1.1. Area pages are not top-level nav items (FRAGO 4.5: they open from a
 # tile on the tracker home, not from the sidebar), so they cannot be reached
 # by _enter_view's data-view lookup. These two helpers reach them by clicking
-# into the area-tiles grid instead, and are shared by every new driver that
-# needs "an area page" or "every area page".
+# a tile on the tracker instead, and are shared by every driver that needs
+# "an area page" or "every area page".
+#
+# v1.3 (FRAGO 03 section 3.2): area-tiles and area-tile are removed from the
+# tracker. The eight tiles now sit in the "Overall compliance status" section
+# as module-tile links to /tracker/areas/{1..8}, so both helpers wait for
+# tracker-overall and click module-tile instead.
 
-AREA_TILE_SELECTOR = "[data-testid='area-tile']"
+AREA_TILE_CONTAINER = "[data-testid='tracker-overall']"
+AREA_TILE_SELECTOR = "[data-testid='module-tile']"
 
 
 def _area_tile_count(page, cfg, settle_ms):
-    """Sign in as the client, open the tracker, and count the clickable
-    tiles inside area-tiles. Returns 0 if the tracker or the tiles are not
-    reachable, which a caller treats as a driver failure, not a skip."""
+    """Sign in as the client, open the tracker, and count the module tiles.
+    Returns 0 if the tracker or the tiles are not reachable, which a caller
+    treats as a driver failure, not a skip."""
     if not _ensure_role(page, cfg, "client", cfg["_target"]):
         return 0
     if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
         return 0
-    tiles_sel = "[data-testid='area-tiles']"
-    if not _wait_for(page, tiles_sel, 6000):
+    if not _wait_for(page, AREA_TILE_SELECTOR, 6000):
         return 0
     return page.locator(AREA_TILE_SELECTOR).count()
 
 
 def _enter_area_page(page, cfg, settle_ms, index=0):
-    """Sign in as the client, open the tracker, and click the tile at
-    `index` inside area-tiles. Returns False if any step fails."""
+    """Sign in as the client, open the tracker, and click the module tile at
+    `index` (0 is module 1). Returns False if any step fails."""
     if not _ensure_role(page, cfg, "client", cfg["_target"]):
         return False
     if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
         return False
-    tiles_sel = "[data-testid='area-tiles']"
-    if not _wait_for(page, tiles_sel, 6000):
+    if not _wait_for(page, AREA_TILE_SELECTOR, 6000):
         return False
     tiles = page.locator(AREA_TILE_SELECTOR)
     if tiles.count() <= index:
         return False
     tiles.nth(index).click()
     page.wait_for_timeout(settle_ms)
+    # The module page is loaded when its h1 is; the task table and intro
+    # arrive with the same response.
+    _wait_for(page, "[data-testid='module-progress']", 6000)
     return True
+
+
+def _enter_client_value(page, cfg, settle_ms):
+    """v1.3. Value has left the client nav (FRAGO 03 section 3.6) but /value
+    still routes for the client, reached from the Statement page's link "The
+    record behind this statement". This reaches it that way, by the link the
+    client actually has, rather than by typing a URL she would not."""
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False
+    if not _enter_view(page, "statement", None, settle_ms, cfg, "client"):
+        return False
+    link_sel = "[data-testid='statement-record-link']"
+    if not _wait_for(page, link_sel, 6000):
+        return False
+    try:
+        page.locator(link_sel).first.click(timeout=6000)
+    except Exception:
+        return False
+    page.wait_for_timeout(settle_ms)
+    return True
+
+
+def _enter_any(page, cfg, view, admin_entry, settle_ms, role):
+    """v1.3. Reach a named view, a module page or the client Value page.
+    "area" is module 1; "area:N" is module N (1 to 8); "value" on the client
+    side goes through the Statement's link, since it is no longer a nav item.
+    Anything else is a nav data-view, as before."""
+    if view == "area":
+        return _enter_area_page(page, cfg, settle_ms, 0)
+    if view.startswith("area:"):
+        return _enter_area_page(page, cfg, settle_ms, int(view.split(":", 1)[1]) - 1)
+    if view == "value" and role == "client":
+        return _enter_client_value(page, cfg, settle_ms)
+    return _enter_view(page, view, admin_entry, settle_ms, cfg, role)
+
+
+def _client_surface_views(line):
+    """The client views a whole-client-side line walks: every nav view, the
+    Value page behind the Statement's link, and all eight module pages."""
+    return line.get("views", [
+        "tracker", "documents", "jobs", "request", "statement", "guide", "value",
+        "area:1", "area:2", "area:3", "area:4", "area:5", "area:6", "area:7", "area:8",
+    ])
 
 
 # --- drivers. One per named check in DEFINITION_OF_DONE.json. -------------
@@ -707,7 +861,8 @@ def drv_views_render(page, cfg, line, res, errors):
         return False, f"could not sign in as the {role} account"
     failed = []
     for v in views:
-        if not _enter_view(page, v, admin_entry, settle_ms, cfg, role):
+        # v1.3: _enter_any, so a line may name "area:N" or the client "value".
+        if not _enter_any(page, cfg, v, admin_entry, settle_ms, role):
             failed.append(f"{v}:nav-missing")
             continue
         _wait_for(page, heading_sel, 6000)
@@ -721,9 +876,13 @@ def drv_views_render(page, cfg, line, res, errors):
 
 
 def drv_record_table_has_rows(page, cfg, line, res, errors):
-    """Line 4: the Record table renders at least one row."""
-    _enter_view(page, line.get("view", "value"), line.get("admin_entry_selector"),
-                line.get("settle_ms", 400), cfg, line.get("role"))
+    """Line 4: the Record table renders at least one row.
+    v1.3: Value is no longer a client nav item, so the client reaches it
+    through the Statement's "The record behind this statement" link
+    (_enter_any's "value" case). The rule itself is unchanged."""
+    if not _enter_any(page, cfg, line.get("view", "value"), line.get("admin_entry_selector"),
+                      line.get("settle_ms", 400), line.get("role")):
+        return False, f"the {line.get('view', 'value')} view was not reachable"
     table_sel = line.get("table_selector", "[data-testid='record-table']")
     _wait_for(page, table_sel)
     row_sel = line.get("row_selector", "tbody tr")
@@ -865,11 +1024,9 @@ def drv_no_horizontal_overflow(page, cfg, line, res, errors):
     role = line.get("role")
     overflowing = []
     for v in views:
-        entered = (
-            _enter_area_page(page, cfg, settle_ms)
-            if v == "area"
-            else _enter_view(page, v, admin_entry, settle_ms, cfg, role)
-        )
+        # v1.3: _enter_any also covers the client "value" page, now reached
+        # only through the Statement's link, and "area:N".
+        entered = _enter_any(page, cfg, v, admin_entry, settle_ms, role)
         if not entered:
             overflowing.append(f"{v}:nav-missing")
             continue
@@ -949,34 +1106,28 @@ def drv_task_table_columns(page, cfg, line, res, errors):
             if run not in joined:
                 problems.append(f"{scope_label} table[{i}]: {got}")
 
-    # The client's area page carries a task table. The tracker home does not:
-    # it is tiles and a "for you" list, and the order does not put a table there.
-    if _enter_area_page(page, cfg, settle_ms):
-        # The table is in the DOM at every width, hidden by CSS below the phone
-        # breakpoint. Wait for it rather than reading a page mid-render.
-        _wait_for(page, table_sel, 6000)
-        headers_of("client:area")
-    else:
-        problems.append("client:area: no area page reachable")
-
-    # v1.2. Jobs is the third place a task table can appear on the client
-    # side: every task across all eight modules, in one list. It must carry
-    # the same six questions in the same order as everywhere else.
-    if _ensure_role(page, cfg, "client", cfg["_target"]) and _enter_view(
-        page, "jobs", None, settle_ms, cfg, "client"
-    ):
-        _wait_for(page, table_sel, 6000)
-        headers_of("client:jobs")
-    else:
-        problems.append("client:jobs: view not reachable")
-
-    if _ensure_role(page, cfg, "admin", cfg["_target"]) and _enter_view(
-        page, "workplan", None, settle_ms, cfg, "admin"
-    ):
-        _wait_for(page, table_sel, 6000)
-        headers_of("admin:workplan")
-    else:
-        problems.append("admin:workplan: view not reachable")
+    # v1.3: the places a task table must appear are read from the line's
+    # "targets" rather than hardcoded. The client Jobs target is retired:
+    # FRAGO 03 section 3.5 replaces the Jobs task tables with a three-column
+    # card board, so there is no table there to check (line 21 now checks
+    # the board, and that no task table is left on it). The area page and the
+    # admin Workplan keep their tables and stay checked.
+    targets = line.get("targets", [
+        {"role": "client", "view": "area"},
+        {"role": "admin", "view": "workplan"},
+    ])
+    for t in targets:
+        role, view = t.get("role"), t.get("view")
+        label = f"{role}:{view}"
+        # The table is in the DOM at every width, hidden by CSS below the
+        # phone breakpoint. Wait for it rather than reading a page mid-render.
+        if _ensure_role(page, cfg, role, cfg["_target"]) and _enter_any(
+            page, cfg, view, None, settle_ms, role
+        ):
+            _wait_for(page, table_sel, 6000)
+            headers_of(label)
+        else:
+            problems.append(f"{label}: view not reachable")
 
     ok = not problems
     detail = (
@@ -1018,29 +1169,31 @@ def _find_percentages_without_fraction(page):
 
 
 def drv_percentage_has_fraction(page, cfg, line, res, errors):
-    """Line 13: no percentage is shown without its fraction beside it, on
-    every client tracker and area page."""
+    """Line 13: no percentage is shown without its fraction beside it.
+    v1.3 (FRAGO 03 section 3.9, "every percentage on the client side"): the
+    walk is extended from the tracker and one area page to every client view
+    in the line's "views" (tracker, all eight module pages, Job management,
+    Statement and the rest of the client side). The in-page rule is unchanged
+    from v1.1: the fraction must be in the text node's own element or that
+    element's parent, which tolerates a percentage wrapped in its own <span>
+    inside the sentence that carries the fraction."""
     settle_ms = line.get("settle_ms", 400)
     offenders = []
+    views = _client_surface_views(line)
 
     if not _ensure_role(page, cfg, "client", cfg["_target"]):
         return False, "could not sign in as the client account"
-    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
-        offenders.append("tracker: view not reachable")
-    else:
+    for v in views:
+        if not _enter_any(page, cfg, v, None, settle_ms, "client"):
+            offenders.append(f"{v}: view not reachable")
+            continue
         page.wait_for_timeout(settle_ms)
         for f in _find_percentages_without_fraction(page):
-            offenders.append(f'tracker: "{f}"')
-
-    if not _enter_area_page(page, cfg, settle_ms):
-        offenders.append("area: view not reachable")
-    else:
-        page.wait_for_timeout(settle_ms)
-        for f in _find_percentages_without_fraction(page):
-            offenders.append(f'area: "{f}"')
+            offenders.append(f'{v}: "{f}"')
 
     ok = not offenders
-    return ok, ("no bare percentage found" if ok else "; ".join(offenders[:8]))
+    return ok, (f"no bare percentage found across {len(views)} client views" if ok
+                else "; ".join(offenders[:8]))
 
 
 def _restore_illustrative_switch(page, cfg, toggle_sel, settle_ms):
@@ -1146,19 +1299,37 @@ def drv_client_read_only_workplan(page, cfg, line, res, errors):
     exist in for-you, and no button or link anywhere on the tracker or any
     area page may offer to edit, delete, reprioritise or change status."""
     settle_ms = line.get("settle_ms", 400)
-    for_you_sel = line.get("for_you_selector", "[data-testid='for-you']")
+    # v1.3 (FRAGO 03 section 3.5): the "for you" rows and their confirm
+    # control move off the tracker into the "Waiting on you" strip at the top
+    # of Job management, so the confirm control is looked for there. The
+    # strip may legitimately hold no open row (every task confirmed, or none
+    # assigned); then for-you-empty or for-you-confirmed stands in, and the
+    # detail says which, so a pass without a live confirm control is visible.
+    for_you_sel = line.get("for_you_selector", "[data-testid='waiting-on-you']")
+    for_you_view = line.get("for_you_view", "jobs")
     confirm_sel = line.get("confirm_selector", "[data-testid='confirm-task']")
+    empty_sel = line.get("for_you_empty_selector",
+                         "[data-testid='for-you-empty'], [data-testid='for-you-confirmed']")
     pattern = _FORBIDDEN_TASK_CONTROL_RE
 
     if not _ensure_role(page, cfg, "client", cfg["_target"]):
         return False, "could not sign in as the client account"
-    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
-        return False, "the client tracker view was not reachable"
+    if not _enter_view(page, for_you_view, None, settle_ms, cfg, "client"):
+        return False, f"the client {for_you_view} view was not reachable"
     if not _wait_for(page, for_you_sel, 6000):
         return False, f"{for_you_sel} not found"
+    # The strip renders before its rows arrive; wait for a row's control or
+    # an explicit empty or confirmed state before deciding which it is.
+    _wait_for(page, ", ".join(
+        f"{for_you_sel} {s}" for s in
+        (confirm_sel, "[data-testid='for-you-empty']", "[data-testid='for-you-confirmed']")
+    ), 6000)
     for_you = page.locator(for_you_sel)
+    confirm_state = "confirm control present"
     if for_you.locator(confirm_sel).count() == 0:
-        return False, f"{confirm_sel} not found inside {for_you_sel}"
+        if for_you.locator(empty_sel).count() == 0:
+            return False, f"neither {confirm_sel} nor an empty or confirmed state inside {for_you_sel}"
+        confirm_state = "no open row to confirm (empty or confirmed state shown)"
 
     offenders = []
 
@@ -1180,9 +1351,16 @@ def drv_client_read_only_workplan(page, cfg, line, res, errors):
             if pattern.search(text):
                 offenders.append(f"{label}: '{text}'")
 
-    scan("tracker")
+    scan(for_you_view)
+
+    if _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        scan("tracker")
+    else:
+        offenders.append("tracker: view not reachable")
 
     tile_count = _area_tile_count(page, cfg, settle_ms)
+    if tile_count == 0:
+        offenders.append("tracker: no module tile to open")
     for idx in range(tile_count):
         if not _enter_area_page(page, cfg, settle_ms, idx):
             offenders.append(f"area[{idx}]: view not reachable")
@@ -1194,13 +1372,8 @@ def drv_client_read_only_workplan(page, cfg, line, res, errors):
     # Documents is a repository the operator publishes into. Both are
     # scanned with the same forbidden-word sweep as the tracker and every
     # area page.
-    if _ensure_role(page, cfg, "client", cfg["_target"]) and _enter_view(
-        page, "jobs", None, settle_ms, cfg, "client"
-    ):
-        scan("jobs")
-    else:
-        offenders.append("jobs: view not reachable")
-
+    # v1.3: Jobs is already scanned above (it is where the confirm control
+    # now lives), so only Documents is added here.
     if _ensure_role(page, cfg, "client", cfg["_target"]) and _enter_view(
         page, "documents", None, settle_ms, cfg, "client"
     ):
@@ -1209,8 +1382,8 @@ def drv_client_read_only_workplan(page, cfg, line, res, errors):
         offenders.append("documents: view not reachable")
 
     ok = not offenders
-    detail = ("confirm control present; no edit/delete/reprioritise control found"
-              if ok else f"confirm present; forbidden controls: {'; '.join(offenders[:8])}")
+    detail = (f"{confirm_state}; no edit/delete/reprioritise control found"
+              if ok else f"{confirm_state}; problems: {'; '.join(offenders[:8])}")
     return ok, detail
 
 
@@ -1219,7 +1392,13 @@ def drv_area_print_clean(page, cfg, line, res, errors):
     hidden; the obligation text and the task table remain visible. Reset to
     screen explicitly afterwards, as line 7 already does, for the same
     reason: media=None does not reliably clear the override in this
-    Playwright build."""
+    Playwright build.
+
+    v1.3: the text that must survive print is now the module introduction
+    (module-intro), which FRAGO 03 section 3.4 puts at the top of every
+    module page; the obligation block is not in the v1.3 page contract. The
+    selector is read from the line's obligation_selector, which the
+    definition of done now sets to module-intro."""
     settle_ms = line.get("settle_ms", 400)
     if not _enter_area_page(page, cfg, settle_ms):
         return False, "no area page reachable"
@@ -1244,12 +1423,18 @@ def drv_area_print_clean(page, cfg, line, res, errors):
         page.wait_for_timeout(100)
     ok = (not chrome_visible) and obligation_visible and table_visible
     return ok, (f"chrome visible under print: {chrome_visible}, "
-                f"obligation visible: {obligation_visible}, tasks visible: {table_visible}")
+                f"{obligation_sel} visible: {obligation_visible}, tasks visible: {table_visible}")
 
 
 def drv_kpi_tiles_never_blank(page, cfg, line, res, errors):
     """Line 17: "no data yet" is a state, not a blank. Every KPI tile on the
-    client tracker must render non-empty text."""
+    client tracker must render non-empty text.
+
+    RETIRED at v1.3: FRAGO 03 section 3.2 removes KpiRow from the tracker, so
+    there is no kpi-row to read. Line 17 carries status "retired" and is not
+    driven; this function stays only so an older definition of done still
+    resolves. The "never blank" rule moves to the module tiles (line 25:
+    every tile carries "{done} of {total} done")."""
     settle_ms = line.get("settle_ms", 400)
     row_sel = line.get("kpi_row_selector", "[data-testid='kpi-row']")
     tile_sel = line.get("kpi_tile_selector", "[data-testid='kpi-tile']")
@@ -1296,13 +1481,27 @@ def drv_client_nav_order(page, cfg, line, res, errors):
 
     order_ok = got == list(expected)
     present_forbidden = [v for v in forbidden if v in got]
-    ok = order_ok and not present_forbidden
+
+    # v1.3 (FRAGO 03 section 3.1): the labels are part of the order too, so
+    # when the line names them they are read (textContent, whitespace
+    # collapsed, so a label hidden by CSS at one width still reads) and
+    # compared exactly, in the same order.
+    labels_expected = line.get("expected_labels")
+    labels_ok = True
+    got_labels = []
+    if labels_expected:
+        got_labels = [" ".join((items.nth(i).text_content() or "").split()) for i in range(n)]
+        labels_ok = got_labels == list(labels_expected)
+
+    ok = order_ok and not present_forbidden and labels_ok
     if ok:
-        detail = f"nav reads {got}, in order, with none of {forbidden}"
+        detail = f"nav reads {got}, in order, labels match, with none of {forbidden}"
     elif not order_ok:
         detail = f"expected {expected}, got {got}"
-    else:
+    elif present_forbidden:
         detail = f"forbidden view(s) present in client nav: {present_forbidden}"
+    else:
+        detail = f"labels expected {labels_expected}, got {got_labels}"
     return ok, detail
 
 
@@ -1323,8 +1522,8 @@ def _load_tracker_areas(cfg):
 
 
 def drv_module_titles_match_areas(page, cfg, line, res, errors):
-    """Line 19: the eight modules carry their v1.2 titles. Checks the module
-    tiles and the module sub-navigation on the tracker against AREAS, read
+    """Line 19: the eight modules carry their v1.3 titles. Checks the module
+    tiles on the tracker and the module sub-navigation against AREAS, read
     from tracker.ts at run time rather than hardcoded here, so the gate
     cannot drift from the source."""
     settle_ms = line.get("settle_ms", 400)
@@ -1332,15 +1531,17 @@ def drv_module_titles_match_areas(page, cfg, line, res, errors):
     if not expected:
         return False, f"could not read AREAS from {TASK_COLUMNS_SOURCE}"
 
-    tile_sel = line.get("tile_selector", "[data-testid='area-tile-name']")
+    # v1.3: the tile names are module-tile-name inside the new
+    # tracker-overall section (area-tiles is gone), and the module
+    # sub-navigation has moved off the tracker onto every module page
+    # (FRAGO 03 section 3.4), so it is read on module 1's page.
+    tile_sel = line.get("tile_selector", "[data-testid='module-tile-name']")
     subnav_sel = line.get("subnav_selector", "[data-testid='module-nav-item']")
 
     if not _ensure_role(page, cfg, "client", cfg["_target"]):
         return False, "could not sign in as the client account"
     if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
         return False, "the client tracker view was not reachable"
-    if not _wait_for(page, "[data-testid='area-tiles']", 6000):
-        return False, "[data-testid='area-tiles'] not found"
 
     problems = []
 
@@ -1348,18 +1549,22 @@ def drv_module_titles_match_areas(page, cfg, line, res, errors):
         problems.append(f"{tile_sel} not found")
     else:
         tiles = page.locator(tile_sel)
-        tile_names = [tiles.nth(i).inner_text().strip() for i in range(tiles.count())]
+        # textContent, not innerText: the name is compared as written in
+        # the DOM, so a CSS text-transform cannot make a right name read wrong.
+        tile_names = [_text(tiles.nth(i)) for i in range(tiles.count())]
         if tile_names != list(expected):
             problems.append(f"tiles read {tile_names}")
 
-    if not _wait_for(page, subnav_sel, 6000):
+    if not _enter_area_page(page, cfg, settle_ms, 0):
+        problems.append("module 1 page not reachable for the sub-navigation")
+    elif not _wait_for(page, subnav_sel, 6000):
         problems.append(f"{subnav_sel} not found")
     else:
         subnav = page.locator(subnav_sel)
         # The sub-navigation numbers its entries ("1. DPO registration"). The
         # rule is that the titles match, not that they are unadorned.
         subnav_names = [
-            re.sub(r"^\s*\d+\.\s*", "", subnav.nth(i).inner_text().strip())
+            re.sub(r"^\s*\d+\.\s*", "", _text(subnav.nth(i)))
             for i in range(subnav.count())
         ]
         if subnav_names != list(expected):
@@ -1418,15 +1623,37 @@ def drv_documents_read_only(page, cfg, line, res, errors):
 
 
 def drv_jobs_page(page, cfg, line, res, errors):
-    """Line 21: Jobs shows every task in the three groups with the six
-    questions. Group headings are only read, never clicked."""
+    """Line 21: Job management is the operator's three-column board, and the
+    client's only write on it is confirm.
+
+    v1.3 (FRAGO 03 section 3.5) rewrites this line. The v1.2 version looked
+    for three grouped task tables; the order replaces them with a board of
+    cards, so the table half is inverted (no task table may remain on the
+    page) and the board is checked instead: one h1 "Job management", the
+    "Waiting on you" strip with its rows or its empty state, exactly three
+    job-column blocks named Not started, In progress, Completed in that order,
+    every card carrying a module name and a RAG label, and a blocked card
+    only ever in In progress. The Guide has left the foot of the page.
+
+    "No write control other than confirm" is checked by shape, inside the
+    page container only (the sidebar's Sign out is outside it): every button
+    must be confirm-task; inputs may only be text or checkbox (the evidence
+    field and the "Due this month" filter); selects are allowed because they
+    are view filters; nothing may be draggable or contenteditable. Every
+    control is read, never clicked."""
     settle_ms = line.get("settle_ms", 400)
     page_sel = line.get("page_selector", "[data-testid='jobs']")
-    table_sel = line.get("table_selector", "[data-testid='task-table']")
-    confirm_sel = line.get("confirm_selector", "[data-testid='confirm-task']")
-    expected_headings = line.get("group_headings", ["Not started", "In progress", "Completed"])
-    heading_sel = line.get("group_heading_selector", "h2, h3")
-    expected_columns = [c.upper() for c in line.get("columns", ["What", "How", "Who", "When", "Done", "Status"])]
+    strip_sel = line.get("strip_selector", "[data-testid='waiting-on-you']")
+    board_sel = line.get("board_selector", "[data-testid='job-board']")
+    column_sel = line.get("column_selector", "[data-testid='job-column']")
+    column_name_sel = line.get("column_name_selector", "[data-testid='job-column-name']")
+    card_sel = line.get("card_selector", "[data-testid='job-card']")
+    blocked_sel = line.get("blocked_selector", "[data-testid='job-blocked']")
+    confirm_testid = line.get("confirm_testid", "confirm-task")
+    title = line.get("title", "Job management")
+    strip_heading = line.get("strip_heading", "Waiting on you")
+    expected_columns = line.get("column_names", ["Not started", "In progress", "Completed"])
+    allowed_input_types = set(line.get("allowed_input_types", ["text", "search", "checkbox", ""]))
 
     if not _ensure_role(page, cfg, "client", cfg["_target"]):
         return False, "could not sign in as the client account"
@@ -1434,73 +1661,669 @@ def drv_jobs_page(page, cfg, line, res, errors):
         return False, "the client jobs view was not reachable"
     if not _wait_for(page, page_sel, 6000):
         return False, f"{page_sel} not found"
+    # The board is drawn once the tasks arrive; absence checks below are only
+    # meaningful after that.
+    if not _wait_for(page, f"{board_sel} {column_sel}", 6000):
+        return False, f"{board_sel} with its columns not found"
 
     problems = []
+    root = page.locator(page_sel).first
+    areas = _load_tracker_areas(cfg) or []
+    rag_labels = list(_load_rag_labels(cfg).values())
 
-    # The page prints the group's own words and its count. The rule is that the
-    # three words are there and are the operator's, not that they stand alone.
-    headings = page.locator(heading_sel)
-    got_headings = [headings.nth(i).inner_text().strip() for i in range(headings.count())]
-    names = page.locator("[data-testid='job-group-name']")
-    got_headings += [names.nth(i).inner_text().strip() for i in range(names.count())]
-    # The page renders these in capitals. The rule is the operator's words, not
-    # their casing, so compare case-insensitively.
-    got_lower = [h.lower() for h in got_headings]
-    for expected in expected_headings:
-        if expected.lower() not in got_lower:
-            problems.append(f"group heading missing: '{expected}'")
+    h1s = page.locator("h1")
+    h1_texts = [_text(h1s.nth(i)) for i in range(h1s.count())]
+    if h1_texts != [title]:
+        problems.append(f"h1 reads {h1_texts}, expected ['{title}']")
 
-    tables = page.locator(table_sel)
-    count = tables.count()
-    if count == 0:
-        problems.append(f"{table_sel} not found")
-    run = "|".join(expected_columns)
-    for i in range(count):
-        cells = tables.nth(i).locator("th")
-        got = [cells.nth(j).inner_text().strip().upper() for j in range(cells.count())]
-        # Below the phone breakpoint the table is replaced by cards, which carry
-        # the same six labels per row rather than header cells. A table with no
-        # headers at this width is the hidden one, not a breach of the rule.
-        if not got:
+    if not _wait_for(page, strip_sel, 6000):
+        problems.append(f"{strip_sel} not found")
+    else:
+        strip = page.locator(strip_sel).first
+        heads = strip.locator("h1, h2, h3, h4")
+        if strip_heading not in [_text(heads.nth(i)) for i in range(heads.count())]:
+            problems.append(f"'{strip_heading}' heading not found in {strip_sel}")
+        state_sel = ", ".join(f"{strip_sel} [data-testid='{t}']"
+                              for t in ("for-you-row", "for-you-empty", "for-you-confirmed"))
+        if not _wait_for(page, state_sel, 6000):
+            problems.append(f"{strip_sel} shows neither a row nor its empty state")
+
+    cols = page.locator(f"{board_sel} {column_sel}")
+    n_cols = cols.count()
+    if n_cols != len(expected_columns):
+        problems.append(f"expected {len(expected_columns)} {column_sel}, found {n_cols}")
+    got_columns = []
+    for i in range(n_cols):
+        name = cols.nth(i).locator(column_name_sel)
+        got_columns.append(_text(name.first) if name.count() > 0 else "")
+        blocked_here = cols.nth(i).locator(blocked_sel).count()
+        if blocked_here and i != 1:
+            problems.append(f"{blocked_here} blocked card(s) outside In progress (column {i + 1})")
+    if got_columns != list(expected_columns):
+        problems.append(f"column names read {got_columns}")
+
+    cards = page.locator(f"{board_sel} {card_sel}")
+    n_cards = cards.count()
+    for i in range(n_cards):
+        t = _text(cards.nth(i))
+        if not t:
+            problems.append(f"card[{i}] is blank")
             continue
-        if run not in "|".join(got):
-            problems.append(f"table[{i}] columns read {got}")
+        if areas and not any(a in t for a in areas):
+            problems.append(f"card[{i}] carries no module name: '{t[:60]}'")
+        if rag_labels and not any(r in t for r in rag_labels):
+            problems.append(f"card[{i}] carries no RAG label: '{t[:60]}'")
 
-    if page.locator(confirm_sel).count() == 0:
-        problems.append(f"{confirm_sel} not found")
+    if page.locator("[data-testid='task-table'], [data-testid='task-cards']").count() > 0:
+        problems.append("a task table is still on Job management")
+    if page.locator("[data-testid='quick-questions-intro']").count() > 0 or root.locator("textarea").count() > 0:
+        problems.append("the Guide (or its question box) is still on Job management")
+
+    buttons = root.locator("button, [role='button'], input[type='submit'], input[type='button'], input[type='reset']")
+    for i in range(buttons.count()):
+        b = buttons.nth(i)
+        if b.get_attribute("data-testid") != confirm_testid:
+            problems.append(f"write-capable control other than confirm: '{_text(b)[:40]}'")
+    inputs = root.locator("input")
+    for i in range(inputs.count()):
+        typ = (inputs.nth(i).get_attribute("type") or "").lower()
+        if typ in ("submit", "button", "reset"):
+            continue  # already reported with the buttons above
+        if typ not in allowed_input_types:
+            problems.append(f"input of type '{typ}' on Job management")
+    if root.locator("[draggable='true']").count() > 0:
+        problems.append("a draggable element is on Job management")
+    if root.locator("[contenteditable='true'], [contenteditable='']").count() > 0:
+        problems.append("a contenteditable element is on Job management")
 
     ok = not problems
-    detail = ("three groups present, task tables carry the six columns, confirm control present"
+    detail = (f"board of 3 columns {got_columns}, {n_cards} card(s), strip present, "
+              f"no task table, no Guide, no write control but confirm"
               if ok else "; ".join(problems[:8]))
     return ok, detail
 
 
+def _dom_order(page, selectors):
+    """v1.3. True if the first element matching each selector exists and each
+    follows the one before it in document order. Returns (ok, detail)."""
+    result = page.evaluate(
+        """
+        (sels) => {
+          const els = sels.map((s) => document.querySelector(s));
+          const missing = sels.filter((s, i) => !els[i]);
+          if (missing.length) return {ok: false, detail: "missing: " + missing.join(", ")};
+          for (let i = 1; i < els.length; i++) {
+            if (!(els[i - 1].compareDocumentPosition(els[i]) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+              return {ok: false, detail: sels[i] + " does not follow " + sels[i - 1]};
+            }
+          }
+          return {ok: true, detail: "in order"};
+        }
+        """,
+        list(selectors),
+    )
+    return bool(result.get("ok")), result.get("detail", "")
+
+
 def drv_overall_status_wording(page, cfg, line, res, errors):
     """Line 22: the overall figure says where the client stands (DC-25's
-    overdue-based denominator, FRAGO 02 section 6)."""
+    overdue-based denominator, FRAGO 02 section 6).
+
+    v1.3 (FRAGO 03 section 3.2, section 2 of the tracker): the single
+    overall-status block is split into named parts, and the wording is now
+    fixed by the order, so each part is read and matched: the score sentence
+    ("Compliance score: {pct}% ({n} of {m} obligations met)", or "Compliance
+    score: nothing has fallen due yet" when nothing has fallen due), "as at
+    {date}", the basis sentence, the standing line ("Nothing overdue" or "{k}
+    overdue or blocked") and the fixed explainer, in that order. The
+    percentage must agree with its own fraction to within rounding."""
     settle_ms = line.get("settle_ms", 400)
-    status_sel = line.get("status_selector", "[data-testid='overall-status']")
+    sel = {k: line.get(f"{k}_selector", f"[data-testid='overall-{k}']")
+           for k in ("sentence", "asat", "basis", "standing", "explainer")}
+    explainer_text = line.get("explainer_text", "")
 
     if not _ensure_role(page, cfg, "client", cfg["_target"]):
         return False, "could not sign in as the client account"
     if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
         return False, "the client tracker view was not reachable"
-    if not _wait_for(page, status_sel, 6000):
-        return False, f"{status_sel} not found"
+    if not _wait_for(page, sel["sentence"], 6000):
+        return False, f"{sel['sentence']} not found"
 
-    text = page.locator(status_sel).first.inner_text()
-    standing_ok = bool(
-        re.search(r"nothing overdue", text, re.I)
-        or re.search(r"\d+\s+overdue or blocked", text, re.I)
+    problems = []
+
+    def read(k):
+        loc = page.locator(sel[k])
+        return _text(loc.first) if loc.count() > 0 else None
+
+    sentence = read("sentence")
+    m = re.fullmatch(r"Compliance score: (\d+)% \((\d+) of (\d+) obligations met\)", sentence or "")
+    if m:
+        pct, n, total = (int(g) for g in m.groups())
+        if total == 0 or n > total:
+            problems.append(f"score fraction is not a real one: '{sentence}'")
+        elif abs(pct - 100.0 * n / total) >= 1:
+            problems.append(f"score {pct}% does not agree with {n} of {total}")
+    elif sentence != "Compliance score: nothing has fallen due yet":
+        problems.append(f"score sentence reads '{sentence}'")
+
+    asat = read("asat")
+    if asat is None or not re.fullmatch(r"as at \S.*", asat):
+        problems.append(f"as-at line reads '{asat}'")
+    if not read("basis"):
+        problems.append(f"{sel['basis']} missing or empty")
+    standing = read("standing")
+    if standing is None or not re.fullmatch(r"(Nothing overdue|\d+ overdue or blocked)\.?", standing):
+        problems.append(f"standing line reads '{standing}'")
+    explainer = read("explainer")
+    if explainer_text and explainer != explainer_text:
+        problems.append(f"explainer reads '{explainer}'")
+
+    order_ok, order_detail = _dom_order(page, [sel[k] for k in
+                                                ("sentence", "asat", "basis", "standing", "explainer")])
+    if not order_ok:
+        problems.append(f"order: {order_detail}")
+
+    ok = not problems
+    return ok, (f"'{sentence}'; standing '{standing}'; parts in order" if ok
+                else "; ".join(problems[:6]))
+
+
+# --- v1.3 drivers, the operator's dashboard (FRAGO 03). --------------------
+
+def _load_tracker_const_names(cfg, const):
+    """Read the name fields of an `export const X = [ ... ] as const` array
+    from tracker.ts at run time (AREAS, PHASES), for the same reason line 19
+    reads AREAS there: the gate and the source cannot drift apart."""
+    path = cfg["root"] / TASK_COLUMNS_SOURCE
+    if not path.is_file():
+        return None
+    text = path.read_text(encoding="utf-8", errors="replace")
+    m = re.search(r"export const " + re.escape(const) + r"\s*=\s*\[(.*?)\]\s*as const", text, re.S)
+    if not m:
+        return None
+    return re.findall(r'name:\s*"([^"]*)"', m.group(1)) or None
+
+
+def _load_rag_labels(cfg):
+    """RAG_LABEL from tracker.ts, as {rag: label}. Empty if not found."""
+    path = cfg["root"] / TASK_COLUMNS_SOURCE
+    if not path.is_file():
+        return {}
+    text = path.read_text(encoding="utf-8", errors="replace")
+    m = re.search(r"export const RAG_LABEL[^=]*=\s*\{(.*?)\}", text, re.S)
+    if not m:
+        return {}
+    return dict(re.findall(r'(\w+):\s*"([^"]*)"', m.group(1)))
+
+
+def _wait_tracker_loaded(page, settle_ms):
+    """The tracker is loaded when its three sections and its tiles are in
+    the DOM. Absence checks are only meaningful after that."""
+    ok = all(_wait_for(page, f"[data-testid='{t}']", 6000)
+             for t in ("tracker-journey", "tracker-overall", "tracker-upcoming"))
+    ok = _wait_for(page, AREA_TILE_SELECTOR, 6000) and ok
+    page.wait_for_timeout(settle_ms)
+    return ok
+
+
+def drv_tracker_three_sections(page, cfg, line, res, errors):
+    """Line 23 (new at v1.3): the tracker is three sections only (FRAGO 03
+    section 3.2). Exactly three h2 on the page, reading Journey, Overall
+    compliance status, Upcoming, each inside its own section, in that order;
+    none of the removed test ids anywhere on the page; Upcoming lists at most
+    eight items or says "Nothing scheduled yet."."""
+    settle_ms = line.get("settle_ms", 400)
+    sections = line.get("sections", [
+        ["tracker-journey", "Journey"],
+        ["tracker-overall", "Overall compliance status"],
+        ["tracker-upcoming", "Upcoming"],
+    ])
+    absent = line.get("absent_testids", [])
+    max_upcoming = line.get("max_upcoming", 8)
+    empty_text = line.get("upcoming_empty_text", "Nothing scheduled yet.")
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        return False, "the client tracker view was not reachable"
+    if not _wait_tracker_loaded(page, settle_ms):
+        return False, "the tracker's three sections and tiles did not all render"
+
+    problems = []
+    h2s = page.locator("h2")
+    got = [_text(h2s.nth(i)) for i in range(h2s.count())]
+    want = [h for _, h in sections]
+    if got != want:
+        problems.append(f"h2 headings read {got}, expected {want}")
+    for tid, heading in sections:
+        inner = page.locator(f"[data-testid='{tid}'] h2")
+        if inner.count() != 1 or _text(inner.first) != heading:
+            problems.append(f"'{heading}' is not the one h2 inside {tid}")
+    order_ok, order_detail = _dom_order(page, [f"[data-testid='{t}']" for t, _ in sections])
+    if not order_ok:
+        problems.append(f"section order: {order_detail}")
+
+    present = [t for t in absent if page.locator(f"[data-testid='{t}']").count() > 0]
+    if present:
+        problems.append(f"removed test id(s) still on the tracker: {present}")
+
+    items = page.locator("[data-testid='upcoming-item']").count()
+    empty = page.locator("[data-testid='upcoming-empty']")
+    if items > max_upcoming:
+        problems.append(f"{items} upcoming items, more than {max_upcoming}")
+    if items == 0:
+        if empty.count() == 0 or _text(empty.first) != empty_text:
+            problems.append(f"no upcoming item and no '{empty_text}'")
+    elif empty.count() > 0:
+        problems.append("upcoming items and the empty state are both shown")
+
+    ok = not problems
+    return ok, (f"three sections {want} in order, none of {len(absent)} removed ids, "
+                f"{items} upcoming item(s)" if ok else "; ".join(problems[:6]))
+
+
+def drv_journey_section(page, cfg, line, res, errors):
+    """Line 24 (new at v1.3): the Journey section (FRAGO 03 section 3.2). A
+    "Current stage: ..." line naming a phase or "not yet set"; a non-empty
+    note; five nodes in PHASES order (read from tracker.ts), each with a
+    valid data-state, the states running done, then at most one current,
+    then future; the current node, if any, is the phase the stage line
+    names and says "Current" in text, not by colour alone."""
+    settle_ms = line.get("settle_ms", 400)
+    phases = _load_tracker_const_names(cfg, "PHASES")
+    if not phases:
+        return False, f"could not read PHASES from {TASK_COLUMNS_SOURCE}"
+    unset = line.get("unset_text", "not yet set")
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        return False, "the client tracker view was not reachable"
+    if not _wait_for(page, "[data-testid='journey-node']", 6000):
+        return False, "[data-testid='journey-node'] not found"
+
+    problems = []
+    cur = page.locator("[data-testid='journey-current']")
+    cur_text = _text(cur.first) if cur.count() > 0 else ""
+    m = re.fullmatch(r"Current stage: (.+)", cur_text)
+    stage = m.group(1).rstrip(".") if m else None
+    if stage is None or (stage != unset and stage not in phases):
+        problems.append(f"stage line reads '{cur_text}'")
+    note = page.locator("[data-testid='journey-note']")
+    if note.count() == 0 or not _text(note.first):
+        problems.append("journey-note missing or empty")
+
+    nodes = page.locator("[data-testid='journey-node']")
+    n = nodes.count()
+    if n != len(phases):
+        problems.append(f"{n} journey nodes, expected {len(phases)}")
+    states = []
+    current_idx = []
+    for i in range(n):
+        node = nodes.nth(i)
+        st = node.get_attribute("data-state") or ""
+        states.append(st)
+        t = _text(node)
+        if st not in ("done", "current", "future"):
+            problems.append(f"node {i + 1} data-state '{st}'")
+        if i < len(phases) and phases[i] not in t:
+            problems.append(f"node {i + 1} does not carry '{phases[i]}'")
+        has_word = re.search(r"\bCurrent\b", t) is not None
+        if st == "current":
+            current_idx.append(i)
+            if not has_word:
+                problems.append(f"current node {i + 1} does not say 'Current' in text")
+        elif has_word:
+            problems.append(f"node {i + 1} says 'Current' but is {st}")
+    if not re.fullmatch(r"(done,)*(current,)?(future,)*", "".join(s + "," for s in states)):
+        problems.append(f"states out of order: {states}")
+    if len(current_idx) > 1:
+        problems.append(f"{len(current_idx)} current nodes")
+    if stage and stage != unset and stage in phases:
+        if current_idx != [phases.index(stage)]:
+            problems.append(f"stage line names '{stage}' but the current node is {current_idx}")
+    elif stage == unset and current_idx:
+        problems.append("stage is not set but a node is marked current")
+
+    ok = not problems
+    return ok, (f"'{cur_text}'; states {states}" if ok else "; ".join(problems[:6]))
+
+
+def drv_module_tiles_link(page, cfg, line, res, errors):
+    """Line 25 (new at v1.3): eight module tiles, each a link to its module
+    (FRAGO 03 section 3.2). Exactly eight module-tile inside tracker-overall,
+    each an <a> with href /tracker/areas/{1..8} in id order, a valid
+    data-rag, the module name, and "{done} of {total} done" (which also
+    carries line 17's "never blank" rule, retired with the KPI row). Then
+    every tile is clicked and must land on /tracker/areas/N with the module
+    name as the page's h1."""
+    settle_ms = line.get("settle_ms", 400)
+    expected = _load_tracker_areas(cfg)
+    if not expected:
+        return False, f"could not read AREAS from {TASK_COLUMNS_SOURCE}"
+    rags = set(line.get("rag_values", ["green", "amber", "red", "grey"]))
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        return False, "the client tracker view was not reachable"
+    if not _wait_for(page, AREA_TILE_SELECTOR, 6000):
+        return False, f"{AREA_TILE_SELECTOR} not found"
+
+    problems = []
+    tiles = page.locator(f"{AREA_TILE_CONTAINER} {AREA_TILE_SELECTOR}")
+    n = tiles.count()
+    if n != len(expected) or page.locator(AREA_TILE_SELECTOR).count() != n:
+        problems.append(f"{n} tiles inside tracker-overall, "
+                        f"{page.locator(AREA_TILE_SELECTOR).count()} on the page, expected {len(expected)}")
+    for i in range(min(n, len(expected))):
+        tile = tiles.nth(i)
+        tag = tile.evaluate("el => el.tagName.toLowerCase()")
+        href = tile.get_attribute("href") or ""
+        if tag != "a" or not re.search(rf"/tracker/areas/{i + 1}/?$", href):
+            problems.append(f"tile {i + 1} is <{tag}> href '{href}'")
+        if (tile.get_attribute("data-rag") or "") not in rags:
+            problems.append(f"tile {i + 1} data-rag '{tile.get_attribute('data-rag')}'")
+        name = tile.locator("[data-testid='module-tile-name']")
+        if name.count() == 0 or _text(name.first) != expected[i]:
+            problems.append(f"tile {i + 1} name '{_text(name.first) if name.count() else ''}'")
+        count = tile.locator("[data-testid='module-tile-count']")
+        cm = re.fullmatch(r"(\d+) of (\d+) done", _text(count.first) if count.count() else "")
+        if not cm or int(cm.group(1)) > int(cm.group(2)):
+            problems.append(f"tile {i + 1} count '{_text(count.first) if count.count() else ''}'")
+
+    from urllib.parse import urlparse
+    for i in range(len(expected)):
+        if not _enter_area_page(page, cfg, settle_ms, i):
+            problems.append(f"tile {i + 1} could not be clicked")
+            continue
+        path = urlparse(page.url).path.rstrip("/")
+        h1s = page.locator("h1")
+        h1_texts = [_text(h1s.nth(j)) for j in range(h1s.count())]
+        if path != f"/tracker/areas/{i + 1}" or expected[i] not in h1_texts:
+            problems.append(f"tile {i + 1} landed on '{path}' with h1 {h1_texts}")
+
+    ok = not problems
+    return ok, (f"{n} tiles, each links to its module and lands on the matching h1" if ok
+                else "; ".join(problems[:6]))
+
+
+def drv_module_page_structure(page, cfg, line, res, errors):
+    """Line 26 (new at v1.3): every module page follows FRAGO 03 section 3.4,
+    in order: h1 module name, introduction, "Relevant documents and
+    trackers" (links, or "None filed yet"), "Compliance status: {done} of
+    {total} done, {pct}%" with its RAG label in text, the task table, then
+    the eight-item module sub-navigation. The status figures must agree with
+    the module's own tile on the tracker and the percentage with its own
+    fraction."""
+    settle_ms = line.get("settle_ms", 400)
+    expected = _load_tracker_areas(cfg)
+    if not expected:
+        return False, f"could not read AREAS from {TASK_COLUMNS_SOURCE}"
+    rag_labels = list(_load_rag_labels(cfg).values())
+    empty_text = line.get("documents_empty_text", "None filed yet")
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        return False, "the client tracker view was not reachable"
+    if not _wait_for(page, "[data-testid='module-tile-count']", 6000):
+        return False, "module tile counts not found on the tracker"
+    counts = page.locator("[data-testid='module-tile-count']")
+    tile_counts = []
+    for i in range(counts.count()):
+        cm = re.fullmatch(r"(\d+) of (\d+) done", _text(counts.nth(i)))
+        tile_counts.append((int(cm.group(1)), int(cm.group(2))) if cm else None)
+
+    problems = []
+    for i, name in enumerate(expected):
+        label = f"module {i + 1}"
+        if not _enter_area_page(page, cfg, settle_ms, i):
+            problems.append(f"{label}: not reachable")
+            continue
+        h1s = page.locator("h1")
+        if h1s.count() == 0 or _text(h1s.first) != name:
+            problems.append(f"{label}: h1 '{_text(h1s.first) if h1s.count() else ''}'")
+        intro = page.locator("[data-testid='module-intro']")
+        if intro.count() == 0 or not _text(intro.first):
+            problems.append(f"{label}: module-intro missing or empty")
+
+        docs = page.locator("[data-testid='module-documents']")
+        if docs.count() == 0:
+            problems.append(f"{label}: module-documents missing")
+        else:
+            links = docs.first.locator("[data-testid='module-doc']")
+            empty = docs.first.locator("[data-testid='module-documents-empty']")
+            if links.count() == 0:
+                if empty.count() == 0 or _text(empty.first).rstrip(".") != empty_text:
+                    problems.append(f"{label}: no document and no '{empty_text}'")
+            else:
+                if empty.count() > 0:
+                    problems.append(f"{label}: documents and the empty state both shown")
+                # A policy opens in the policy panel, as it does on Compliance
+                # Documents, so it is a button; every other item is a link. Fix
+                # pass 1: the first cut demanded an href of both.
+                for j in range(links.count()):
+                    el = links.nth(j)
+                    tag = el.evaluate("e => e.tagName.toLowerCase()")
+                    if tag == "a" and not el.get_attribute("href"):
+                        problems.append(f"{label}: module-doc {j + 1} is a link with no href")
+                    elif tag not in ("a", "button"):
+                        problems.append(f"{label}: module-doc {j + 1} opens nothing")
+
+        prog = page.locator("[data-testid='module-progress']")
+        ptext = _text(prog.first) if prog.count() > 0 else ""
+        pm = re.search(r"Compliance status: (\d+) of (\d+) done, (\d+)%", ptext)
+        if not pm:
+            problems.append(f"{label}: progress reads '{ptext[:80]}'")
+        else:
+            done, total, pct = (int(g) for g in pm.groups())
+            if done > total or (total and abs(pct - 100.0 * done / total) >= 1):
+                problems.append(f"{label}: '{pm.group(0)}' does not add up")
+            if i < len(tile_counts) and tile_counts[i] and tile_counts[i] != (done, total):
+                problems.append(f"{label}: page says {done} of {total}, tile says "
+                                f"{tile_counts[i][0]} of {tile_counts[i][1]}")
+            if rag_labels and not any(r in ptext for r in rag_labels):
+                problems.append(f"{label}: no RAG label in text beside the status")
+
+        nav_items = page.locator("[data-testid='module-nav'] [data-testid='module-nav-item']")
+        if nav_items.count() != len(expected):
+            problems.append(f"{label}: {nav_items.count()} module-nav items")
+        else:
+            for j in range(nav_items.count()):
+                if not nav_items.nth(j).get_attribute("href"):
+                    problems.append(f"{label}: module-nav item {j + 1} is not a link")
+                    break
+
+        table = ("[data-testid='task-table']" if page.locator("[data-testid='task-table']").count()
+                 else "[data-testid='task-cards']")
+        order_ok, order_detail = _dom_order(page, [
+            "h1", "[data-testid='module-intro']", "[data-testid='module-documents']",
+            "[data-testid='module-progress']", table, "[data-testid='module-nav']",
+        ])
+        if not order_ok:
+            problems.append(f"{label}: order: {order_detail}")
+
+    ok = not problems
+    return ok, (f"{len(expected)} module pages carry the order's structure, in order" if ok
+                else "; ".join(problems[:6]))
+
+
+def drv_statement_record_link(page, cfg, line, res, errors):
+    """Line 27 (new at v1.3): the Statement links to its record (FRAGO 03
+    section 3.6, T02 A3). statement-record-link has href /value and the
+    order's text; the old Record/CFO statement tab strip is gone; following
+    the link lands on /value with the Record table rendered."""
+    settle_ms = line.get("settle_ms", 400)
+    link_sel = line.get("link_selector", "[data-testid='statement-record-link']")
+    link_text = line.get("link_text", "The record behind this statement")
+    href_want = line.get("href", "/value")
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    if not _enter_view(page, "statement", None, settle_ms, cfg, "client"):
+        return False, "the client statement view was not reachable"
+    if not _wait_for(page, link_sel, 6000):
+        return False, f"{link_sel} not found"
+
+    problems = []
+    link = page.locator(link_sel).first
+    href = link.get_attribute("href") or ""
+    from urllib.parse import urlparse
+    if urlparse(href).path.rstrip("/") != href_want:
+        problems.append(f"href '{href}'")
+    if _text(link) != link_text:
+        problems.append(f"link text '{_text(link)}'")
+    if page.locator("[role='tablist']").count() > 0:
+        problems.append("a tab strip is still on the Statement page")
+
+    try:
+        link.click(timeout=6000)
+        page.wait_for_timeout(settle_ms)
+    except Exception as exc:
+        problems.append(f"link could not be followed: {type(exc).__name__}")
+    else:
+        path = urlparse(page.url).path.rstrip("/")
+        if path != href_want:
+            problems.append(f"link landed on '{path}'")
+        elif not _wait_for(page, "[data-testid='record-table']", 6000):
+            problems.append("the Record table did not render behind the link")
+
+    ok = not problems
+    return ok, (f"'{link_text}' links to {href_want}, the Record renders there, no tab strip" if ok
+                else "; ".join(problems))
+
+
+def drv_quick_questions(page, cfg, line, res, errors):
+    """Line 28 (new at v1.3): Quick questions (FRAGO 03 section 3.7). The
+    guide view's h1 reads "Quick questions" and its first line is the order's
+    plain statement of what the page does, which must stay true without an
+    API key; the gate checks the words, not the answering."""
+    settle_ms = line.get("settle_ms", 400)
+    title = line.get("title", "Quick questions")
+    intro_text = line.get("intro_text", "")
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    if not _enter_view(page, "guide", None, settle_ms, cfg, "client"):
+        return False, "the client guide view was not reachable"
+    if not _wait_for(page, "[data-testid='quick-questions-intro']", 6000):
+        return False, "[data-testid='quick-questions-intro'] not found"
+
+    problems = []
+    h1s = page.locator("h1")
+    h1_texts = [_text(h1s.nth(i)) for i in range(h1s.count())]
+    if h1_texts != [title]:
+        problems.append(f"h1 reads {h1_texts}")
+    intro = _text(page.locator("[data-testid='quick-questions-intro']").first)
+    if intro != intro_text:
+        problems.append(f"intro reads '{intro}'")
+    ok = not problems
+    return ok, (f"h1 '{title}', intro matches" if ok else "; ".join(problems))
+
+
+def _client_visible_words(page):
+    """Every word the client can read on the page: text nodes outside
+    script, style and noscript, plus title, aria-label and alt attributes and
+    the document title. Hidden-by-CSS text is included on purpose; it is in
+    the client's page all the same."""
+    return page.evaluate(
+        """
+        () => {
+          const parts = [document.title];
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          let node;
+          while ((node = walker.nextNode())) {
+            const p = node.parentElement;
+            if (p && ["SCRIPT", "STYLE", "NOSCRIPT"].includes(p.tagName)) continue;
+            parts.push(node.textContent);
+          }
+          for (const el of document.querySelectorAll("[title], [aria-label], [alt]")) {
+            for (const a of ["title", "aria-label", "alt"]) {
+              const v = el.getAttribute(a);
+              if (v) parts.push(v);
+            }
+          }
+          return parts.join(" ").replace(/\\s+/g, " ");
+        }
+        """
     )
-    pct_present = bool(re.search(r"\d+%", text))
-    frac_present = bool(re.search(r"\d+\s+of\s+\d+", text))
-    fraction_ok = (not pct_present) or frac_present
 
-    ok = standing_ok and fraction_ok
-    detail = (f"standing phrase present: {standing_ok}; "
-              f"percentage present: {pct_present}, fraction present: {frac_present}")
-    return ok, detail
+
+def drv_old_module_names_absent(page, cfg, line, res, errors):
+    """Line 29 (new at v1.3): the three retired module names appear nowhere
+    on the client side (FRAGO 03 sections 3.3 and 3.9). Walks every client
+    nav view, the Value page behind the Statement's link and all eight module
+    pages, and matches OLD_AREA_NAME_PATTERNS (case-sensitive; see the
+    comment there for the "Data retention" rule and the policy title it is
+    shaped around)."""
+    settle_ms = line.get("settle_ms", 400)
+    views = _client_surface_views(line)
+    problems = []
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    for v in views:
+        if not _enter_any(page, cfg, v, None, settle_ms, "client"):
+            problems.append(f"{v}: view not reachable")
+            continue
+        page.wait_for_timeout(settle_ms)
+        words = _client_visible_words(page)
+        for label, pattern in OLD_AREA_NAME_PATTERNS:
+            if pattern.search(words):
+                problems.append(f"{v}: '{label}'")
+
+    ok = not problems
+    return ok, (f"no retired module name across {len(views)} client views" if ok
+                else "; ".join(problems[:8]))
+
+
+def drv_admin_value_page(page, cfg, line, res, errors):
+    """Line 31 (new at v1.3): Value on the operator's side (FRAGO 03 sections
+    3.6 and 3.8). The admin nav item value-admin opens the Record page (its
+    Record table renders) with value-settings-link to /admin/settings; the
+    Settings page carries the "Journey and module introductions" section
+    with a journey-phase select that offers "derive from tasks"."""
+    settle_ms = line.get("settle_ms", 400)
+    section_heading = line.get("settings_section_heading", "Journey and module introductions")
+    derive_text = line.get("derive_option_text", "derive from tasks")
+
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator account"
+    if not _enter_view(page, "value-admin", None, settle_ms, cfg, "admin"):
+        return False, "the admin value-admin view was not reachable"
+
+    problems = []
+    if not _wait_for(page, "[data-testid='record-table']", 6000):
+        problems.append("the Record table did not render under Value")
+    link = page.locator("[data-testid='value-settings-link']")
+    if link.count() == 0:
+        problems.append("value-settings-link not found")
+    else:
+        from urllib.parse import urlparse
+        href = link.first.get_attribute("href") or ""
+        if urlparse(href).path.rstrip("/") != "/admin/settings":
+            problems.append(f"value-settings-link href '{href}'")
+
+    if not _enter_view(page, "settings", None, settle_ms, cfg, "admin"):
+        problems.append("settings view not reachable")
+    else:
+        heads = page.locator("h1, h2, h3, h4")
+        _wait_for(page, "h2, h3", 6000)
+        texts = [_text(heads.nth(i)) for i in range(heads.count())]
+        if section_heading not in texts:
+            problems.append(f"'{section_heading}' heading not on Settings")
+        has_derive = page.evaluate(
+            """(want) => Array.from(document.querySelectorAll("select option"))
+                 .some((o) => o.textContent.toLowerCase().includes(want.toLowerCase()))""",
+            derive_text,
+        )
+        if not has_derive:
+            problems.append(f"no select offers '{derive_text}'")
+
+    ok = not problems
+    return ok, ("Value opens the Record with a Settings link; Settings carries the journey section"
+                if ok else "; ".join(problems))
 
 
 DRIVERS = {
@@ -1520,6 +2343,8 @@ DRIVERS = {
     "tracker_excludes_illustrative_when_off": drv_tracker_excludes_illustrative_when_off,
     "client_read_only_workplan": drv_client_read_only_workplan,
     "area_print_clean": drv_area_print_clean,
+    # Retired at v1.3 with line 17 (KpiRow removed by FRAGO 03 section 3.2);
+    # kept registered so an older definition of done still resolves.
     "kpi_tiles_never_blank": drv_kpi_tiles_never_blank,
     # v1.2, Lurong's structure.
     "client_nav_order": drv_client_nav_order,
@@ -1527,6 +2352,15 @@ DRIVERS = {
     "documents_read_only": drv_documents_read_only,
     "jobs_page": drv_jobs_page,
     "overall_status_wording": drv_overall_status_wording,
+    # v1.3, the operator's dashboard.
+    "tracker_three_sections": drv_tracker_three_sections,
+    "journey_section": drv_journey_section,
+    "module_tiles_link": drv_module_tiles_link,
+    "module_page_structure": drv_module_page_structure,
+    "statement_record_link": drv_statement_record_link,
+    "quick_questions": drv_quick_questions,
+    "old_module_names_absent": drv_old_module_names_absent,
+    "admin_value_page": drv_admin_value_page,
 }
 
 
