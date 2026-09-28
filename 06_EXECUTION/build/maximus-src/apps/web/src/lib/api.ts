@@ -1,6 +1,7 @@
 // All API calls use relative /api paths only - the site and functions are
 // same-origin behind Netlify.
 
+import { ADMIN_ORG_HEADER, selectedOrg } from "./org";
 import { PREVIEW_HEADER, previewOrg } from "./preview";
 
 export class ApiError extends Error {
@@ -17,6 +18,8 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (init?.body) headers["content-type"] = "application/json";
   const org = previewOrg();
   if (org) headers[PREVIEW_HEADER] = `client:${org}`;
+  const adminOrg = selectedOrg();
+  if (adminOrg && path.startsWith("/admin")) headers[ADMIN_ORG_HEADER] = adminOrg;
   const res = await fetch(`/api${path}`, {
     credentials: "same-origin",
     ...init,

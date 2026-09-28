@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AuditRecord } from "../db/model.ts";
 import { readOrg } from "../db/store.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireRole, type AppEnv, ADMIN_ORG_HEADER } from "../lib/middleware.ts";
 
 export const adminAuditRoutes = new Hono<AppEnv>();
 adminAuditRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
@@ -19,7 +19,7 @@ function filterRows(rows: AuditRecord[], action: string | undefined): AuditRecor
 
 /** Filterable audit log for the selected client account (newest first). */
 adminAuditRoutes.get("/audit", async (c) => {
-  const accountId = c.req.query("accountId");
+  const accountId = c.req.query("accountId") || c.req.header(ADMIN_ORG_HEADER);
   if (!accountId) return c.json({ error: "accountId is required" }, 400);
 
   const doc = await readOrg(accountId);
@@ -41,7 +41,7 @@ adminAuditRoutes.get("/audit", async (c) => {
 
 /** CSV export of the filtered audit log (read-only). */
 adminAuditRoutes.get("/audit/export.csv", async (c) => {
-  const accountId = c.req.query("accountId");
+  const accountId = c.req.query("accountId") || c.req.header(ADMIN_ORG_HEADER);
   if (!accountId) return c.json({ error: "accountId is required" }, 400);
 
   const doc = await readOrg(accountId);

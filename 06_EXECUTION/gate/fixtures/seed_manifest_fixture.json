@@ -1,0 +1,67 @@
+{
+  "manifest": "ASSURE seed manifest v1.0, 2026-09-28, written by Seagull from 00_INTENT/ASSURE_PREPOPULATION_PLAN.md. Consumed by the FRAGO 05 seed command. No client name, no person's name. Owner fields are roles. Nothing is marked done that the source does not show done. Fields follow packages/shared/src/tracker.ts (taskSchema, documentSectionSchema).",
+  "organisation": {
+    "displayName": null,
+    "jurisdiction": "UK",
+    "regulation": "UK GDPR and Data Protection Act 2018",
+    "settings": {
+      "journeyPhase": 3,
+      "journeyNote": "This shows where the organisation is on its data protection journey. The stage reflects the year's deliverables and is adjusted as they are met."
+    }
+  },
+  "defaults": {
+    "ownerTypeMitmark": "mitmark",
+    "ownerRoleMitmark": "MITMARK data compliance officer",
+    "ownerTypeClient": "client",
+    "source": "handover-2026-03",
+    "notesUndated": "Date to be set by the operator. Carried over from the March 2026 handover plan."
+  },
+  "tasks": [
+    {"ref": "H01", "area": 4, "phase": 3, "title": "Move the policy set to a shared site all staff can reach and update the access matrix", "how": "Agree the site with the client's managed IT provider; all staff to have access; record the change in the access matrix.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer with client IT provider", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H02", "area": 1, "phase": 4, "title": "Regulator registration renewal", "how": "Annual renewal on direct debit; confirm both registered entities are current.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": "2027-03-21", "recurrence": "annual", "status": "done", "notes": "March 2026 renewal complete; direct debit set up. Next due 21 March 2027 per the handover plan; the operator's deck says May 2027, to be confirmed."},
+    {"ref": "H03", "area": 7, "phase": 3, "title": "Finalise the vendor management policy and the vendor log", "how": "With the client's health and safety lead, who already holds a vendor spreadsheet and credential checks.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer with client H&S lead", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H04", "area": 8, "phase": 3, "title": "Business continuity and disaster recovery plan", "how": "With the client's health and safety lead; include Martyn's Law considerations and the out-of-hours evacuation policy.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer with client H&S lead", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H05", "area": 8, "phase": 2, "title": "Decision on vulnerability management and web filtering quotes", "how": "Quotes already provided by the managed IT provider; client executives to decide.", "ownerType": "client", "ownerRole": "Client executives", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H06", "area": 5, "phase": 1, "title": "Comprehensive risk assessment and risk register", "how": "Create the register; review at least annually.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "annual", "status": "not_started"},
+    {"ref": "H07", "area": 1, "phase": 2, "title": "Security and privacy steering group, quarterly", "how": "Client executives confirm membership; meets every quarter.", "ownerType": "client", "ownerRole": "Client executives", "dueAt": null, "recurrence": "quarterly", "status": "not_started"},
+    {"ref": "H08", "area": 7, "phase": 4, "title": "Internal audit of the managed IT provider", "how": "Confirm the provider is delivering what it is contracted to deliver.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "annual", "status": "not_started"},
+    {"ref": "H09", "area": 7, "phase": 2, "title": "Managed service provider options", "how": "Assess alternatives to the current provider and present to client executives.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H10", "area": 8, "phase": 3, "title": "Incident and emergency communication list, formalised", "how": "Client confirms the list; held with the incident procedure.", "ownerType": "client", "ownerRole": "Client executives", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H11", "area": 2, "phase": 3, "title": "Access change log created", "how": "Create the log; reviewed alongside the access matrix.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H12", "area": 8, "phase": 1, "title": "Confirm mass-deletion tracing with the managed IT provider", "how": "Data loss prevention: can the provider trace when mass deletions happen.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H13", "area": 7, "phase": 2, "title": "Vendor management committee membership", "how": "Client confirms who sits on it.", "ownerType": "client", "ownerRole": "Client executives", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H14", "area": 8, "phase": 1, "title": "Business impact analysis", "how": "Undertake the analysis; feeds the continuity plan.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H15", "area": 8, "phase": 2, "title": "Crisis management team and incident response team membership", "how": "Client confirms who sits on each.", "ownerType": "client", "ownerRole": "Client executives", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H16", "area": 2, "phase": 4, "title": "Scheduled reviews in diaries: information asset register, access change log", "how": "Set the recurring meetings and confirm attendees have them.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "quarterly", "status": "not_started"},
+    {"ref": "H17", "area": 2, "phase": 3, "title": "Information asset register completed", "how": "With the client's asset-list contact; the managed IT provider's device log can assist.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer with client contact", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H18", "area": 1, "phase": 3, "title": "Operator's contact address circulated to all client staff", "how": "The Information Officer circulates it so staff can raise queries and requests directly.", "ownerType": "client", "ownerRole": "Information Officer", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "H19", "area": 4, "phase": 5, "title": "Follow-up audit to confirm remaining gaps", "how": "After the handover actions are complete.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "once", "status": "not_started"},
+    {"ref": "D01", "area": 4, "phase": 3, "title": "Data Protection Policy: replace the two placeholder links (retention policy, breach procedure)", "how": "Edit the approved policy; re-approve as version 1.1.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "once", "status": "not_started", "source": "document-review-2026-09"},
+    {"ref": "D02", "area": 4, "phase": 3, "title": "Internal Privacy Policy: complete dates and contacts, approve, publish", "how": "Draft exists; effective date, last updated and the HR contact are blank.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "once", "status": "in_progress", "source": "document-review-2026-09"},
+    {"ref": "D03", "area": 3, "phase": 3, "title": "Data Retention Policy: complete dates and contact, approve, publish", "how": "Draft exists with the retention schedule complete; dates and contact are blank.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "once", "status": "in_progress", "source": "document-review-2026-09"},
+    {"ref": "D04", "area": 4, "phase": 3, "title": "Website privacy policy: complete, approve, publish", "how": "Draft exists.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "once", "status": "in_progress", "source": "document-review-2026-09"},
+    {"ref": "D05", "area": 2, "phase": 3, "title": "Record of processing activities: populate beyond the example row and complete document control", "how": "Template filed under Trackers; one example row only.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": null, "recurrence": "once", "status": "in_progress", "source": "document-review-2026-09"},
+    {"ref": "D06", "area": 2, "phase": 4, "title": "Employee access matrix: populate and complete the annual review", "how": "Template filed under Trackers; last review 15 September 2025, so the annual review fell due 15 September 2026.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": "2026-09-15", "recurrence": "annual", "status": "not_started", "source": "document-review-2026-09"},
+    {"ref": "D07", "area": 4, "phase": 3, "title": "Data protection awareness session for staff", "how": "Planned for the new year per the operator; date to be fixed.", "ownerType": "mitmark", "ownerRole": "MITMARK data compliance officer", "dueAt": "2027-01-31", "recurrence": "annual", "status": "not_started", "source": "operator-deck-2026-09"}
+  ],
+  "clocks": [
+    {"ref": "C01", "kind": "registration_renewal", "dueAt": "2027-03-21", "note": "Per the handover plan; operator's deck says May 2027, confirm before relying on it.", "taskRef": "H02"},
+    {"ref": "C02", "kind": "register_review", "dueAt": "2026-09-15", "note": "Access matrix annual review, overdue.", "taskRef": "D06"}
+  ],
+  "documents": [
+    {"file": "P01_Data_Protection_Policy_v1_2026-03-31.docx", "title": "Data Protection Policy", "section": "policies", "area": 4, "status": "approved", "version": "1", "approvedAt": "2026-03-31", "description": "Approved policy, version 1, 31 March 2026. Two cross-reference links still to be completed (see workplan)."},
+    {"file": "P02_Internal_Privacy_Policy_DRAFT.docx", "title": "Internal Privacy Policy (draft)", "section": "policies", "area": 4, "status": "draft", "description": "Draft. Dates and HR contact to be completed before approval."},
+    {"file": "P03_Data_Retention_Policy_DRAFT.docx", "title": "Data Retention Policy (draft)", "section": "policies", "area": 3, "status": "draft", "description": "Draft. Retention schedule complete; dates and contact to be completed before approval."},
+    {"file": "P04_Website_Privacy_Policy_DRAFT.docx", "title": "Privacy policy, website version (draft)", "section": "policies", "area": 4, "status": "draft", "description": "Draft."},
+    {"file": "D01_Guide_to_Data_Sharing_Agreements_2026-05.docx", "title": "Guide to Data Sharing Agreements", "section": "procedures", "area": 7, "status": "published", "description": "Guidance, May 2026."},
+    {"file": "D02_Data_Sharing_Agreement_2026-05.docx", "title": "Data Sharing Agreement (template)", "section": "procedures", "area": 7, "status": "published", "description": "Template agreement, May 2026."},
+    {"file": "D03_Roles_Assessment_Guidance_2026-05.docx", "title": "Roles Assessment Guidance", "section": "procedures", "area": 7, "status": "published", "description": "Controller and processor roles guidance, May 2026."},
+    {"file": "T01_Record_of_Processing_Activities_template.xlsx", "title": "Record of Processing Activities", "section": "trackers", "area": 2, "status": "template", "description": "Template with field guide and one example row. Not yet populated."},
+    {"file": "T02_Employee_Access_Matrix_template.xlsx", "title": "Employee Access Matrix", "section": "trackers", "area": 2, "status": "template", "description": "Template with one row. Last reviewed 15 September 2025; annual review overdue."}
+  ],
+  "notSeeded": [
+    "Record entries (MITMARK work done): none on the drive since March 2026; Block 1 of ASSURE_LIVE_REQUIREMENTS needed.",
+    "Retainer fee, contract dates, rates, client display name: not on the drive.",
+    "MITMARK template library (six items): operator-side working library, filed by the operator, not client-visible."
+  ]
+}

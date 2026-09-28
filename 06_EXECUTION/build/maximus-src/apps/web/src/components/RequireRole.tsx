@@ -11,6 +11,9 @@ export function RequireRole({ role, children }: { role: Role; children: ReactNod
   if (status === "anonymous" || !user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
+  // A one-time password opens nothing but the change-password page. The
+  // server refuses everything else too; this only saves a failed page load.
+  if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
   // The operator may read the client portal in "View as client". Nothing
   // else crosses: the server refuses every write in that view.
   const previewing = role === "client" && user.role === "mitmark_admin" && previewOrg() !== null;
@@ -18,5 +21,12 @@ export function RequireRole({ role, children }: { role: Role; children: ReactNod
     // Send each role to its own workspace rather than a dead end.
     return <Navigate to={user.role === "mitmark_admin" ? "/admin" : "/"} replace />;
   }
+  return <>{children}</>;
+}
+
+/** Any signed-in user, whatever their role: the change-password page. */
+export function RequireSignedIn({ children }: { children: ReactNode }) {
+  const { status, user } = useAuth();
+  if (status === "anonymous" || !user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }

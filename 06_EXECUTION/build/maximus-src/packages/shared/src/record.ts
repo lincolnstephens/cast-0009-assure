@@ -100,6 +100,8 @@ export const orgSettingsSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .default(null),
+  /** v1.5. The regulation line on the client's tracker. Empty means the jurisdiction's default. */
+  regulationLabel: z.string().trim().max(200).default(""),
   /** The journey's current stage, 1 to 5. Null means work it out from the tasks. */
   journeyPhase: z.coerce.number().int().min(1).max(5).nullable().default(null),
   /** The sentence beneath the stage. Empty means the default sentence. */

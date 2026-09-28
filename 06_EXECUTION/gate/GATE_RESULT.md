@@ -2750,3 +2750,495 @@ Not started'
 | 36 | L36 @390x844: The client-view banner shows on every client page for the operator and | PASS | banner on 6 client pages and module 1, writes disabled, return lands in /admin; absent for the client seat |
 | 37 | L37 @390x844: The admin denominator toggle does not change the client-view tracker f | PASS | API level; run once, at the first resolution |
 | 38 | L38 @390x844: Entering client view writes one audit entry per session. | PASS | API level; run once, at the first resolution |
+
+## Run 2026-09-28 15:34Z - https://6aba8355ad82c37584eadd6b--tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.5. **Verdict:** FAIL, 148 of 154.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 134 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | static: TASK_COLUMNS is What, How, Who, When, Done, Status in order | PASS | matches exactly |
+|  | static: the eight module names match FRAGO 03 section 3.3, in order | PASS | matches exactly |
+|  | static: no file write outside documents.ts and the Blobs store | PASS | no hits |
+| 30 | L30 static: check_restricted.py passes. | PASS | 3 restricted terms checked across 277 files, 0 hits |
+| 50 | L50 static: No restricted term in the built bundle. | PASS | 3 restricted terms checked against 5 bundle files, 0 hits |
+| 51 | L51 static: No server source line logs or audits a password. | PASS | 60 console.* and writeAudit calls read, none passes a password |
+|  | driven: definition of done present | PASS | 51 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | PASS | 14 views render a heading |
+| 4 | L4 @1920x1080: The Record table behind the Statement renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1920x1080: The client's home is the Compliance Tracker in its three sections. | PASS | all 11 test ids present |
+| 12 | L12 @1920x1080: Every task table shows the six questions, in order, and they are not r | PASS | 2 task table(s) carry the six questions in order |
+| 13 | L13 @1920x1080: No percentage is shown without its fraction beside it, anywhere on the | PASS | no bare percentage found across 15 client views |
+| 14 | L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1920x1080: An area page prints as a clean document. | PASS | chrome visible under print: False, [data-testid='module-intro'] visible: True, tasks visible: True |
+| 18 | L18 @1920x1080: The client's navigation is the operator's six items, in her order, wit | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'statement', 'guide'], in order, labels match, with none of ['posture', 'exposure', 'value'] |
+| 19 | L19 @1920x1080: The eight modules carry their v1.3 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1920x1080: Job management is a three-column board, and confirm is the client's on | PASS | board of 3 columns ['Not started', 'In progress', 'Completed'], 65 card(s), strip present, no task table, no Guide, no write control but confirm |
+| 22 | L22 @1920x1080: The overall figure says where the client stands, in the order's words. | PASS | 'Compliance score: 38% (3 of 8 obligations met)'; standing '5 overdue or blocked'; parts in order |
+| 23 | L23 @1920x1080: The Compliance Tracker has three sections only. | PASS | three sections ['Journey', 'Overall compliance status', 'Upcoming'] in order, none of 9 removed ids, 8 upcoming item(s) |
+| 24 | L24 @1920x1080: The Journey shows the current stage in words and the five phases as a  | PASS | 'Current stage: Assessment and discovery'; states ['current', 'future', 'future', 'future', 'future'] |
+| 25 | L25 @1920x1080: The eight module tiles exist and each links to its module. | PASS | 8 tiles, each links to its module and lands on the matching h1 |
+| 26 | L26 @1920x1080: Every module page carries its name, introduction, documents, status, t | PASS | 8 module pages carry the order's structure, in order |
+| 27 | L27 @1920x1080: The Statement links to the record behind it. | PASS | 'The record behind this statement' links to /value, the Record renders there, no tab strip |
+| 28 | L28 @1920x1080: Quick questions says plainly what it does. | PASS | h1 'Quick questions', intro matches |
+| 29 | L29 @1920x1080: The old module names appear nowhere on the client side. | PASS | no retired module name across 15 client views |
+| 31 | L31 @1920x1080: Value sits on the operator's side, with the inputs to the statement on | PASS | Value opens the Record with a Settings link; Settings carries the journey section |
+| 32 | L32 @1920x1080: Module tile text reads at 4.5:1 or better against the tile fill in eve | PASS | present green, amber, red; lowest ratio per state: amber 7.24, red 4.64, green 9.08, grey (probe) 4.83 |
+| 33 | L33 @1920x1080: In client view the operator receives exactly the client seat's respons | PASS | 16 GETs identical; no volatile fields excluded |
+| 34 | L34 @1920x1080: In client view every write is refused and the task is unchanged. | PASS | confirm on an open for-you task, Guide message and request refused 403 'Read only in client view'; task state unchanged; unmarked operator refused 403 |
+| 35 | L35 @1920x1080: For the client seat the preview marker does nothing. | PASS | 16 GETs unchanged with the marker; own org: no volatile fields excluded / bogus org: no volatile fields excluded |
+| 36 | L36 @1920x1080: The client-view banner shows on every client page for the operator and | PASS | banner on 6 client pages and module 1, writes disabled, return lands in /admin; absent for the client seat |
+| 37 | L37 @1920x1080: The admin denominator toggle does not change the client-view tracker f | PASS | with denominatorMode 'cycle' the preview overall equals the client's; restored to 'overdue' |
+| 38 | L38 @1920x1080: Entering client view writes one audit entry per session. | PASS | three preview GETs wrote one client_view.open entry, actor the operator |
+| 39 | L39 @1920x1080: Users: create, reset, disable and re-enable are each audited by user i | PASS | create or reset, disable, enable and reset audited by user id with the operator as actor; client entries mirrored in the organisation's audit; 409 on a repeat email; disabled session and sign-in refused 401; no one-time password in any later response; last active manager refused 409 |
+| 40 | L40 @1920x1080: A user who must change her password reaches nothing else until she doe | PASS | must-change refused 403 password_change_required on 6 client and 3 admin routes; under 12 characters refused 400; the change issues a fresh cookie, clears the flag and ends the other session (401) |
+| 41 | L41 @1920x1080: In the browser, a must-change user is held on the change-password scre | PASS | held on /change-password from every path tried; form, three inputs and the rule present; portal opens after the change; header link on both portals |
+| 42 | L42 @1920x1080: The Users page shows a one-time password exactly once, says it is show | FAIL | the gate client's row is not in users-table |
+| 43 | L43 @1920x1080: Organisations: create, apply the task library with its count, per-orga | PASS | list carries the six fields; no-organisation admin GETs refused 400; org, accountId and X-Assure-Org agree; settings isolated and restored; created this run with 0 tasks; apply library: preview 64 = created 64 |
+| 44 | L44 @1920x1080: The organisation switcher changes every admin page, is remembered for  | FAIL | the gate organisation is not in organisations-table |
+| 45 | L45 @1920x1080: View as client takes the selected organisation. | PASS | client view with the gate organisation selected sends 2 preview requests, all for it; 16 preview GETs equal the gate client seat's; no volatile fields excluded |
+| 46 | L46 @1920x1080: A client user of one organisation never receives a record of another,  | PASS | 16 client GETs per seat: every orgId is the seat's own; 68 demo and 64 gate task or document ids, none crossing |
+| 47 | L47 @1920x1080: The seed: a dry run changes nothing and counts the manifest; a real ru | PASS | dry run would create 27 and changed nothing; replace seeded 27; repeat refused 409; journey stage as the manifest |
+| 48 | L48 @1920x1080: No restricted name or address appears in any field of the seeded organ | PASS | 3 restricted terms against 5 responses, 0 hits |
+| 49 | L49 @1920x1080: Sign-in audit entries no longer carry a session id. | PASS | 9 auth.login entries from this run, none with a session id |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | PASS | 14 views render a heading |
+| 4 | L4 @1366x768: The Record table behind the Statement renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1366x768: The client's home is the Compliance Tracker in its three sections. | PASS | all 11 test ids present |
+| 12 | L12 @1366x768: Every task table shows the six questions, in order, and they are not r | PASS | 2 task table(s) carry the six questions in order |
+| 13 | L13 @1366x768: No percentage is shown without its fraction beside it, anywhere on the | PASS | no bare percentage found across 15 client views |
+| 14 | L14 @1366x768: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1366x768: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1366x768: An area page prints as a clean document. | PASS | chrome visible under print: False, [data-testid='module-intro'] visible: True, tasks visible: True |
+| 18 | L18 @1366x768: The client's navigation is the operator's six items, in her order, wit | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'statement', 'guide'], in order, labels match, with none of ['posture', 'exposure', 'value'] |
+| 19 | L19 @1366x768: The eight modules carry their v1.3 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1366x768: Job management is a three-column board, and confirm is the client's on | PASS | board of 3 columns ['Not started', 'In progress', 'Completed'], 65 card(s), strip present, no task table, no Guide, no write control but confirm |
+| 22 | L22 @1366x768: The overall figure says where the client stands, in the order's words. | PASS | 'Compliance score: 38% (3 of 8 obligations met)'; standing '5 overdue or blocked'; parts in order |
+| 23 | L23 @1366x768: The Compliance Tracker has three sections only. | PASS | three sections ['Journey', 'Overall compliance status', 'Upcoming'] in order, none of 9 removed ids, 8 upcoming item(s) |
+| 24 | L24 @1366x768: The Journey shows the current stage in words and the five phases as a  | PASS | 'Current stage: Assessment and discovery'; states ['current', 'future', 'future', 'future', 'future'] |
+| 25 | L25 @1366x768: The eight module tiles exist and each links to its module. | PASS | 8 tiles, each links to its module and lands on the matching h1 |
+| 26 | L26 @1366x768: Every module page carries its name, introduction, documents, status, t | PASS | 8 module pages carry the order's structure, in order |
+| 27 | L27 @1366x768: The Statement links to the record behind it. | PASS | 'The record behind this statement' links to /value, the Record renders there, no tab strip |
+| 28 | L28 @1366x768: Quick questions says plainly what it does. | PASS | h1 'Quick questions', intro matches |
+| 29 | L29 @1366x768: The old module names appear nowhere on the client side. | PASS | no retired module name across 15 client views |
+| 31 | L31 @1366x768: Value sits on the operator's side, with the inputs to the statement on | PASS | Value opens the Record with a Settings link; Settings carries the journey section |
+| 32 | L32 @1366x768: Module tile text reads at 4.5:1 or better against the tile fill in eve | PASS | present green, amber, red; lowest ratio per state: amber 7.24, red 4.64, green 9.08, grey (probe) 4.83 |
+| 33 | L33 @1366x768: In client view the operator receives exactly the client seat's respons | PASS | API level; run once, at the first resolution |
+| 34 | L34 @1366x768: In client view every write is refused and the task is unchanged. | PASS | API level; run once, at the first resolution |
+| 35 | L35 @1366x768: For the client seat the preview marker does nothing. | PASS | API level; run once, at the first resolution |
+| 36 | L36 @1366x768: The client-view banner shows on every client page for the operator and | PASS | banner on 6 client pages and module 1, writes disabled, return lands in /admin; absent for the client seat |
+| 37 | L37 @1366x768: The admin denominator toggle does not change the client-view tracker f | PASS | API level; run once, at the first resolution |
+| 38 | L38 @1366x768: Entering client view writes one audit entry per session. | PASS | API level; run once, at the first resolution |
+| 39 | L39 @1366x768: Users: create, reset, disable and re-enable are each audited by user i | PASS | API level; run once, at the first resolution |
+| 40 | L40 @1366x768: A user who must change her password reaches nothing else until she doe | PASS | API level; run once, at the first resolution |
+| 41 | L41 @1366x768: In the browser, a must-change user is held on the change-password scre | PASS | held on /change-password from every path tried; form, three inputs and the rule present; portal opens after the change; header link on both portals |
+| 42 | L42 @1366x768: The Users page shows a one-time password exactly once, says it is show | FAIL | the gate client's row is not in users-table |
+| 43 | L43 @1366x768: Organisations: create, apply the task library with its count, per-orga | PASS | API level; run once, at the first resolution |
+| 44 | L44 @1366x768: The organisation switcher changes every admin page, is remembered for  | FAIL | the gate organisation is not in organisations-table |
+| 45 | L45 @1366x768: View as client takes the selected organisation. | PASS | client view with the gate organisation selected sends 2 preview requests, all for it; API identity run at the first resolution |
+| 46 | L46 @1366x768: A client user of one organisation never receives a record of another,  | PASS | API level; run once, at the first resolution |
+| 47 | L47 @1366x768: The seed: a dry run changes nothing and counts the manifest; a real ru | PASS | API level; run once, at the first resolution |
+| 48 | L48 @1366x768: No restricted name or address appears in any field of the seeded organ | PASS | API level; run once, at the first resolution |
+| 49 | L49 @1366x768: Sign-in audit entries no longer carry a session id. | PASS | API level; run once, at the first resolution |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | PASS | 14 views render a heading |
+| 4 | L4 @390x844: The Record table behind the Statement renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th | PASS | 8 views checked, no overflow |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @390x844: The client's home is the Compliance Tracker in its three sections. | PASS | all 11 test ids present |
+| 12 | L12 @390x844: Every task table shows the six questions, in order, and they are not r | PASS | 2 task table(s) carry the six questions in order |
+| 13 | L13 @390x844: No percentage is shown without its fraction beside it, anywhere on the | PASS | no bare percentage found across 15 client views |
+| 14 | L14 @390x844: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @390x844: An area page prints as a clean document. | PASS | chrome visible under print: False, [data-testid='module-intro'] visible: True, tasks visible: True |
+| 18 | L18 @390x844: The client's navigation is the operator's six items, in her order, wit | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'statement', 'guide'], in order, labels match, with none of ['posture', 'exposure', 'value'] |
+| 19 | L19 @390x844: The eight modules carry their v1.3 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @390x844: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @390x844: Job management is a three-column board, and confirm is the client's on | PASS | board of 3 columns ['Not started', 'In progress', 'Completed'], 65 card(s), strip present, no task table, no Guide, no write control but confirm |
+| 22 | L22 @390x844: The overall figure says where the client stands, in the order's words. | PASS | 'Compliance score: 38% (3 of 8 obligations met)'; standing '5 overdue or blocked'; parts in order |
+| 23 | L23 @390x844: The Compliance Tracker has three sections only. | PASS | three sections ['Journey', 'Overall compliance status', 'Upcoming'] in order, none of 9 removed ids, 8 upcoming item(s) |
+| 24 | L24 @390x844: The Journey shows the current stage in words and the five phases as a  | PASS | 'Current stage: Assessment and discovery'; states ['current', 'future', 'future', 'future', 'future'] |
+| 25 | L25 @390x844: The eight module tiles exist and each links to its module. | PASS | 8 tiles, each links to its module and lands on the matching h1 |
+| 26 | L26 @390x844: Every module page carries its name, introduction, documents, status, t | PASS | 8 module pages carry the order's structure, in order |
+| 27 | L27 @390x844: The Statement links to the record behind it. | PASS | 'The record behind this statement' links to /value, the Record renders there, no tab strip |
+| 28 | L28 @390x844: Quick questions says plainly what it does. | PASS | h1 'Quick questions', intro matches |
+| 29 | L29 @390x844: The old module names appear nowhere on the client side. | PASS | no retired module name across 15 client views |
+| 31 | L31 @390x844: Value sits on the operator's side, with the inputs to the statement on | PASS | Value opens the Record with a Settings link; Settings carries the journey section |
+| 32 | L32 @390x844: Module tile text reads at 4.5:1 or better against the tile fill in eve | PASS | present green, amber, red; lowest ratio per state: amber 7.24, red 4.64, green 9.08, grey (probe) 4.83 |
+| 33 | L33 @390x844: In client view the operator receives exactly the client seat's respons | PASS | API level; run once, at the first resolution |
+| 34 | L34 @390x844: In client view every write is refused and the task is unchanged. | PASS | API level; run once, at the first resolution |
+| 35 | L35 @390x844: For the client seat the preview marker does nothing. | PASS | API level; run once, at the first resolution |
+| 36 | L36 @390x844: The client-view banner shows on every client page for the operator and | PASS | banner on 6 client pages and module 1, writes disabled, return lands in /admin; absent for the client seat |
+| 37 | L37 @390x844: The admin denominator toggle does not change the client-view tracker f | PASS | API level; run once, at the first resolution |
+| 38 | L38 @390x844: Entering client view writes one audit entry per session. | PASS | API level; run once, at the first resolution |
+| 39 | L39 @390x844: Users: create, reset, disable and re-enable are each audited by user i | PASS | API level; run once, at the first resolution |
+| 40 | L40 @390x844: A user who must change her password reaches nothing else until she doe | PASS | API level; run once, at the first resolution |
+| 41 | L41 @390x844: In the browser, a must-change user is held on the change-password scre | PASS | held on /change-password from every path tried; form, three inputs and the rule present; portal opens after the change; header link on both portals |
+| 42 | L42 @390x844: The Users page shows a one-time password exactly once, says it is show | FAIL | the gate client's row is not in users-table |
+| 43 | L43 @390x844: Organisations: create, apply the task library with its count, per-orga | PASS | API level; run once, at the first resolution |
+| 44 | L44 @390x844: The organisation switcher changes every admin page, is remembered for  | FAIL | the gate organisation is not in organisations-table |
+| 45 | L45 @390x844: View as client takes the selected organisation. | PASS | client view with the gate organisation selected sends 2 preview requests, all for it; API identity run at the first resolution |
+| 46 | L46 @390x844: A client user of one organisation never receives a record of another,  | PASS | API level; run once, at the first resolution |
+| 47 | L47 @390x844: The seed: a dry run changes nothing and counts the manifest; a real ru | PASS | API level; run once, at the first resolution |
+| 48 | L48 @390x844: No restricted name or address appears in any field of the seeded organ | PASS | API level; run once, at the first resolution |
+| 49 | L49 @390x844: Sign-in audit entries no longer carry a session id. | PASS | API level; run once, at the first resolution |
+|  | driven: every gate user disabled at the end of the run | PASS | none left enabled |
+
+**Failed:**
+
+- L42 @1920x1080: The Users page shows a one-time password exactly once, says it is show: the gate client's row is not in users-table
+- L44 @1920x1080: The organisation switcher changes every admin page, is remembered for : the gate organisation is not in organisations-table
+- L42 @1366x768: The Users page shows a one-time password exactly once, says it is show: the gate client's row is not in users-table
+- L44 @1366x768: The organisation switcher changes every admin page, is remembered for : the gate organisation is not in organisations-table
+- L42 @390x844: The Users page shows a one-time password exactly once, says it is show: the gate client's row is not in users-table
+- L44 @390x844: The organisation switcher changes every admin page, is remembered for : the gate organisation is not in organisations-table
+
+## Run 2026-09-28 16:01Z - https://tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.5. **Verdict:** PASS, 154 of 154.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 134 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | static: TASK_COLUMNS is What, How, Who, When, Done, Status in order | PASS | matches exactly |
+|  | static: the eight module names match FRAGO 03 section 3.3, in order | PASS | matches exactly |
+|  | static: no file write outside documents.ts and the Blobs store | PASS | no hits |
+| 30 | L30 static: check_restricted.py passes. | PASS | 3 restricted terms checked across 277 files, 0 hits |
+| 50 | L50 static: No restricted term in the built bundle. | PASS | 3 restricted terms checked against 5 bundle files, 0 hits |
+| 51 | L51 static: No server source line logs or audits a password. | PASS | 60 console.* and writeAudit calls read, none passes a password |
+|  | driven: definition of done present | PASS | 51 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | PASS | 14 views render a heading |
+| 4 | L4 @1920x1080: The Record table behind the Statement renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1920x1080: The client's home is the Compliance Tracker in its three sections. | PASS | all 11 test ids present |
+| 12 | L12 @1920x1080: Every task table shows the six questions, in order, and they are not r | PASS | 2 task table(s) carry the six questions in order |
+| 13 | L13 @1920x1080: No percentage is shown without its fraction beside it, anywhere on the | PASS | no bare percentage found across 15 client views |
+| 14 | L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1920x1080: An area page prints as a clean document. | PASS | chrome visible under print: False, [data-testid='module-intro'] visible: True, tasks visible: True |
+| 18 | L18 @1920x1080: The client's navigation is the operator's six items, in her order, wit | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'statement', 'guide'], in order, labels match, with none of ['posture', 'exposure', 'value'] |
+| 19 | L19 @1920x1080: The eight modules carry their v1.3 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1920x1080: Job management is a three-column board, and confirm is the client's on | PASS | board of 3 columns ['Not started', 'In progress', 'Completed'], 65 card(s), strip present, no task table, no Guide, no write control but confirm |
+| 22 | L22 @1920x1080: The overall figure says where the client stands, in the order's words. | PASS | 'Compliance score: 38% (3 of 8 obligations met)'; standing '5 overdue or blocked'; parts in order |
+| 23 | L23 @1920x1080: The Compliance Tracker has three sections only. | PASS | three sections ['Journey', 'Overall compliance status', 'Upcoming'] in order, none of 9 removed ids, 8 upcoming item(s) |
+| 24 | L24 @1920x1080: The Journey shows the current stage in words and the five phases as a  | PASS | 'Current stage: Assessment and discovery'; states ['current', 'future', 'future', 'future', 'future'] |
+| 25 | L25 @1920x1080: The eight module tiles exist and each links to its module. | PASS | 8 tiles, each links to its module and lands on the matching h1 |
+| 26 | L26 @1920x1080: Every module page carries its name, introduction, documents, status, t | PASS | 8 module pages carry the order's structure, in order |
+| 27 | L27 @1920x1080: The Statement links to the record behind it. | PASS | 'The record behind this statement' links to /value, the Record renders there, no tab strip |
+| 28 | L28 @1920x1080: Quick questions says plainly what it does. | PASS | h1 'Quick questions', intro matches |
+| 29 | L29 @1920x1080: The old module names appear nowhere on the client side. | PASS | no retired module name across 15 client views |
+| 31 | L31 @1920x1080: Value sits on the operator's side, with the inputs to the statement on | PASS | Value opens the Record with a Settings link; Settings carries the journey section |
+| 32 | L32 @1920x1080: Module tile text reads at 4.5:1 or better against the tile fill in eve | PASS | present green, amber, red; lowest ratio per state: amber 7.24, red 4.64, green 9.08, grey (probe) 4.83 |
+| 33 | L33 @1920x1080: In client view the operator receives exactly the client seat's respons | PASS | 16 GETs identical; no volatile fields excluded |
+| 34 | L34 @1920x1080: In client view every write is refused and the task is unchanged. | PASS | confirm on an open for-you task, Guide message and request refused 403 'Read only in client view'; task state unchanged; unmarked operator refused 403 |
+| 35 | L35 @1920x1080: For the client seat the preview marker does nothing. | PASS | 16 GETs unchanged with the marker; own org: no volatile fields excluded / bogus org: no volatile fields excluded |
+| 36 | L36 @1920x1080: The client-view banner shows on every client page for the operator and | PASS | banner on 6 client pages and module 1, writes disabled, return lands in /admin; absent for the client seat |
+| 37 | L37 @1920x1080: The admin denominator toggle does not change the client-view tracker f | PASS | with denominatorMode 'cycle' the preview overall equals the client's; restored to 'overdue' |
+| 38 | L38 @1920x1080: Entering client view writes one audit entry per session. | PASS | three preview GETs wrote one client_view.open entry, actor the operator |
+| 39 | L39 @1920x1080: Users: create, reset, disable and re-enable are each audited by user i | PASS | create or reset, disable, enable and reset audited by user id with the operator as actor; client entries mirrored in the organisation's audit; 409 on a repeat email; disabled session and sign-in refused 401; no one-time password in any later response; last active manager refused 409 |
+| 40 | L40 @1920x1080: A user who must change her password reaches nothing else until she doe | PASS | must-change refused 403 password_change_required on 6 client and 3 admin routes; under 12 characters refused 400; the change issues a fresh cookie, clears the flag and ends the other session (401) |
+| 41 | L41 @1920x1080: In the browser, a must-change user is held on the change-password scre | PASS | held on /change-password from every path tried; form, three inputs and the rule present; portal opens after the change; header link on both portals |
+| 42 | L42 @1920x1080: The Users page shows a one-time password exactly once, says it is show | PASS | Users page and users-table present; a reset shows the one-time password once with both statements; gone after a reload |
+| 43 | L43 @1920x1080: Organisations: create, apply the task library with its count, per-orga | PASS | list carries the six fields; no-organisation admin GETs refused 400; org, accountId and X-Assure-Org agree; settings isolated and restored; existing gate organisation reused, so the 0-task rule was proved on its first run only; apply library: preview 64 = created 64 |
+| 44 | L44 @1920x1080: The organisation switcher changes every admin page, is remembered for  | PASS | switcher lists both; with the gate organisation Workplan, Documents and Settings show its data and all 6 organisation-bound admin requests carry it; remembered across a reload; demo data back after switching |
+| 45 | L45 @1920x1080: View as client takes the selected organisation. | PASS | client view with the gate organisation selected sends 2 preview requests, all for it; 16 preview GETs equal the gate client seat's; no volatile fields excluded |
+| 46 | L46 @1920x1080: A client user of one organisation never receives a record of another,  | PASS | 16 client GETs per seat: every orgId is the seat's own; 68 demo and 91 gate task or document ids, none crossing |
+| 47 | L47 @1920x1080: The seed: a dry run changes nothing and counts the manifest; a real ru | PASS | dry run would create 27 and changed nothing; replace seeded 27; repeat refused 409; journey stage as the manifest |
+| 48 | L48 @1920x1080: No restricted name or address appears in any field of the seeded organ | PASS | 3 restricted terms against 5 responses, 0 hits |
+| 49 | L49 @1920x1080: Sign-in audit entries no longer carry a session id. | PASS | 9 auth.login entries from this run, none with a session id |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | PASS | 14 views render a heading |
+| 4 | L4 @1366x768: The Record table behind the Statement renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1366x768: The client's home is the Compliance Tracker in its three sections. | PASS | all 11 test ids present |
+| 12 | L12 @1366x768: Every task table shows the six questions, in order, and they are not r | PASS | 2 task table(s) carry the six questions in order |
+| 13 | L13 @1366x768: No percentage is shown without its fraction beside it, anywhere on the | PASS | no bare percentage found across 15 client views |
+| 14 | L14 @1366x768: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1366x768: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1366x768: An area page prints as a clean document. | PASS | chrome visible under print: False, [data-testid='module-intro'] visible: True, tasks visible: True |
+| 18 | L18 @1366x768: The client's navigation is the operator's six items, in her order, wit | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'statement', 'guide'], in order, labels match, with none of ['posture', 'exposure', 'value'] |
+| 19 | L19 @1366x768: The eight modules carry their v1.3 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1366x768: Job management is a three-column board, and confirm is the client's on | PASS | board of 3 columns ['Not started', 'In progress', 'Completed'], 65 card(s), strip present, no task table, no Guide, no write control but confirm |
+| 22 | L22 @1366x768: The overall figure says where the client stands, in the order's words. | PASS | 'Compliance score: 38% (3 of 8 obligations met)'; standing '5 overdue or blocked'; parts in order |
+| 23 | L23 @1366x768: The Compliance Tracker has three sections only. | PASS | three sections ['Journey', 'Overall compliance status', 'Upcoming'] in order, none of 9 removed ids, 8 upcoming item(s) |
+| 24 | L24 @1366x768: The Journey shows the current stage in words and the five phases as a  | PASS | 'Current stage: Assessment and discovery'; states ['current', 'future', 'future', 'future', 'future'] |
+| 25 | L25 @1366x768: The eight module tiles exist and each links to its module. | PASS | 8 tiles, each links to its module and lands on the matching h1 |
+| 26 | L26 @1366x768: Every module page carries its name, introduction, documents, status, t | PASS | 8 module pages carry the order's structure, in order |
+| 27 | L27 @1366x768: The Statement links to the record behind it. | PASS | 'The record behind this statement' links to /value, the Record renders there, no tab strip |
+| 28 | L28 @1366x768: Quick questions says plainly what it does. | PASS | h1 'Quick questions', intro matches |
+| 29 | L29 @1366x768: The old module names appear nowhere on the client side. | PASS | no retired module name across 15 client views |
+| 31 | L31 @1366x768: Value sits on the operator's side, with the inputs to the statement on | PASS | Value opens the Record with a Settings link; Settings carries the journey section |
+| 32 | L32 @1366x768: Module tile text reads at 4.5:1 or better against the tile fill in eve | PASS | present green, amber, red; lowest ratio per state: amber 7.24, red 4.64, green 9.08, grey (probe) 4.83 |
+| 33 | L33 @1366x768: In client view the operator receives exactly the client seat's respons | PASS | API level; run once, at the first resolution |
+| 34 | L34 @1366x768: In client view every write is refused and the task is unchanged. | PASS | API level; run once, at the first resolution |
+| 35 | L35 @1366x768: For the client seat the preview marker does nothing. | PASS | API level; run once, at the first resolution |
+| 36 | L36 @1366x768: The client-view banner shows on every client page for the operator and | PASS | banner on 6 client pages and module 1, writes disabled, return lands in /admin; absent for the client seat |
+| 37 | L37 @1366x768: The admin denominator toggle does not change the client-view tracker f | PASS | API level; run once, at the first resolution |
+| 38 | L38 @1366x768: Entering client view writes one audit entry per session. | PASS | API level; run once, at the first resolution |
+| 39 | L39 @1366x768: Users: create, reset, disable and re-enable are each audited by user i | PASS | API level; run once, at the first resolution |
+| 40 | L40 @1366x768: A user who must change her password reaches nothing else until she doe | PASS | API level; run once, at the first resolution |
+| 41 | L41 @1366x768: In the browser, a must-change user is held on the change-password scre | PASS | held on /change-password from every path tried; form, three inputs and the rule present; portal opens after the change; header link on both portals |
+| 42 | L42 @1366x768: The Users page shows a one-time password exactly once, says it is show | PASS | Users page and users-table present; a reset shows the one-time password once with both statements; gone after a reload |
+| 43 | L43 @1366x768: Organisations: create, apply the task library with its count, per-orga | PASS | API level; run once, at the first resolution |
+| 44 | L44 @1366x768: The organisation switcher changes every admin page, is remembered for  | PASS | switcher lists both; with the gate organisation Workplan, Documents and Settings show its data and all 6 organisation-bound admin requests carry it; remembered across a reload; demo data back after switching |
+| 45 | L45 @1366x768: View as client takes the selected organisation. | PASS | client view with the gate organisation selected sends 2 preview requests, all for it; API identity run at the first resolution |
+| 46 | L46 @1366x768: A client user of one organisation never receives a record of another,  | PASS | API level; run once, at the first resolution |
+| 47 | L47 @1366x768: The seed: a dry run changes nothing and counts the manifest; a real ru | PASS | API level; run once, at the first resolution |
+| 48 | L48 @1366x768: No restricted name or address appears in any field of the seeded organ | PASS | API level; run once, at the first resolution |
+| 49 | L49 @1366x768: Sign-in audit entries no longer carry a session id. | PASS | API level; run once, at the first resolution |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | PASS | 14 views render a heading |
+| 4 | L4 @390x844: The Record table behind the Statement renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th | PASS | 8 views checked, no overflow |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @390x844: The client's home is the Compliance Tracker in its three sections. | PASS | all 11 test ids present |
+| 12 | L12 @390x844: Every task table shows the six questions, in order, and they are not r | PASS | 2 task table(s) carry the six questions in order |
+| 13 | L13 @390x844: No percentage is shown without its fraction beside it, anywhere on the | PASS | no bare percentage found across 15 client views |
+| 14 | L14 @390x844: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @390x844: An area page prints as a clean document. | PASS | chrome visible under print: False, [data-testid='module-intro'] visible: True, tasks visible: True |
+| 18 | L18 @390x844: The client's navigation is the operator's six items, in her order, wit | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'statement', 'guide'], in order, labels match, with none of ['posture', 'exposure', 'value'] |
+| 19 | L19 @390x844: The eight modules carry their v1.3 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @390x844: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @390x844: Job management is a three-column board, and confirm is the client's on | PASS | board of 3 columns ['Not started', 'In progress', 'Completed'], 65 card(s), strip present, no task table, no Guide, no write control but confirm |
+| 22 | L22 @390x844: The overall figure says where the client stands, in the order's words. | PASS | 'Compliance score: 38% (3 of 8 obligations met)'; standing '5 overdue or blocked'; parts in order |
+| 23 | L23 @390x844: The Compliance Tracker has three sections only. | PASS | three sections ['Journey', 'Overall compliance status', 'Upcoming'] in order, none of 9 removed ids, 8 upcoming item(s) |
+| 24 | L24 @390x844: The Journey shows the current stage in words and the five phases as a  | PASS | 'Current stage: Assessment and discovery'; states ['current', 'future', 'future', 'future', 'future'] |
+| 25 | L25 @390x844: The eight module tiles exist and each links to its module. | PASS | 8 tiles, each links to its module and lands on the matching h1 |
+| 26 | L26 @390x844: Every module page carries its name, introduction, documents, status, t | PASS | 8 module pages carry the order's structure, in order |
+| 27 | L27 @390x844: The Statement links to the record behind it. | PASS | 'The record behind this statement' links to /value, the Record renders there, no tab strip |
+| 28 | L28 @390x844: Quick questions says plainly what it does. | PASS | h1 'Quick questions', intro matches |
+| 29 | L29 @390x844: The old module names appear nowhere on the client side. | PASS | no retired module name across 15 client views |
+| 31 | L31 @390x844: Value sits on the operator's side, with the inputs to the statement on | PASS | Value opens the Record with a Settings link; Settings carries the journey section |
+| 32 | L32 @390x844: Module tile text reads at 4.5:1 or better against the tile fill in eve | PASS | present green, amber, red; lowest ratio per state: amber 7.24, red 4.64, green 9.08, grey (probe) 4.83 |
+| 33 | L33 @390x844: In client view the operator receives exactly the client seat's respons | PASS | API level; run once, at the first resolution |
+| 34 | L34 @390x844: In client view every write is refused and the task is unchanged. | PASS | API level; run once, at the first resolution |
+| 35 | L35 @390x844: For the client seat the preview marker does nothing. | PASS | API level; run once, at the first resolution |
+| 36 | L36 @390x844: The client-view banner shows on every client page for the operator and | PASS | banner on 6 client pages and module 1, writes disabled, return lands in /admin; absent for the client seat |
+| 37 | L37 @390x844: The admin denominator toggle does not change the client-view tracker f | PASS | API level; run once, at the first resolution |
+| 38 | L38 @390x844: Entering client view writes one audit entry per session. | PASS | API level; run once, at the first resolution |
+| 39 | L39 @390x844: Users: create, reset, disable and re-enable are each audited by user i | PASS | API level; run once, at the first resolution |
+| 40 | L40 @390x844: A user who must change her password reaches nothing else until she doe | PASS | API level; run once, at the first resolution |
+| 41 | L41 @390x844: In the browser, a must-change user is held on the change-password scre | PASS | held on /change-password from every path tried; form, three inputs and the rule present; portal opens after the change; header link on both portals |
+| 42 | L42 @390x844: The Users page shows a one-time password exactly once, says it is show | PASS | Users page and users-table present; a reset shows the one-time password once with both statements; gone after a reload |
+| 43 | L43 @390x844: Organisations: create, apply the task library with its count, per-orga | PASS | API level; run once, at the first resolution |
+| 44 | L44 @390x844: The organisation switcher changes every admin page, is remembered for  | PASS | switcher lists both; with the gate organisation Workplan, Documents and Settings show its data and all 6 organisation-bound admin requests carry it; remembered across a reload; demo data back after switching |
+| 45 | L45 @390x844: View as client takes the selected organisation. | PASS | client view with the gate organisation selected sends 2 preview requests, all for it; API identity run at the first resolution |
+| 46 | L46 @390x844: A client user of one organisation never receives a record of another,  | PASS | API level; run once, at the first resolution |
+| 47 | L47 @390x844: The seed: a dry run changes nothing and counts the manifest; a real ru | PASS | API level; run once, at the first resolution |
+| 48 | L48 @390x844: No restricted name or address appears in any field of the seeded organ | PASS | API level; run once, at the first resolution |
+| 49 | L49 @390x844: Sign-in audit entries no longer carry a session id. | PASS | API level; run once, at the first resolution |
+|  | driven: every gate user disabled at the end of the run | PASS | none left enabled |
+
+## Run 2026-09-28 16:40Z - https://tessera-assure.netlify.app
+
+**Operation:** ASSURE. **Iteration:** v1.5. **Verdict:** PASS, 154 of 154.
+
+| Line | Check | Result | Detail |
+|---|---|---|---|
+|  | static: source found | PASS | 134 files |
+|  | static: no banned term | PASS |  |
+|  | static: no em dash in source | PASS |  |
+|  | static: no retired colour | PASS |  |
+|  | static: no restricted name present | PASS | 2 restricted names checked, 0 hits |
+|  | static: no key value in source | PASS | 0 pattern(s) matched |
+|  | static: print stylesheet present in source | PASS | '@media print' found |
+|  | static: TASK_COLUMNS is What, How, Who, When, Done, Status in order | PASS | matches exactly |
+|  | static: the eight module names match FRAGO 03 section 3.3, in order | PASS | matches exactly |
+|  | static: no file write outside documents.ts and the Blobs store | PASS | no hits |
+| 30 | L30 static: check_restricted.py passes. | PASS | 3 restricted terms checked across 279 files, 0 hits |
+| 50 | L50 static: No restricted term in the built bundle. | PASS | 3 restricted terms checked against 5 bundle files, 0 hits |
+| 51 | L51 static: No server source line logs or audits a password. | PASS | 60 console.* and writeAudit calls read, none passes a password |
+|  | driven: definition of done present | PASS | 51 lines |
+| 1 | L1 @1920x1080: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1920x1080: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1920x1080: Signed in as the operator, every admin view loads and renders a headin | PASS | 14 views render a heading |
+| 4 | L4 @1920x1080: The Record table behind the Statement renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1920x1080: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1920x1080: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1920x1080: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1920x1080: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1920x1080: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1920x1080: The client's home is the Compliance Tracker in its three sections. | PASS | all 11 test ids present |
+| 12 | L12 @1920x1080: Every task table shows the six questions, in order, and they are not r | PASS | 2 task table(s) carry the six questions in order |
+| 13 | L13 @1920x1080: No percentage is shown without its fraction beside it, anywhere on the | PASS | no bare percentage found across 15 client views |
+| 14 | L14 @1920x1080: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1920x1080: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1920x1080: An area page prints as a clean document. | PASS | chrome visible under print: False, [data-testid='module-intro'] visible: True, tasks visible: True |
+| 18 | L18 @1920x1080: The client's navigation is the operator's six items, in her order, wit | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'statement', 'guide'], in order, labels match, with none of ['posture', 'exposure', 'value'] |
+| 19 | L19 @1920x1080: The eight modules carry their v1.3 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1920x1080: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1920x1080: Job management is a three-column board, and confirm is the client's on | PASS | board of 3 columns ['Not started', 'In progress', 'Completed'], 65 card(s), strip present, no task table, no Guide, no write control but confirm |
+| 22 | L22 @1920x1080: The overall figure says where the client stands, in the order's words. | PASS | 'Compliance score: 38% (3 of 8 obligations met)'; standing '5 overdue or blocked'; parts in order |
+| 23 | L23 @1920x1080: The Compliance Tracker has three sections only. | PASS | three sections ['Journey', 'Overall compliance status', 'Upcoming'] in order, none of 9 removed ids, 8 upcoming item(s) |
+| 24 | L24 @1920x1080: The Journey shows the current stage in words and the five phases as a  | PASS | 'Current stage: Assessment and discovery'; states ['current', 'future', 'future', 'future', 'future'] |
+| 25 | L25 @1920x1080: The eight module tiles exist and each links to its module. | PASS | 8 tiles, each links to its module and lands on the matching h1 |
+| 26 | L26 @1920x1080: Every module page carries its name, introduction, documents, status, t | PASS | 8 module pages carry the order's structure, in order |
+| 27 | L27 @1920x1080: The Statement links to the record behind it. | PASS | 'The record behind this statement' links to /value, the Record renders there, no tab strip |
+| 28 | L28 @1920x1080: Quick questions says plainly what it does. | PASS | h1 'Quick questions', intro matches |
+| 29 | L29 @1920x1080: The old module names appear nowhere on the client side. | PASS | no retired module name across 15 client views |
+| 31 | L31 @1920x1080: Value sits on the operator's side, with the inputs to the statement on | PASS | Value opens the Record with a Settings link; Settings carries the journey section |
+| 32 | L32 @1920x1080: Module tile text reads at 4.5:1 or better against the tile fill in eve | PASS | present green, amber, red; lowest ratio per state: amber 7.24, red 4.64, green 9.08, grey (probe) 4.83 |
+| 33 | L33 @1920x1080: In client view the operator receives exactly the client seat's respons | PASS | 16 GETs identical; no volatile fields excluded |
+| 34 | L34 @1920x1080: In client view every write is refused and the task is unchanged. | PASS | confirm on an open for-you task, Guide message and request refused 403 'Read only in client view'; task state unchanged; unmarked operator refused 403 |
+| 35 | L35 @1920x1080: For the client seat the preview marker does nothing. | PASS | 16 GETs unchanged with the marker; own org: no volatile fields excluded / bogus org: no volatile fields excluded |
+| 36 | L36 @1920x1080: The client-view banner shows on every client page for the operator and | PASS | banner on 6 client pages and module 1, writes disabled, return lands in /admin; absent for the client seat |
+| 37 | L37 @1920x1080: The admin denominator toggle does not change the client-view tracker f | PASS | with denominatorMode 'cycle' the preview overall equals the client's; restored to 'overdue' |
+| 38 | L38 @1920x1080: Entering client view writes one audit entry per session. | PASS | three preview GETs wrote one client_view.open entry, actor the operator |
+| 39 | L39 @1920x1080: Users: create, reset, disable and re-enable are each audited by user i | PASS | create or reset, disable, enable and reset audited by user id with the operator as actor; client entries mirrored in the organisation's audit; 409 on a repeat email; disabled session and sign-in refused 401; no one-time password in any later response; last active manager refused 409 |
+| 40 | L40 @1920x1080: A user who must change her password reaches nothing else until she doe | PASS | must-change refused 403 password_change_required on 6 client and 3 admin routes; under 12 characters refused 400; the change issues a fresh cookie, clears the flag and ends the other session (401) |
+| 41 | L41 @1920x1080: In the browser, a must-change user is held on the change-password scre | PASS | held on /change-password from every path tried; form, three inputs and the rule present; portal opens after the change; header link on both portals |
+| 42 | L42 @1920x1080: The Users page shows a one-time password exactly once, says it is show | PASS | Users page and users-table present; a reset shows the one-time password once with both statements; gone after a reload |
+| 43 | L43 @1920x1080: Organisations: create, apply the task library with its count, per-orga | PASS | list carries the six fields; no-organisation admin GETs refused 400; org, accountId and X-Assure-Org agree; settings isolated and restored; existing gate organisation reused, so the 0-task rule was proved on its first run only; apply library: preview 64 = created 64 |
+| 44 | L44 @1920x1080: The organisation switcher changes every admin page, is remembered for  | PASS | switcher lists both; with the gate organisation Workplan, Documents and Settings show its data and all 6 organisation-bound admin requests carry it; remembered across a reload; demo data back after switching |
+| 45 | L45 @1920x1080: View as client takes the selected organisation. | PASS | client view with the gate organisation selected sends 2 preview requests, all for it; 16 preview GETs equal the gate client seat's; no volatile fields excluded |
+| 46 | L46 @1920x1080: A client user of one organisation never receives a record of another,  | PASS | 16 client GETs per seat: every orgId is the seat's own; 68 demo and 91 gate task or document ids, none crossing |
+| 47 | L47 @1920x1080: The seed: a dry run changes nothing and counts the manifest; a real ru | PASS | dry run would create 27 and changed nothing; replace seeded 27; repeat refused 409; journey stage as the manifest |
+| 48 | L48 @1920x1080: No restricted name or address appears in any field of the seeded organ | PASS | 3 restricted terms against 5 responses, 0 hits |
+| 49 | L49 @1920x1080: Sign-in audit entries no longer carry a session id. | PASS | 9 auth.login entries from this run, none with a session id |
+| 1 | L1 @1366x768: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @1366x768: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @1366x768: Signed in as the operator, every admin view loads and renders a headin | PASS | 14 views render a heading |
+| 4 | L4 @1366x768: The Record table behind the Statement renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @1366x768: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @1366x768: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @1366x768: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 9 | L9 @1366x768: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @1366x768: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @1366x768: The client's home is the Compliance Tracker in its three sections. | PASS | all 11 test ids present |
+| 12 | L12 @1366x768: Every task table shows the six questions, in order, and they are not r | PASS | 2 task table(s) carry the six questions in order |
+| 13 | L13 @1366x768: No percentage is shown without its fraction beside it, anywhere on the | PASS | no bare percentage found across 15 client views |
+| 14 | L14 @1366x768: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @1366x768: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @1366x768: An area page prints as a clean document. | PASS | chrome visible under print: False, [data-testid='module-intro'] visible: True, tasks visible: True |
+| 18 | L18 @1366x768: The client's navigation is the operator's six items, in her order, wit | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'statement', 'guide'], in order, labels match, with none of ['posture', 'exposure', 'value'] |
+| 19 | L19 @1366x768: The eight modules carry their v1.3 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @1366x768: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @1366x768: Job management is a three-column board, and confirm is the client's on | PASS | board of 3 columns ['Not started', 'In progress', 'Completed'], 65 card(s), strip present, no task table, no Guide, no write control but confirm |
+| 22 | L22 @1366x768: The overall figure says where the client stands, in the order's words. | PASS | 'Compliance score: 38% (3 of 8 obligations met)'; standing '5 overdue or blocked'; parts in order |
+| 23 | L23 @1366x768: The Compliance Tracker has three sections only. | PASS | three sections ['Journey', 'Overall compliance status', 'Upcoming'] in order, none of 9 removed ids, 8 upcoming item(s) |
+| 24 | L24 @1366x768: The Journey shows the current stage in words and the five phases as a  | PASS | 'Current stage: Assessment and discovery'; states ['current', 'future', 'future', 'future', 'future'] |
+| 25 | L25 @1366x768: The eight module tiles exist and each links to its module. | PASS | 8 tiles, each links to its module and lands on the matching h1 |
+| 26 | L26 @1366x768: Every module page carries its name, introduction, documents, status, t | PASS | 8 module pages carry the order's structure, in order |
+| 27 | L27 @1366x768: The Statement links to the record behind it. | PASS | 'The record behind this statement' links to /value, the Record renders there, no tab strip |
+| 28 | L28 @1366x768: Quick questions says plainly what it does. | PASS | h1 'Quick questions', intro matches |
+| 29 | L29 @1366x768: The old module names appear nowhere on the client side. | PASS | no retired module name across 15 client views |
+| 31 | L31 @1366x768: Value sits on the operator's side, with the inputs to the statement on | PASS | Value opens the Record with a Settings link; Settings carries the journey section |
+| 32 | L32 @1366x768: Module tile text reads at 4.5:1 or better against the tile fill in eve | PASS | present green, amber, red; lowest ratio per state: amber 7.24, red 4.64, green 9.08, grey (probe) 4.83 |
+| 33 | L33 @1366x768: In client view the operator receives exactly the client seat's respons | PASS | API level; run once, at the first resolution |
+| 34 | L34 @1366x768: In client view every write is refused and the task is unchanged. | PASS | API level; run once, at the first resolution |
+| 35 | L35 @1366x768: For the client seat the preview marker does nothing. | PASS | API level; run once, at the first resolution |
+| 36 | L36 @1366x768: The client-view banner shows on every client page for the operator and | PASS | banner on 6 client pages and module 1, writes disabled, return lands in /admin; absent for the client seat |
+| 37 | L37 @1366x768: The admin denominator toggle does not change the client-view tracker f | PASS | API level; run once, at the first resolution |
+| 38 | L38 @1366x768: Entering client view writes one audit entry per session. | PASS | API level; run once, at the first resolution |
+| 39 | L39 @1366x768: Users: create, reset, disable and re-enable are each audited by user i | PASS | API level; run once, at the first resolution |
+| 40 | L40 @1366x768: A user who must change her password reaches nothing else until she doe | PASS | API level; run once, at the first resolution |
+| 41 | L41 @1366x768: In the browser, a must-change user is held on the change-password scre | PASS | held on /change-password from every path tried; form, three inputs and the rule present; portal opens after the change; header link on both portals |
+| 42 | L42 @1366x768: The Users page shows a one-time password exactly once, says it is show | PASS | Users page and users-table present; a reset shows the one-time password once with both statements; gone after a reload |
+| 43 | L43 @1366x768: Organisations: create, apply the task library with its count, per-orga | PASS | API level; run once, at the first resolution |
+| 44 | L44 @1366x768: The organisation switcher changes every admin page, is remembered for  | PASS | switcher lists both; with the gate organisation Workplan, Documents and Settings show its data and all 6 organisation-bound admin requests carry it; remembered across a reload; demo data back after switching |
+| 45 | L45 @1366x768: View as client takes the selected organisation. | PASS | client view with the gate organisation selected sends 2 preview requests, all for it; API identity run at the first resolution |
+| 46 | L46 @1366x768: A client user of one organisation never receives a record of another,  | PASS | API level; run once, at the first resolution |
+| 47 | L47 @1366x768: The seed: a dry run changes nothing and counts the manifest; a real ru | PASS | API level; run once, at the first resolution |
+| 48 | L48 @1366x768: No restricted name or address appears in any field of the seeded organ | PASS | API level; run once, at the first resolution |
+| 49 | L49 @1366x768: Sign-in audit entries no longer carry a session id. | PASS | API level; run once, at the first resolution |
+| 1 | L1 @390x844: Sign-in succeeds and lands on the client portal. | PASS | signed in, [data-view='tracker'] present |
+| 2 | L2 @390x844: Every client portal view loads and renders a heading: Compliance Track | PASS | 6 views render a heading |
+| 3 | L3 @390x844: Signed in as the operator, every admin view loads and renders a headin | PASS | 14 views render a heading |
+| 4 | L4 @390x844: The Record table behind the Statement renders at least one row. | PASS | 27 row(s) in [data-testid='record-table'] |
+| 5 | L5 @390x844: The Statement renders and contains the limitations paragraph. | PASS | limitations phrase present: True |
+| 6 | L6 @390x844: With the operator's show illustrative switch off, no illustrative entr | PASS | 'illustrative' in the client statement with the switch off: False |
+| 7 | L7 @390x844: Print output hides the header and navigation and shows the Statement. | PASS | chrome visible under print: False, statement visible under print: True |
+| 8 | L8 @390x844: At 390 pixels wide, no view produces horizontal overflow, including th | PASS | 8 views checked, no overflow |
+| 9 | L9 @390x844: No console errors or page errors occur across the whole run. | PASS | 0 console or page errors: [] |
+| 10 | L10 @390x844: The deployed page declares noindex in the head. | PASS | noindex present in head |
+| 11 | L11 @390x844: The client's home is the Compliance Tracker in its three sections. | PASS | all 11 test ids present |
+| 12 | L12 @390x844: Every task table shows the six questions, in order, and they are not r | PASS | 2 task table(s) carry the six questions in order |
+| 13 | L13 @390x844: No percentage is shown without its fraction beside it, anywhere on the | PASS | no bare percentage found across 15 client views |
+| 14 | L14 @390x844: No illustrative figure is reachable on the client side of the tracker. | PASS | 'illustrative' not found on the client tracker or area page |
+| 15 | L15 @390x844: The client can confirm a task assigned to them and can do nothing else | PASS | confirm control present; no edit/delete/reprioritise control found |
+| 16 | L16 @390x844: An area page prints as a clean document. | PASS | chrome visible under print: False, [data-testid='module-intro'] visible: True, tasks visible: True |
+| 18 | L18 @390x844: The client's navigation is the operator's six items, in her order, wit | PASS | nav reads ['tracker', 'documents', 'jobs', 'request', 'statement', 'guide'], in order, labels match, with none of ['posture', 'exposure', 'value'] |
+| 19 | L19 @390x844: The eight modules carry their v1.3 titles. | PASS | 8 module names match AREAS on tiles and sub-nav |
+| 20 | L20 @390x844: Compliance Documents shows the three sections and the client cannot wr | PASS | three sections present, no upload input, no write control |
+| 21 | L21 @390x844: Job management is a three-column board, and confirm is the client's on | PASS | board of 3 columns ['Not started', 'In progress', 'Completed'], 65 card(s), strip present, no task table, no Guide, no write control but confirm |
+| 22 | L22 @390x844: The overall figure says where the client stands, in the order's words. | PASS | 'Compliance score: 38% (3 of 8 obligations met)'; standing '5 overdue or blocked'; parts in order |
+| 23 | L23 @390x844: The Compliance Tracker has three sections only. | PASS | three sections ['Journey', 'Overall compliance status', 'Upcoming'] in order, none of 9 removed ids, 8 upcoming item(s) |
+| 24 | L24 @390x844: The Journey shows the current stage in words and the five phases as a  | PASS | 'Current stage: Assessment and discovery'; states ['current', 'future', 'future', 'future', 'future'] |
+| 25 | L25 @390x844: The eight module tiles exist and each links to its module. | PASS | 8 tiles, each links to its module and lands on the matching h1 |
+| 26 | L26 @390x844: Every module page carries its name, introduction, documents, status, t | PASS | 8 module pages carry the order's structure, in order |
+| 27 | L27 @390x844: The Statement links to the record behind it. | PASS | 'The record behind this statement' links to /value, the Record renders there, no tab strip |
+| 28 | L28 @390x844: Quick questions says plainly what it does. | PASS | h1 'Quick questions', intro matches |
+| 29 | L29 @390x844: The old module names appear nowhere on the client side. | PASS | no retired module name across 15 client views |
+| 31 | L31 @390x844: Value sits on the operator's side, with the inputs to the statement on | PASS | Value opens the Record with a Settings link; Settings carries the journey section |
+| 32 | L32 @390x844: Module tile text reads at 4.5:1 or better against the tile fill in eve | PASS | present green, amber, red; lowest ratio per state: amber 7.24, red 4.64, green 9.08, grey (probe) 4.83 |
+| 33 | L33 @390x844: In client view the operator receives exactly the client seat's respons | PASS | API level; run once, at the first resolution |
+| 34 | L34 @390x844: In client view every write is refused and the task is unchanged. | PASS | API level; run once, at the first resolution |
+| 35 | L35 @390x844: For the client seat the preview marker does nothing. | PASS | API level; run once, at the first resolution |
+| 36 | L36 @390x844: The client-view banner shows on every client page for the operator and | PASS | banner on 6 client pages and module 1, writes disabled, return lands in /admin; absent for the client seat |
+| 37 | L37 @390x844: The admin denominator toggle does not change the client-view tracker f | PASS | API level; run once, at the first resolution |
+| 38 | L38 @390x844: Entering client view writes one audit entry per session. | PASS | API level; run once, at the first resolution |
+| 39 | L39 @390x844: Users: create, reset, disable and re-enable are each audited by user i | PASS | API level; run once, at the first resolution |
+| 40 | L40 @390x844: A user who must change her password reaches nothing else until she doe | PASS | API level; run once, at the first resolution |
+| 41 | L41 @390x844: In the browser, a must-change user is held on the change-password scre | PASS | held on /change-password from every path tried; form, three inputs and the rule present; portal opens after the change; header link on both portals |
+| 42 | L42 @390x844: The Users page shows a one-time password exactly once, says it is show | PASS | Users page and users-table present; a reset shows the one-time password once with both statements; gone after a reload |
+| 43 | L43 @390x844: Organisations: create, apply the task library with its count, per-orga | PASS | API level; run once, at the first resolution |
+| 44 | L44 @390x844: The organisation switcher changes every admin page, is remembered for  | PASS | switcher lists both; with the gate organisation Workplan, Documents and Settings show its data and all 6 organisation-bound admin requests carry it; remembered across a reload; demo data back after switching |
+| 45 | L45 @390x844: View as client takes the selected organisation. | PASS | client view with the gate organisation selected sends 2 preview requests, all for it; API identity run at the first resolution |
+| 46 | L46 @390x844: A client user of one organisation never receives a record of another,  | PASS | API level; run once, at the first resolution |
+| 47 | L47 @390x844: The seed: a dry run changes nothing and counts the manifest; a real ru | PASS | API level; run once, at the first resolution |
+| 48 | L48 @390x844: No restricted name or address appears in any field of the seeded organ | PASS | API level; run once, at the first resolution |
+| 49 | L49 @390x844: Sign-in audit entries no longer carry a session id. | PASS | API level; run once, at the first resolution |
+|  | driven: every gate user disabled at the end of the run | PASS | none left enabled |

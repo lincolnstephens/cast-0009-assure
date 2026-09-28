@@ -17,7 +17,7 @@ import {
 import type { OrgDoc, ProcedureRecord, TaskRecord } from "../db/model.ts";
 import { mutateOrg, newId, readOrg } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireRole, type AppEnv, adminOrgOf } from "../lib/middleware.ts";
 import { raiseEntry } from "../lib/raiseEntry.ts";
 import { overallStatus, ownerLabel, taskRag, today } from "../lib/tracker.ts";
 import { AREA_LINE, applyLibraryToDoc, hoursForTask } from "../lib/workplan.ts";
@@ -32,9 +32,8 @@ export const adminWorkplanRoutes = new Hono<AppEnv>();
 adminWorkplanRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
 
 /** An admin acts on an organisation named in the query, defaulting to demo - the house pattern (adminRecord.ts). */
-function orgIdOf(c: { req: { query: (k: string) => string | undefined } }): string {
-  return c.req.query("org") || "demo";
-}
+// v1.5: no default organisation; see adminOrgOf.
+const orgIdOf = adminOrgOf;
 
 const LIBRARY_HOURS_BY_ID = new Map(LIBRARY_TASKS.map((t) => [t.id, t.defaultHours] as const));
 const LIBRARY_BY_ID = new Map(LIBRARY_TASKS.map((t) => [t.id, t] as const));
@@ -223,6 +222,22 @@ adminWorkplanRoutes.delete("/workplan/:id", async (c) => {
 // ---------------------------------------------------------------------------
 // Library apply: additive only, never overwrites an edit
 // ---------------------------------------------------------------------------
+
+/**
+ * v1.5. How many tasks applying the library would create, so the operator's
+ * confirmation can say so before anything is written. Runs the same apply on
+ * a copy of the document and throws the copy away.
+ */
+adminWorkplanRoutes.get("/workplan/apply-library/preview", async (c) => {
+  const orgId = orgIdOf(c);
+  const parsed = applyLibrarySchema.safeParse({ startDate: c.req.query("startDate") });
+  if (!parsed.success) return c.json({ error: "Give a start date." }, 400);
+  const doc = await readOrg(orgId);
+  if (!doc) return c.json({ error: "No such organisation." }, 404);
+  const copy = structuredClone(doc);
+  const result = applyLibraryToDoc(copy, parsed.data.startDate, c.get("user").displayName);
+  return c.json({ willCreate: result.created, alreadyPresent: result.skipped });
+});
 
 adminWorkplanRoutes.post("/workplan/apply-library", async (c) => {
   const orgId = orgIdOf(c);

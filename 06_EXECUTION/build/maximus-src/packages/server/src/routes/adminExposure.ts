@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { listOrgIds, mutateOrg, newId, readOrg } from "../db/store.ts";
 import type { ExposureAlertRecord, OrgDoc } from "../db/model.ts";
 import { writeAudit } from "../lib/audit.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireRole, type AppEnv, ADMIN_ORG_HEADER } from "../lib/middleware.ts";
 
 export const adminExposureRoutes = new Hono<AppEnv>();
 adminExposureRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
@@ -29,7 +29,7 @@ async function findOrgByAlertId(alertId: string): Promise<{ doc: OrgDoc; alert: 
 }
 
 adminExposureRoutes.get("/exposure", async (c) => {
-  const accountId = c.req.query("accountId");
+  const accountId = c.req.query("accountId") || c.req.header(ADMIN_ORG_HEADER);
   if (!accountId) return c.json({ error: "accountId is required" }, 400);
   const doc = await readOrg(accountId);
   if (!doc) return c.json({ alerts: [] });

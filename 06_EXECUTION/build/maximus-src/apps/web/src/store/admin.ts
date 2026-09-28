@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api, ApiError } from "../lib/api";
+import { rememberOrg, selectedOrg } from "../lib/org";
 
 interface Account {
   id: string;
@@ -19,7 +20,7 @@ interface AdminState {
 
 export const useAdmin = create<AdminState>((set, get) => ({
   accounts: [],
-  selectedAccountId: null,
+  selectedAccountId: selectedOrg(),
   accountsStatus: "loading",
   accountsError: null,
 
@@ -27,9 +28,13 @@ export const useAdmin = create<AdminState>((set, get) => ({
     set({ accountsStatus: "loading", accountsError: null });
     try {
       const res = await api<{ accounts: Account[] }>("/admin/accounts");
+      // Keep the remembered choice only if it still exists.
+      const remembered = get().selectedAccountId;
+      const selected = res.accounts.some((a) => a.id === remembered) ? remembered : (res.accounts[0]?.id ?? null);
+      rememberOrg(selected);
       set({
         accounts: res.accounts,
-        selectedAccountId: get().selectedAccountId ?? res.accounts[0]?.id ?? null,
+        selectedAccountId: selected,
         accountsStatus: "ready",
         accountsError: null,
       });
@@ -44,5 +49,8 @@ export const useAdmin = create<AdminState>((set, get) => ({
     }
   },
 
-  selectAccount: (id) => set({ selectedAccountId: id }),
+  selectAccount: (id) => {
+    rememberOrg(id);
+    set({ selectedAccountId: id });
+  },
 }));

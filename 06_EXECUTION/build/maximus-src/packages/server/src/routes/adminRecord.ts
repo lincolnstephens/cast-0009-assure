@@ -16,7 +16,7 @@ import {
   totalsOf,
 } from "../lib/record.ts";
 import { writeAudit } from "../lib/audit.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireRole, type AppEnv, adminOrgOf } from "../lib/middleware.ts";
 
 /**
  * The operator's side of the Record. The MITMARK contract lead keeps this.
@@ -26,9 +26,8 @@ export const adminRecordRoutes = new Hono<AppEnv>();
 adminRecordRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
 
 /** An admin acts on an organisation named in the query, defaulting to demo. */
-function orgIdOf(c: { req: { query: (k: string) => string | undefined } }): string {
-  return c.req.query("org") || "demo";
-}
+// v1.5: no default organisation; see adminOrgOf.
+const orgIdOf = adminOrgOf;
 
 adminRecordRoutes.get("/record", async (c) => {
   const orgId = orgIdOf(c);

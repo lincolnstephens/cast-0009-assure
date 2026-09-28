@@ -1,9 +1,16 @@
-import { brandingFor, loginRequestSchema, type ClientBranding } from "@maximus/shared";
+import {
+  brandingFor,
+  changePasswordSchema,
+  loginRequestSchema,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_RULE,
+  type ClientBranding,
+} from "@maximus/shared";
 import bcrypt from "bcryptjs";
 import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { OrgDoc, UserRecord } from "../db/model.ts";
-import { readOrg, readUsers } from "../db/store.ts";
+import { mutateUsers, readOrg, readUsers } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { previewOrgOf, requireAuth, type AppEnv } from "../lib/middleware.ts";
 import {
@@ -12,6 +19,7 @@ import {
   destroySession,
   encodeSessionCookie,
   SESSION_COOKIE,
+  sessionRef,
 } from "../lib/sessions.ts";
 
 export const authRoutes = new Hono<AppEnv>();
@@ -37,17 +45,29 @@ authRoutes.post("/login", async (c) => {
   if (!user) return c.json(invalid, 401);
 
   const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return c.json(invalid, 401);
+  // A disabled account answers exactly as a wrong password does, so the
+  // sign-in form never confirms which addresses exist.
+  if (!ok || user.disabled) return c.json(invalid, 401);
 
-  const session = await createSession(user.id);
+  const session = await createSession(user.id, user.sessionEpoch ?? 0);
   setCookie(c, SESSION_COOKIE, encodeSessionCookie(session.id), cookieOptions);
 
+  const signedInAt = new Date().toISOString();
+  await mutateUsers((doc) => {
+    const row = doc.users.find((u) => u.id === user.id);
+    if (row) row.lastSignInAt = signedInAt;
+  });
+  user.lastSignInAt = signedInAt;
+
+  // v1.5: the audit carries a one-way reference to the session, never the
+  // session id, which is a bearer credential (it was written here raw
+  // from v1.0 to v1.4).
   await writeAudit({
     orgId: user.orgId,
     actorId: user.id,
     actorName: user.displayName,
     action: "auth.login",
-    detail: `session=${session.id}`,
+    detail: `session ${sessionRef(session.id)}`,
   });
 
   return c.json({ user: await toSessionUser(user) });
@@ -95,9 +115,56 @@ authRoutes.post("/logout", requireAuth, async (c) => {
     actorId: user.id,
     actorName: user.displayName,
     action: "auth.logout",
-    detail: sessionId ? `session=${sessionId}` : "",
+    detail: sessionId ? `session ${sessionRef(sessionId)}` : "",
   });
 
+  return c.json({ ok: true });
+});
+
+/**
+ * v1.5 (FRAGO 05 3.3). Any signed-in user changes their own password here,
+ * and a user holding a one-time password must do so before anything else
+ * opens. The new password is hashed and never written anywhere else: not to
+ * a log, not to the audit. Every other session for the user ends; this one
+ * is replaced by a fresh session under the new epoch.
+ */
+authRoutes.post("/password", requireAuth, async (c) => {
+  const user = c.get("user");
+  const parsed = changePasswordSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Enter your current password and a new one." }, 400);
+  const { currentPassword, newPassword } = parsed.data;
+  if (newPassword.length < PASSWORD_MIN_LENGTH) {
+    return c.json({ error: `The new password must be ${PASSWORD_RULE.toLowerCase().replace(/\.$/, "")}.` }, 400);
+  }
+
+  const record = (await readUsers()).users.find((u) => u.id === user.id);
+  if (!record || !(await bcrypt.compare(currentPassword, record.passwordHash))) {
+    return c.json({ error: "The current password is not right." }, 400);
+  }
+  if (await bcrypt.compare(newPassword, record.passwordHash)) {
+    return c.json({ error: "Choose a password different from the current one." }, 400);
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const epoch = await mutateUsers((doc) => {
+    const row = doc.users.find((u) => u.id === user.id)!;
+    row.passwordHash = passwordHash;
+    row.mustChangePassword = false;
+    row.sessionEpoch = (row.sessionEpoch ?? 0) + 1;
+    return row.sessionEpoch;
+  });
+
+  await destroySession(user.sessionId);
+  const session = await createSession(user.id, epoch);
+  setCookie(c, SESSION_COOKIE, encodeSessionCookie(session.id), cookieOptions);
+
+  await writeAudit({
+    orgId: user.clientAccountId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "auth.password_change",
+    detail: "Password changed by its owner; other sessions ended.",
+  });
   return c.json({ ok: true });
 });
 
@@ -130,6 +197,7 @@ authRoutes.get("/me", requireAuth, async (c) => {
       role: user.role,
       clientAccountId: user.clientAccountId,
       clientAccountName,
+      mustChangePassword: user.mustChangePassword,
     },
     officer: officer ? { displayName: officer.displayName } : null,
     branding,
@@ -149,6 +217,7 @@ async function toSessionUser(user: UserRecord) {
     role: user.role,
     clientAccountId: user.orgId,
     clientAccountName,
+    mustChangePassword: user.mustChangePassword === true,
   };
 }
 

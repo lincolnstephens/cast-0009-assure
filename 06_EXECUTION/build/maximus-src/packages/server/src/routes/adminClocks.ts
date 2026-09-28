@@ -11,7 +11,7 @@ import {
   findClockGlobally,
   recordEntryForClosedClock,
 } from "../lib/intakes.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireRole, type AppEnv, ADMIN_ORG_HEADER } from "../lib/middleware.ts";
 
 export const adminRoutes = new Hono<AppEnv>();
 adminRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
@@ -33,7 +33,7 @@ adminRoutes.get("/accounts", async (c) => {
 
 /** All clocks for an account, active first. */
 adminRoutes.get("/clocks", async (c) => {
-  const accountId = c.req.query("accountId");
+  const accountId = c.req.query("accountId") || c.req.header(ADMIN_ORG_HEADER);
   if (!accountId) return c.json({ error: "accountId is required" }, 400);
   const doc = await readOrg(accountId);
   if (!doc) return c.json({ clocks: [] });

@@ -1,0 +1,100 @@
+import { z } from "zod";
+import { recurrenceSchema, taskStatusSchema } from "@maximus/shared";
+
+/**
+ * The seed manifest (FRAGO 05 3.5, as amended 28 Sep: the command implements
+ * the shape of the manifest Seagull supplied, and T18 documents it from that
+ * file). One file describes one organisation's starting content: its settings,
+ * its workplan tasks, the dated obligations ("clocks") that sit on those
+ * tasks, and the documents to file.
+ *
+ * Roles only. An owner is a role, never a person, and no title carries the
+ * client's name.
+ */
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export const seedTaskSchema = z.object({
+  /** The manifest's own reference ("H01", "D06"); kept on the task's source. */
+  ref: z.string().trim().min(1).max(40),
+  area: z.number().int().min(1).max(8),
+  phase: z.number().int().min(1).max(5).default(3),
+  title: z.string().trim().min(1).max(300),
+  how: z.string().trim().max(500).default(""),
+  ownerType: z.enum(["mitmark", "client"]),
+  ownerRole: z.string().trim().max(120).default(""),
+  dueAt: isoDate.nullable().default(null),
+  recurrence: recurrenceSchema.default("once"),
+  status: taskStatusSchema.default("not_started"),
+  notes: z.string().trim().max(2000).optional(),
+  source: z.string().trim().max(120).optional(),
+});
+export type SeedTask = z.infer<typeof seedTaskSchema>;
+
+/**
+ * A dated obligation that belongs to a task. Not a statutory clock: those are
+ * for data requests and breaches. It dates the task it names, or, when that
+ * task is already done, it becomes the next open instance of it.
+ */
+export const seedClockSchema = z.object({
+  ref: z.string().trim().min(1).max(40),
+  kind: z.string().trim().max(60),
+  dueAt: isoDate,
+  note: z.string().trim().max(500).default(""),
+  taskRef: z.string().trim().min(1).max(40),
+});
+export type SeedClock = z.infer<typeof seedClockSchema>;
+
+export const seedDocumentSchema = z.object({
+  /** File name, relative to the manifest. */
+  file: z.string().trim().min(1).max(300),
+  title: z.string().trim().min(1).max(300),
+  section: z.enum(["policies", "procedures", "trackers"]),
+  area: z.number().int().min(1).max(8).nullable().default(null),
+  status: z.enum(["approved", "draft", "published", "template"]),
+  version: z.string().trim().max(40).optional(),
+  approvedAt: isoDate.optional(),
+  description: z.string().trim().max(300).default(""),
+  /** False files it on the operator's side only. Defaults to visible. */
+  clientVisible: z.boolean().default(true),
+});
+export type SeedDocument = z.infer<typeof seedDocumentSchema>;
+
+export const seedManifestSchema = z.object({
+  manifest: z.string().max(500).optional(),
+  organisation: z
+    .object({
+      displayName: z.string().trim().max(200).nullable().default(null),
+      jurisdiction: z.enum(["UK", "CH-MC", "DIFC", "SG", "US"]).optional(),
+      regulation: z.string().trim().max(200).optional(),
+      settings: z
+        .object({
+          journeyPhase: z.number().int().min(1).max(5).nullable().optional(),
+          journeyNote: z.string().trim().max(300).optional(),
+        })
+        .default({}),
+    })
+    .default({ displayName: null, settings: {} }),
+  defaults: z
+    .object({
+      source: z.string().trim().max(120).optional(),
+      notesUndated: z.string().trim().max(2000).optional(),
+    })
+    .passthrough()
+    .default({}),
+  tasks: z.array(seedTaskSchema).max(500),
+  clocks: z.array(seedClockSchema).max(50).default([]),
+  documents: z.array(seedDocumentSchema).max(100).default([]),
+  /** What the manifest deliberately leaves out, for the record. Not seeded. */
+  notSeeded: z.array(z.unknown()).optional(),
+});
+export type SeedManifest = z.infer<typeof seedManifestSchema>;
+
+/**
+ * How many tasks a manifest creates: one per task, plus one for each clock
+ * whose task is already done (the next open instance). Shared by the server,
+ * the command and the tests so the three cannot disagree.
+ */
+export function tasksCreatedBy(m: SeedManifest): number {
+  const done = new Set(m.tasks.filter((t) => t.status === "done").map((t) => t.ref));
+  return m.tasks.length + m.clocks.filter((c) => done.has(c.taskRef)).length;
+}

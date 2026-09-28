@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import type { PolicyRecord } from "../db/model.ts";
 import { mutateOrg, newId, readOrg } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireRole, type AppEnv, ADMIN_ORG_HEADER } from "../lib/middleware.ts";
 import { createDraftFrom, findPolicyAnywhere, parsePolicyDocument } from "../lib/policies.ts";
 import { raisePolicyEntry } from "../lib/raiseEntry.ts";
 
@@ -31,7 +31,7 @@ function detailOf(policy: PolicyRecord) {
 
 /** All policy versions for an account, newest version first per code. */
 adminPolicyRoutes.get("/policies", async (c) => {
-  const accountId = c.req.query("accountId");
+  const accountId = c.req.query("accountId") || c.req.header(ADMIN_ORG_HEADER);
   if (!accountId) return c.json({ error: "accountId is required" }, 400);
   const doc = await readOrg(accountId);
   if (!doc) return c.json({ error: "Organisation not found" }, 404);

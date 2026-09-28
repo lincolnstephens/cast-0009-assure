@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { SessionRecord } from "../db/model.ts";
 import { deleteSession, newId, readSession, readUsers, writeSession } from "../db/store.ts";
 
@@ -31,13 +31,15 @@ export function decodeSessionCookie(value: string): string | null {
   return sessionId;
 }
 
-export async function createSession(userId: string): Promise<SessionRecord> {
+/** `epoch` is the user's sessionEpoch now; a later bump ends this session. */
+export async function createSession(userId: string, epoch = 0): Promise<SessionRecord> {
   const now = new Date();
   const session: SessionRecord = {
     id: newId(),
     userId,
     expiresAt: new Date(now.getTime() + SESSION_TTL_MS).toISOString(),
     createdAt: now.toISOString(),
+    epoch,
   };
   await writeSession(session);
   return session;
@@ -54,6 +56,17 @@ export interface AuthedUser {
   displayName: string;
   role: string;
   clientAccountId: string | null;
+  /** v1.5. Until false, only the /auth routes answer (requireAuth). */
+  mustChangePassword: boolean;
+}
+
+/**
+ * A short, non-reversible reference to a session, for the audit log. The
+ * session id itself is a bearer credential and is never written anywhere but
+ * its own blob and the signed cookie.
+ */
+export function sessionRef(sessionId: string): string {
+  return createHash("sha256").update(sessionId).digest("hex").slice(0, 12);
 }
 
 /**
@@ -71,6 +84,12 @@ export async function getUserForSession(sessionId: string): Promise<AuthedUser |
   const doc = await readUsers();
   const user = doc.users.find((u) => u.id === session.userId);
   if (!user) return null;
+  // A disabled user, or a session made before the user's password changed or
+  // was reset, is refused. The blob is removed as it is found.
+  if (user.disabled || (session.epoch ?? 0) !== (user.sessionEpoch ?? 0)) {
+    await deleteSession(sessionId);
+    return null;
+  }
 
   return {
     sessionId: session.id,
@@ -79,5 +98,6 @@ export async function getUserForSession(sessionId: string): Promise<AuthedUser |
     displayName: user.displayName,
     role: user.role,
     clientAccountId: user.orgId,
+    mustChangePassword: user.mustChangePassword === true,
   };
 }

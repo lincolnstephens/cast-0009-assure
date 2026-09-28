@@ -355,3 +355,52 @@ Instead, one guard sits on every client router. An operator carrying the marker 
 **None in the product.** Before the operator is sent the link, MITMARK should do two things this order left out:
 1. **Change the demo passwords and rotate `SESSION_SECRET`.** Anyone holding "demo" can now also open client view as the operator.
 2. **Answer the client confirmation raised on 18 September.**
+
+
+---
+
+# v1.5, named accounts and organisations
+
+**Live:** https://tessera-assure.netlify.app
+**Production deploy:** `6aba92e001af288f634c999e`, 2026-09-28 17:16 BST (after `6aba899937e9ebb4ceeb7398` at 16:38; see below)
+**Gate:** PASS, 154 of 154, against the production URL
+**Spend:** no new money committed. Build-session time, local compute, and five deploys on the existing Netlify plan. No new dependency, and no environment variable changed.
+**Built under:** `06_EXECUTION/FRAGO_05_ACCOUNTS.md`, issued 15:55 with four hours to go live, and amended during the run; live at 16:38, final at 17:16.
+
+## What v1.5 adds
+
+**People.** A manager can create users, reset their passwords, and disable or re-enable them from **Users**:
+- A new or reset password is 20 random characters, shown once to the manager and held only as a hash. The product sends no email, and the screen says so.
+- Whoever holds a one-time password can reach nothing but "Set your password" until they have chosen their own, of at least 12 characters. The server enforces this, so it is not just a screen.
+- Changing a password, resetting it, or disabling the account ends every other session for that user.
+- The last active manager cannot be disabled.
+- Every action is audited by user id, never by email.
+
+**Organisations.** **Organisations** lists and creates them, and applying the task library is a separate step that states its count first. A switcher in the admin header chooses the organisation every admin page and View as client act on. Admin requests carry the choice, and a request that names no organisation is refused rather than quietly served the demo.
+
+**The seed.** `seed-organisation` gives one organisation its starting content from Seagull's manifest:
+- It sets the organisation's settings, its tasks and their dated clocks, then files its documents one by one.
+- It runs as a signed-in manager through the product's own routes.
+- It reports counts either side, offers a dry run, and refuses a second run without `--replace`.
+
+**The order changed while it was being built.** The manifest and the nine files were placed at 15:56, moments after the build had found the folder empty. FRAGO 05 was amended to say the command reads that manifest's shape, and T18 documents the format from the file. The first production deploy (16:38) had a format of its own, so the seed was reworked, re-tested and redeployed at 17:16.
+
+Run against the real manifest and files as a dry run, the command reports 27 tasks and 9 of 9 documents: 26 tasks, plus one because the registration-renewal clock falls on a task already done. The format is in T18 section 5j.
+
+## Two things found that were not in the order
+
+1. **Session ids in the audit.** Since v1.0, every sign-in and sign-out wrote `session=<id>` to the organisation's audit log. A session id opens the account it belongs to. Both now write a one-way reference. Old entries stay, because the register is append-only; rotating `SESSION_SECRET`, already planned, makes them worthless (DC-51).
+2. **The silent demo default.** Admin routes served the demo organisation when a request named none. With one organisation that was harmless. With two, a page that forgot its parameter would have shown or changed the demo while the switcher said "client". They now answer 400 (DC-52).
+
+## One step of the order's section 7 will not work as written
+
+Changing `SEED_CLIENT_PASSWORD` and `SEED_OFFICER_PASSWORD` in Netlify will not change the demo accounts' passwords. Those variables are read only by the very first seed of an empty store, and a marker stops that seed ever running again, which is what protects the operator's work from being overwritten. The new Users page is the way to change or retire the demo accounts. Rotating `SESSION_SECRET` still works and still matters (DC-54).
+
+## What was not possible, and why
+
+- **Seeding the client's organisation.** That is section 7 step 2, after the operator is in. The client organisation does not exist yet, and creating it is a manager's action.
+- **Creating the operator's account.** The restricted file holds no email addresses. The account is created in Users by whoever holds her address, and the build never needed it.
+
+## The smallest next decision for Sunray
+
+**Who creates the operator's manager account, and when.** It takes one minute in Users. Everything else in section 7 follows from that.

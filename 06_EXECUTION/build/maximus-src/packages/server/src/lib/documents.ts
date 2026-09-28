@@ -76,6 +76,7 @@ function toClientDocument(d: DocumentRecord): ComplianceDocument {
     published: d.published,
     updatedAt: d.updatedAt,
     updatedBy: d.updatedBy,
+    description: d.description ?? "",
   };
 }
 
@@ -108,6 +109,7 @@ function policyDocument(p: PolicyRecord, area: number | null, title: string): Co
     published: true,
     updatedAt: p.approvedAt ?? p.createdAt,
     updatedBy: "MITMARK",
+    description: "",
   };
 }
 
@@ -168,6 +170,7 @@ function procedureDocument(area: number, p: ProcedureRecord): ComplianceDocument
     published: true,
     updatedAt: p.publishedAt ?? "",
     updatedBy: "MITMARK",
+    description: "",
   };
 }
 
@@ -208,13 +211,14 @@ function unfiledTrackerItem(doc: OrgDoc, t: (typeof TRACKER_DOCUMENTS)[number]):
     published: false,
     updatedAt: "",
     updatedBy: "",
+    description: "",
   };
 }
 
 function trackersSectionItems(doc: OrgDoc): ComplianceDocument[] {
   const filed = doc.documents.filter((d) => d.section === "trackers" && d.published);
   const matches = (d: DocumentRecord, t: (typeof TRACKER_DOCUMENTS)[number]) =>
-    d.title.trim().toLowerCase() === t.title.trim().toLowerCase();
+    [t.title, ...(t.aliases ?? [])].some((name) => d.title.trim().toLowerCase() === name.trim().toLowerCase());
 
   const items: ComplianceDocument[] = TRACKER_DOCUMENTS.map((t) => {
     const found = filed.find((d) => matches(d, t));

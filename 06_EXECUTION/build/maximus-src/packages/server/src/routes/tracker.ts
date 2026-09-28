@@ -84,7 +84,7 @@ trackerRoutes.get("/home", async (c) => {
       clientName: doc.settings.clientName,
       title: "Compliance Tracker",
       jurisdiction: JURISDICTION_LABEL[doc.settings.jurisdiction],
-      regulation: JURISDICTION_REGULATION[doc.settings.jurisdiction],
+      regulation: doc.settings.regulationLabel?.trim() || JURISDICTION_REGULATION[doc.settings.jurisdiction],
       asAt,
       asAtBasis,
     },

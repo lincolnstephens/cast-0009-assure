@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import type { ChatMessageRecord } from "../db/model.ts";
 import { mutateOrg, newId, readOrg } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireRole, type AppEnv, ADMIN_ORG_HEADER } from "../lib/middleware.ts";
 import { findEscalationOrgId } from "../lib/reviewQueue.ts";
 import { raiseGuideEntry } from "../lib/raiseEntry.ts";
 
@@ -12,7 +12,7 @@ adminEscalationRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
 
 /** Escalations for an account, newest first. */
 adminEscalationRoutes.get("/escalations", async (c) => {
-  const accountId = c.req.query("accountId");
+  const accountId = c.req.query("accountId") || c.req.header(ADMIN_ORG_HEADER);
   if (!accountId) return c.json({ error: "accountId is required" }, 400);
   const doc = await readOrg(accountId);
   if (!doc) return c.json({ error: "Organisation not found" }, 404);

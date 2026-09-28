@@ -15,6 +15,8 @@ export const sessionUserSchema = z.object({
   role: roleSchema,
   clientAccountId: z.string().min(1).nullable(),
   clientAccountName: z.string().nullable(),
+  /** v1.5. True until the user sets their own password; nothing else opens until then. */
+  mustChangePassword: z.boolean().default(false),
 });
 export type SessionUser = z.infer<typeof sessionUserSchema>;
 
@@ -29,3 +31,13 @@ export const meResponseSchema = z.object({
   branding: clientBrandingSchema.nullable(),
 });
 export type MeResponse = z.infer<typeof meResponseSchema>;
+
+/** v1.5. The rule, stated rather than scored. */
+export const PASSWORD_MIN_LENGTH = 12;
+export const PASSWORD_RULE = `At least ${PASSWORD_MIN_LENGTH} characters.`;
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(200),
+  newPassword: z.string().max(200),
+});
+export type ChangePassword = z.infer<typeof changePasswordSchema>;

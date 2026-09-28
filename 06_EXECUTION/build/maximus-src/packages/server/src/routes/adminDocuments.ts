@@ -4,7 +4,7 @@ import type { DocumentRecord } from "../db/model.ts";
 import { deleteDocumentBlob, mutateOrg, newId, readOrg, writeDocumentBlob } from "../db/store.ts";
 import { EFFECTIVE_UPLOAD_MAX_BYTES, EFFECTIVE_UPLOAD_MAX_MB } from "../lib/documents.ts";
 import { writeAudit } from "../lib/audit.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireRole, type AppEnv, adminOrgOf } from "../lib/middleware.ts";
 
 /**
  * The operator's side of the Compliance Documents repository: file upload or
@@ -20,9 +20,8 @@ import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
 export const adminDocumentRoutes = new Hono<AppEnv>();
 adminDocumentRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
 
-function orgIdOf(c: { req: { query: (k: string) => string | undefined } }): string {
-  return c.req.query("org") || "demo";
-}
+// v1.5: no default organisation; see adminOrgOf.
+const orgIdOf = adminOrgOf;
 
 const OVERSIZE_MESSAGE = `Files up to ${EFFECTIVE_UPLOAD_MAX_MB} MB can be uploaded here; this one is larger. Add it as a link instead.`;
 
@@ -91,6 +90,7 @@ adminDocumentRoutes.post("/documents", async (c) => {
     published: input.published,
     updatedAt: now,
     updatedBy: user.displayName,
+    description: input.description,
   };
 
   if (input.kind === "file") {

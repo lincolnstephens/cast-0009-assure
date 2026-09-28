@@ -528,9 +528,10 @@ export const documentKindSchema = z.enum(["file", "link", "policy"]);
 export type DocumentKind = z.infer<typeof documentKindSchema>;
 
 /** The registers the Trackers section expects, so an empty one can still be named. */
-export const TRACKER_DOCUMENTS: { key: string; title: string; area: number }[] = [
+export const TRACKER_DOCUMENTS: { key: string; title: string; area: number; aliases?: string[] }[] = [
   { key: "ropa", title: "Record of processing activities", area: 2 },
-  { key: "access", title: "Employee access tracker", area: 2 },
+  // v1.5: the client's own register is called a matrix; it is the same register.
+  { key: "access", title: "Employee access tracker", area: 2, aliases: ["Employee access matrix"] },
   { key: "transfers", title: "International transfers register", area: 2 },
   { key: "dsar", title: "Data request log", area: 6 },
   { key: "breach", title: "Breach register", area: 8 },
@@ -559,6 +560,8 @@ export const documentSchema = z.object({
   published: z.boolean(),
   updatedAt: z.string(),
   updatedBy: z.string(),
+  /** v1.5. One plain line about the state of the document. */
+  description: z.string().default(""),
 });
 export type ComplianceDocument = z.infer<typeof documentSchema>;
 
@@ -588,6 +591,7 @@ export const documentInputSchema = z.object({
   fileName: z.string().trim().max(300).default(""),
   contentType: z.string().trim().max(200).default(""),
   published: z.boolean().default(true),
+  description: z.string().trim().max(300).default(""),
 });
 export type DocumentInput = z.infer<typeof documentInputSchema>;
 

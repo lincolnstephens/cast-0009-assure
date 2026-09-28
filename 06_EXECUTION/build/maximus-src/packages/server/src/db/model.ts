@@ -42,6 +42,17 @@ export interface UserRecord {
   role: Role;
   displayName: string;
   createdAt: Iso;
+  /** v1.5. A disabled user cannot sign in and every session is refused. Never deleted. */
+  disabled?: boolean;
+  /** v1.5. Set on create and on reset; cleared when the user sets their own password. */
+  mustChangePassword?: boolean;
+  lastSignInAt?: Iso | null;
+  /**
+   * v1.5. Sessions carry the epoch they were created under. Bumping it ends
+   * every session made before, without having to find them: sessions are one
+   * blob each and are not indexed by user.
+   */
+  sessionEpoch?: number;
 }
 
 export interface SessionRecord {
@@ -49,12 +60,20 @@ export interface SessionRecord {
   userId: string;
   expiresAt: Iso;
   createdAt: Iso;
+  /** The user's sessionEpoch when this session was created. Absent means 0. */
+  epoch?: number;
 }
 
 /** The users document. Sessions live here too; the volume is small. */
 export interface UsersDoc {
   users: UserRecord[];
   sessions: SessionRecord[];
+  /**
+   * v1.5. Manager-level actions (users, organisations) that belong to no one
+   * organisation. An action on a client user is also written to that
+   * organisation's own audit. Never a password, never an email in the detail.
+   */
+  audit?: AuditRecord[];
 }
 
 export const EMPTY_USERS_DOC: UsersDoc = { users: [], sessions: [] };
@@ -304,6 +323,8 @@ export interface DocumentRecord {
   published: boolean;
   updatedAt: Iso;
   updatedBy: string;
+  /** v1.5. One plain line about the state of the document ("Template with one row. Not yet populated."). */
+  description?: string;
 }
 
 /** How MITMARK does the work in an area, for the client to read. */
@@ -397,6 +418,10 @@ export interface OrgSettings {
   denominatorMode: 'overdue' | 'cycle';
   /** When MITMARK expects to publish the first documents in each section. */
   documentsTargetDate: string | null;
+  /** v1.5. The regulation line on the client's tracker. Empty means the jurisdiction's default. */
+  regulationLabel?: string;
+  /** v1.5. When the seed command last ran against this organisation. */
+  seededAt?: string | null;
   /** The journey's current stage, 1 to 5. Null means work it out from the tasks. */
   journeyPhase: number | null;
   /** The sentence beneath the journey stage. Empty means the default. */

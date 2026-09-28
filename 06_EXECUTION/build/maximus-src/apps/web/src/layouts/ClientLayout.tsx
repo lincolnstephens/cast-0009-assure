@@ -1,6 +1,6 @@
 import type { ClientBranding } from "@maximus/shared";
 import type { CSSProperties } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { ClientLogo } from "../components/ClientLogo";
 import { ClientPoweredBy } from "../components/ClientPoweredBy";
 import { ClientViewBanner } from "../components/ClientViewBanner";
@@ -102,6 +102,13 @@ export function ClientLayout() {
               </div>
               <div className="text-[11px] text-client-muted">Your compliance officer</div>
             </div>
+            <Link
+              to="/change-password"
+              data-testid="change-password-link"
+              className="ml-2 text-[12px] text-client-muted underline underline-offset-2 hover:text-client-text"
+            >
+              Change password
+            </Link>
           </div>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto bg-client-bg px-4 py-6 leading-relaxed text-client-text sm:px-8 sm:py-10">

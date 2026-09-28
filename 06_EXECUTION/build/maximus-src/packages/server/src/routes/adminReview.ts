@@ -1,7 +1,7 @@
 import { reviewAnswerSchema, reviewDecisionSchema, reviewItemTypeSchema } from "@maximus/shared";
 import { Hono } from "hono";
 import { readOrg } from "../db/store.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireRole, type AppEnv, ADMIN_ORG_HEADER } from "../lib/middleware.ts";
 import {
   answerChatAmber,
   approveExportRequest,
@@ -19,7 +19,7 @@ adminReviewRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
 
 /** Unified review queue - pending items oldest first, optional type filter. */
 adminReviewRoutes.get("/review", async (c) => {
-  const accountId = c.req.query("accountId");
+  const accountId = c.req.query("accountId") || c.req.header(ADMIN_ORG_HEADER);
   if (!accountId) return c.json({ error: "accountId is required" }, 400);
 
   const typeParam = c.req.query("type");

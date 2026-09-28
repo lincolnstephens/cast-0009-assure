@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { MitmarkLogo } from "../components/MitmarkLogo";
 import { endPreview } from "../lib/preview";
 import { useAdmin } from "../store/admin";
@@ -22,6 +22,8 @@ const navItems = [
   { to: "/admin/exports", label: "Exports", view: "exports" },
   { to: "/admin/settings", label: "Settings", view: "settings" },
   { to: "/admin/audit", label: "Audit log", view: "audit" },
+  { to: "/admin/organisations", label: "Organisations", view: "organisations" },
+  { to: "/admin/users", label: "Users", view: "users" },
   { to: "/admin/client-view", label: "View as client", view: "client-view" },
 ];
 
@@ -88,10 +90,12 @@ export function AdminLayout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line bg-hud-panel/40 px-4 py-2.5 sm:px-5">
-          {/* Beta ships one client account; the switcher must still exist (spec §5). */}
+          {/* The organisation switcher (FRAGO 05 3.4). Every admin page, and
+              View as client, acts on the organisation chosen here. */}
           <label className="flex min-w-0 items-center gap-2 text-[13px] text-hud-muted">
-            Client account
+            Organisation
             <select
+              data-testid="org-switcher"
               className="max-w-[10rem] rounded border border-hud-line bg-hud-bg px-2 py-1 text-[13px] text-hud-text outline-none focus:border-hud-accent"
               value={selectedAccountId ?? ""}
               onChange={(e) => selectAccount(e.target.value)}
@@ -105,6 +109,13 @@ export function AdminLayout() {
           </label>
           <div className="min-w-0 truncate text-[13px] text-hud-muted">
             {user?.displayName} <span className="text-hud-gold">(officer)</span>
+            <Link
+              to="/change-password"
+              data-testid="change-password-link"
+              className="ml-3 text-hud-muted underline underline-offset-2 hover:text-hud-text"
+            >
+              Change password
+            </Link>
           </div>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto p-6">
@@ -119,7 +130,9 @@ export function AdminLayout() {
           {accountsStatus === "ready" && !selectedAccountId && (
             <p className="text-[13px] text-hud-muted">No client accounts are configured.</p>
           )}
-          {accountsStatus === "ready" && selectedAccountId && <Outlet />}
+          {/* Keyed on the organisation, so switching remounts the page and it
+              reloads for the new organisation rather than showing the old one. */}
+          {accountsStatus === "ready" && selectedAccountId && <Outlet key={selectedAccountId} />}
         </main>
       </div>
     </div>

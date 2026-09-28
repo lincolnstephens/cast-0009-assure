@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import type { Context, Next } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { getCookie } from "hono/cookie";
 import { readOrg, readUsers } from "../db/store.ts";
 import { writeAudit } from "./audit.ts";
@@ -7,6 +7,7 @@ import {
   decodeSessionCookie,
   getUserForSession,
   SESSION_COOKIE,
+  sessionRef,
   type AuthedUser,
 } from "./sessions.ts";
 
@@ -25,6 +26,12 @@ export async function requireAuth(c: Context<AppEnv>, next: Next) {
   if (!sessionId) return c.json({ error: "Not signed in" }, 401);
   const user = await getUserForSession(sessionId);
   if (!user) return c.json({ error: "Not signed in" }, 401);
+  // First sign-in (FRAGO 05 3.3): a user holding a one-time password reaches
+  // nothing but the /auth routes until they have set their own. Enforced here,
+  // on the server, so no page and no direct request gets round it.
+  if (user.mustChangePassword && !c.req.path.startsWith("/api/auth/")) {
+    return c.json({ error: "Change your password to continue.", code: "password_change_required" }, 403);
+  }
   c.set("user", user);
   await next();
 }
@@ -56,10 +63,6 @@ export function previewOrgOf(c: Context<AppEnv>): string | null {
   return match ? match[1] : null;
 }
 
-/** A short, non-reversible reference to a session, so the audit can dedupe without holding the session id. */
-function sessionRef(sessionId: string): string {
-  return createHash("sha256").update(sessionId).digest("hex").slice(0, 12);
-}
 
 /**
  * Every client router sits behind this instead of `requireRole("client")`.
@@ -110,7 +113,35 @@ export async function requireClientSeat(c: Context<AppEnv>, next: Next) {
     displayName: seat.displayName,
     role: "client",
     clientAccountId: orgId,
+    mustChangePassword: false,
   });
   c.set("preview", true);
   await next();
+}
+
+// ---------------------------------------------------------------------------
+// Which organisation an admin request acts on (FRAGO 05 3.4)
+// ---------------------------------------------------------------------------
+
+/** The header the web client sets from the organisation switcher. */
+export const ADMIN_ORG_HEADER = "x-assure-org";
+
+/**
+ * The organisation an admin request names: the `org` or `accountId` query
+ * parameter, else the switcher's header. There is no default. Until v1.5 a
+ * missing parameter fell back to the demo organisation, which with a second
+ * organisation would have let a page read the demo while the switcher showed
+ * the client. A request that names none is refused with 400.
+ */
+export function adminOrgOf(c: Context): string {
+  const id = (c.req.query("org") || c.req.query("accountId") || c.req.header(ADMIN_ORG_HEADER) || "").trim();
+  if (!id) {
+    throw new HTTPException(400, {
+      res: new Response(JSON.stringify({ error: "Choose an organisation first." }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      }),
+    });
+  }
+  return id;
 }

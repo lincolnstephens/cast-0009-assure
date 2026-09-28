@@ -3,13 +3,13 @@ import { Hono } from "hono";
 import { mutateOrg, readOrg } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { domainsForOrg, findPostureDomainGlobally, historyForDomain, recordPostureChange } from "../lib/posture.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireRole, type AppEnv, ADMIN_ORG_HEADER } from "../lib/middleware.ts";
 
 export const adminPostureRoutes = new Hono<AppEnv>();
 adminPostureRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
 
 adminPostureRoutes.get("/posture", async (c) => {
-  const accountId = c.req.query("accountId");
+  const accountId = c.req.query("accountId") || c.req.header(ADMIN_ORG_HEADER);
   if (!accountId) return c.json({ error: "accountId is required" }, 400);
   const doc = await readOrg(accountId);
   if (!doc) return c.json({ domains: [] });

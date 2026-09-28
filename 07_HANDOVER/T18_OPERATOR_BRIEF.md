@@ -1,8 +1,8 @@
 ---
 document: OPERATOR_BRIEF
 job: CAST-0009 ASSURE
-product: Tessera Assure v1.4
-version: v1.4
+product: Tessera Assure v1.5
+version: v1.5
 status: FOR THE MITMARK OPERATOR
 authority: Seagull, written by the build session under T02 A6
 register_id: T18
@@ -240,6 +240,143 @@ The stricter view is still yours. **Settings** has a toggle: "Signed off this cy
 - The overall figure is always her figure. Your "Signed off this cycle" setting does not change what you see here, because it does not change what she sees.
 
 **Module tile colours changed at v1.4.** Green and amber tiles now carry dark text and red tiles white text, so every tile is readable (4.5:1 or better). A grey tile, for a module with nothing open, also carries white text.
+
+## 5j. People, organisations and the seed (v1.5)
+
+### Creating a user and handing over the password
+
+1. In the admin workspace, open **Users**.
+2. Enter the email address and choose the role:
+   - **Manager:** sees every organisation.
+   - **Client user:** belongs to one organisation, which you choose.
+3. Add a display name if you want one, then choose **Create user**.
+4. A one-time password appears once, in a box marked "Shown once". **Tessera Assure does not send email.** Pass the password on yourself, by MITMARK's usual secure channel. It is never stored in readable form and cannot be shown again. If it is lost, choose **Reset password** on that user's row to get a new one.
+5. **Disable** stops someone signing in and ends every session they have open. **Re-enable** lets them back in. There is no delete.
+6. The product will not disable the last active manager.
+7. Every one of these actions is written to the audit, naming you and the user's id. The audit never records a password or the user's email address.
+
+### First sign-in
+
+- **One-time password:** someone signing in with one sees only "Set your password" until they choose their own. The rule is stated on the screen: at least 12 characters. The server enforces it too, so nothing else opens until the password is set.
+- **Changing a password later:** anyone can change their password from **Change password** in the header, on either side. Doing so signs them out everywhere else.
+
+### Organisations and the switcher
+
+- **Creating one:** **Organisations** lists every organisation with its users and tasks. Creating one takes a display name (as it should appear on the client's pages), a jurisdiction and, optionally, a regulation label for the tracker's header. A new organisation starts empty.
+- **Applying the task library:** **Apply task library** is a separate step. It first tells you how many tasks it will create, and writes nothing until you confirm.
+- **The switcher:** the **Organisation** select at the top of every admin page decides which organisation you are working on. Every admin page, and **View as client**, acts on the one selected. The choice is remembered until you close the browser tab. Each organisation has its own settings, including rates, journey stage and module introductions.
+
+### Running the seed
+
+The seed gives one organisation its starting content from a manifest file. You run it from the job's build folder on a machine with the source:
+
+```
+set ASSURE_SEED_EMAIL and ASSURE_SEED_PASSWORD to a manager account (in the shell only)
+pnpm --filter @maximus/server seed-organisation -- --url https://tessera-assure.netlify.app --org <organisation id> --manifest <path>/manifest.json --dry-run
+```
+
+- **The dry run** reports how many tasks it would create, and which document files are present or missing. It writes nothing.
+- **The real run:** run the same command without `--dry-run`. It writes the tasks and the journey stage, then files each document found next to the manifest, reporting counts before and after.
+- **A missing file** is logged and skipped; you can file it later from **Documents**.
+- **Running it twice:** the seed refuses to run against an organisation that already has tasks, unless you add `--replace`. That replaces the tasks, but it does not remove documents already filed, so re-running files them again. Delete duplicates from **Documents**.
+- **The organisation id** is shown under each name on the **Organisations** page.
+
+### The manifest format
+
+The format is the one in Seagull's `material/lurong_documents/manifest.json` (FRAGO 05, as amended 28 Sep); the command reads that file as it is. It is one JSON file, placed next to the document files it names. Owners are roles, never people's names, and no title carries the client's name.
+
+```
+{
+  "manifest": "a line saying what this is and who wrote it",
+  "organisation": {
+    "displayName": null,
+    "jurisdiction": "UK",
+    "regulation": "UK GDPR and Data Protection Act 2018",
+    "settings": { "journeyPhase": 3, "journeyNote": "one sentence" }
+  },
+  "defaults": {
+    "source": "handover-2026-03",
+    "notesUndated": "note given to any open task with no date"
+  },
+  "tasks": [
+    {
+      "ref": "H01",
+      "area": 4,
+      "phase": 3,
+      "title": "...",
+      "how": "...",
+      "ownerType": "mitmark",
+      "ownerRole": "MITMARK data compliance officer",
+      "dueAt": null,
+      "recurrence": "once",
+      "status": "not_started",
+      "notes": "optional",
+      "source": "optional"
+    }
+  ],
+  "clocks": [
+    { "ref": "C01", "kind": "registration_renewal", "dueAt": "2027-03-21", "note": "...", "taskRef": "H02" }
+  ],
+  "documents": [
+    {
+      "file": "P01_Data_Protection_Policy_v1_2026-03-31.docx",
+      "title": "Data Protection Policy",
+      "section": "policies",
+      "area": 4,
+      "status": "approved",
+      "version": "1",
+      "approvedAt": "2026-03-31",
+      "description": "one plain line about the document's state"
+    }
+  ],
+  "notSeeded": ["what the manifest deliberately leaves out, for the record"]
+}
+```
+
+**Organisation:**
+- `displayName: null` leaves the organisation's name as you created it.
+- `regulation` becomes the regulation line on the client's tracker.
+- `journeyPhase` and `journeyNote` set the journey.
+
+**Tasks:**
+
+| Field | Values |
+|---|---|
+| `ref` | Kept on the task (its source reads `<source>:<ref>`), so every task traces back to its line in the plan |
+| `area` | The module, 1 to 8 |
+| `phase` | 1 to 5 |
+| `ownerType` | `mitmark` or `client` |
+| `status` | `not_started`, `in_progress`, `blocked`, `done` or `not_applicable`. Nothing is marked `done` unless the source shows it done |
+| `dueAt` | `YYYY-MM-DD` or `null`. An open task with no date takes `defaults.notesUndated` as its note, unless it has its own `notes` |
+| `recurrence` | `once`, `monthly`, `quarterly`, `annual` or `always-on` |
+
+**Clocks** are dated obligations that belong to a task (`taskRef`). They are not statutory clocks, which are reserved for data requests and breaches:
+- If the task is open, the clock sets its due date and adds its note.
+- If the task is already done, as with the March 2026 registration renewal, the clock becomes one new open task with the clock's date. That way the next renewal appears under Upcoming instead of sitting on a completed task. This is why the seed can create one more task than the manifest lists; the dry run reports the true number.
+
+**Documents:**
+
+| Field | Values |
+|---|---|
+| `section` | `policies`, `procedures` or `trackers` |
+| `area` | 1 to 8, or `null` |
+| `status` | `approved`, `draft`, `published` or `template` |
+| `version`, `approvedAt` | For an approved document. The client sees "Version 1, approved 31 March 2026" |
+| `description` | Shown to the client beneath the title, so a template or a draft reads as what it is |
+| `clientVisible` | Optional; `false` files it on your side only. Default `true` |
+
+A tracker filed as "Employee Access Matrix" is recognised as the employee access tracker register, so it does not also appear as "Not yet filed".
+
+`06_EXECUTION/gate/fixtures/seed_manifest_fixture.json` is a copy of this manifest (it contains no client name), and the gate seeds its own test organisation from it on every run.
+
+### What the client sees on day one
+
+The organisation's own name on every page, and its own workplan and documents. The journey shows the stage from the manifest. There are no illustrative Record entries: a new organisation starts with "show illustrative" off, so the Record and the Statement are empty and say so until real entries are added. Nothing is sent to anyone. The client user's account exists only when a manager creates it, and her one-time password reaches her only by the route Sunray chooses.
+
+### Two points about the secrets step that follows
+
+- **Changing `SEED_CLIENT_PASSWORD` and `SEED_OFFICER_PASSWORD` in Netlify will not change the demo accounts' passwords.** Those variables are read only by the very first seed of an empty store, which has long since run and will not run again. To change or retire the demo accounts, use **Users**: reset their passwords, or disable them.
+- **Rotating `SESSION_SECRET` signs everyone out, and that is intended.** Audit entries written before v1.5 contain raw session ids, and rotating the secret makes every one of them worthless. Since v1.5 the audit records only a one-way reference to a session.
 
 ## 6. Importing the v0.1 export
 

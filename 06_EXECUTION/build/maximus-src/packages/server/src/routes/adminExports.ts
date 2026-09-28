@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { readOrg } from "../db/store.ts";
-import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
+import { requireAuth, requireRole, type AppEnv, ADMIN_ORG_HEADER } from "../lib/middleware.ts";
 
 export const adminExportRoutes = new Hono<AppEnv>();
 adminExportRoutes.use("*", requireAuth, requireRole("mitmark_admin"));
 
 adminExportRoutes.get("/exports", async (c) => {
-  const accountId = c.req.query("accountId");
+  const accountId = c.req.query("accountId") || c.req.header(ADMIN_ORG_HEADER);
   if (!accountId) return c.json({ error: "accountId is required" }, 400);
 
   const doc = await readOrg(accountId);

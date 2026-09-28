@@ -1,5 +1,5 @@
 import type { AuditRecord } from "../db/model.ts";
-import { mutateOrg, newId } from "../db/store.ts";
+import { mutateOrg, mutateUsers, newId } from "../db/store.ts";
 
 /**
  * NEW call signature (see PORTING_BRIEF.md and the AUTH lane report for the
@@ -47,4 +47,28 @@ export async function writeAudit(entry: AuditEntry): Promise<void> {
   await mutateOrg(orgId, (doc) => {
     doc.audit.push(record);
   });
+}
+
+/**
+ * v1.5. A manager-level action (users, organisations) belongs to no single
+ * organisation, so it is written to the users document's own audit. When it
+ * concerns an organisation (a client user, a new organisation), the same
+ * entry is also written to that organisation's audit, so its log is complete.
+ * The detail names ids, never an email and never a password.
+ */
+export async function writeSystemAudit(entry: AuditEntry): Promise<void> {
+  const record: AuditRecord = {
+    id: newId(),
+    orgId: entry.orgId,
+    actorId: entry.actorId,
+    actorName: entry.actorName,
+    action: entry.action,
+    detail: entry.detail ?? "",
+    createdAt: new Date().toISOString(),
+  };
+  await mutateUsers((doc) => {
+    doc.audit ??= [];
+    doc.audit.push(record);
+  });
+  if (entry.orgId) await writeAudit(entry);
 }

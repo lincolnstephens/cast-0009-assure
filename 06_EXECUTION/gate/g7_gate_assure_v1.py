@@ -60,6 +60,19 @@ the client, and the one setting changed (denominatorMode) is restored in a
 finally block. client-view is not added to line 3: it redirects out of the
 admin workspace, so line 36 covers it instead.
 
+v1.5 (FRAGO 05, named accounts, organisations and seed). Lines 39 to 49 drive
+user management, the first-sign-in password change, organisations, the
+organisation switcher, client isolation, the seed endpoint and the audit
+hygiene of sign-in; lines 50 and 51 are static (restricted terms against the
+built bundle, and no password logged or audited in server source). The gate
+runs against the live store, where nothing can be deleted, so every
+organisation and user it creates is find-or-create under fixed identities
+(GATE_ORG_NAME, GATE_CLIENT_EMAIL, GATE_MANAGER_EMAIL), nothing is ever created
+in the demo organisation, and every gate user is disabled again in a finally
+block, per line and once more at the end of the driven section. The v1.4
+lines that used "the first organisation in the account list" now use the demo
+client seat's own organisation, since the list holds more than one.
+
 Usage:
     python gate/g7_gate_assure_v1.py [url-or-path] [outdir]
 
@@ -84,7 +97,7 @@ import sys
 CONFIG = {
     # Identity of the run, for the report header.
     "codename": "ASSURE",
-    "iteration": "v1.4",
+    "iteration": "v1.5",
 
     # What is gated. Either a deployed URL or a path to a local artefact.
     # Passed on the command line; these are the defaults.
@@ -510,8 +523,165 @@ def sdrv_check_restricted_passes(cfg, line):
     return False, (summary or "no summary line") + f" (exit {proc.returncode})"
 
 
+# v1.5. The restricted terms, read at run time by the same function
+# check_restricted.py uses (imported, not copied), so the gate and the
+# pre-commit check agree on what a term is. Email addresses in the restricted
+# file are added, since FRAGO 05 section 3.7 speaks of "no name or address".
+# The terms are never printed, returned in a detail or written to the report.
+_RESTRICTED_CACHE = {}
+
+
+def _restricted_terms_runtime(cfg):
+    if "terms" in _RESTRICTED_CACHE:
+        return _RESTRICTED_CACHE["terms"]
+    import importlib.util
+    terms = []
+    script = cfg["root"] / CHECK_RESTRICTED_SCRIPT
+    try:
+        spec = importlib.util.spec_from_file_location("_gate_check_restricted", str(script))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        terms = list(mod.restricted_terms(str(cfg["root"])))
+    except Exception:
+        terms = list(load_restricted_names(cfg) or [])
+    path = cfg["root"] / cfg["restricted_names_file"]
+    if not os.environ.get(cfg["restricted_names_env"], "").strip() and path.is_file():
+        text = path.read_text(encoding="utf-8", errors="replace")
+        terms.extend(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text))
+    terms = sorted({t for t in terms if t.strip()})
+    _RESTRICTED_CACHE["terms"] = terms or None
+    return _RESTRICTED_CACHE["terms"]
+
+
+def _restricted_hit_count(text, terms):
+    """How many distinct terms occur in text, case-insensitive. Never which."""
+    low = text.lower()
+    return sum(1 for t in terms if t.lower() in low)
+
+
+BUNDLE_PATHS = (
+    "06_EXECUTION/build/maximus-src/apps/web/dist",
+    "06_EXECUTION/build/maximus-src/netlify/functions/_api-bundle.mjs",
+)
+
+
+def sdrv_restricted_in_bundle(cfg, line):
+    """Line 50 (new at v1.5): the restricted terms against the built web
+    bundle and the built function bundle. Hits are reported as file and
+    line number, redacted."""
+    terms = _restricted_terms_runtime(cfg)
+    if not terms:
+        return False, "the restricted terms could not be read; an absent list is not a pass"
+    files, missing = [], []
+    for rel in line.get("paths", BUNDLE_PATHS):
+        p = cfg["root"] / rel
+        if p.is_file():
+            files.append(p)
+        elif p.is_dir():
+            files.extend(f for f in p.rglob("*") if f.is_file())
+        else:
+            missing.append(rel)
+    if missing:
+        return False, "bundle not found: " + ", ".join(missing)
+    hits = []
+    for f in files:
+        try:
+            text = f.read_bytes().decode("utf-8", errors="replace")
+        except OSError:
+            continue
+        if not _restricted_hit_count(text, terms):
+            continue
+        rel = str(f.relative_to(cfg["root"])).replace("\\", "/")
+        for n, ln in enumerate(text.splitlines(), start=1):
+            if _restricted_hit_count(ln, terms):
+                hits.append(f"{rel}:{n}: [REDACTED]")
+    if hits:
+        return False, f"{len(hits)} hit(s): " + "; ".join(hits[:5])
+    return True, f"{len(terms)} restricted terms checked against {len(files)} bundle files, 0 hits"
+
+
+# v1.5. No password reaches a log or the audit log (FRAGO 05 sections 4 and
+# 5). String literal text is blanked first (template-literal ${...}
+# expressions are kept), so prose such as the action name "user.reset_password"
+# does not trip it; what is flagged is a password-bearing identifier among the
+# arguments of a console.* or writeAudit call.
+PASSWORD_IDENTIFIERS = re.compile(
+    r"\b(password|oneTimePassword|newPassword|currentPassword|passwordHash)\b")
+LOG_CALL_START = re.compile(r"\bconsole\.(log|info|warn|error|debug|trace)\s*\(|\bwriteAudit\s*\(")
+SERVER_SRC = "06_EXECUTION/build/maximus-src/packages/server/src"
+
+
+def _blank_string_literals(src):
+    """Replace the content of '...', "..." and `...` literals with spaces,
+    keeping ${...} expressions inside template literals, and keeping the
+    length so offsets still map to line numbers."""
+    out, i, n = [], 0, len(src)
+    stack = []  # "`" while inside a template literal's text, "{" inside ${ }
+    depth = []
+    while i < n:
+        ch = src[i]
+        in_tpl = stack and stack[-1] == "`"
+        if in_tpl:
+            if ch == "\\" and i + 1 < n:
+                out.append("  "); i += 2; continue
+            if ch == "`":
+                stack.pop(); out.append(ch); i += 1; continue
+            if ch == "$" and i + 1 < n and src[i + 1] == "{":
+                stack.append("{"); depth.append(0); out.append("${"); i += 2; continue
+            out.append("\n" if ch == "\n" else " "); i += 1; continue
+        if ch in "'\"":
+            j = i + 1
+            while j < n and src[j] != ch and src[j] != "\n":
+                j += 2 if src[j] == "\\" else 1
+            out.append(ch + " " * max(0, min(j, n) - i - 1) + (src[j] if j < n else ""))
+            i = j + 1; continue
+        if ch == "`":
+            stack.append("`"); out.append(ch); i += 1; continue
+        if stack and stack[-1] == "{":
+            if ch == "{":
+                depth[-1] += 1
+            elif ch == "}":
+                if depth[-1] == 0:
+                    stack.pop(); depth.pop(); out.append(ch); i += 1; continue
+                depth[-1] -= 1
+        if ch == "/" and i + 1 < n and src[i + 1] == "/":
+            j = src.find("\n", i)
+            j = n if j == -1 else j
+            out.append(" " * (j - i)); i = j; continue
+        out.append(ch); i += 1
+    return "".join(out)
+
+
+def sdrv_no_password_logging(cfg, line):
+    """Line 51 (new at v1.5)."""
+    base = cfg["root"] / line.get("path", SERVER_SRC)
+    if not base.is_dir():
+        return False, f"{line.get('path', SERVER_SRC)} not found"
+    hits, calls = [], 0
+    for f in base.rglob("*"):
+        if not f.is_file() or f.suffix not in (".ts", ".mts", ".js", ".mjs", ".tsx"):
+            continue
+        raw = f.read_text(encoding="utf-8", errors="replace")
+        text = _blank_string_literals(raw)
+        for m in LOG_CALL_START.finditer(text):
+            calls += 1
+            k, d = m.end(), 1
+            while k < len(text) and d:
+                d += {"(": 1, ")": -1}.get(text[k], 0)
+                k += 1
+            args = text[m.end():k]
+            if PASSWORD_IDENTIFIERS.search(args):
+                rel = str(f.relative_to(cfg["root"])).replace("\\", "/")
+                hits.append(f"{rel}:{raw.count(chr(10), 0, m.start()) + 1}")
+    if hits:
+        return False, "password-bearing argument in a log or audit call at " + "; ".join(hits[:8])
+    return True, f"{calls} console.* and writeAudit calls read, none passes a password"
+
+
 STATIC_DRIVERS = {
     "check_restricted_passes": sdrv_check_restricted_passes,
+    "restricted_in_bundle": sdrv_restricted_in_bundle,
+    "no_password_logging": sdrv_no_password_logging,
 }
 
 
@@ -609,6 +779,15 @@ def run_driven(cfg, target):
         if line.get("status") == "retired":
             print(f"RETIRED L{line['id']}: {line.get('retired_reason', 'no reason given')}")
 
+    try:
+        _run_driven_browser(cfg, target, dod, sync_playwright)
+    finally:
+        # v1.5: whatever happened above, no gate user is left able to sign in.
+        _final_gate_cleanup(cfg)
+    return "RAN"
+
+
+def _run_driven_browser(cfg, target, dod, sync_playwright):
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         for res in cfg["resolutions"]:
@@ -661,6 +840,12 @@ def _credentials(cfg, role):
 def _sign_in(page, cfg, role, target):
     """Sign out if signed in, then sign in as the account for `role`."""
     email, password = _credentials(cfg, role)
+    return _sign_in_with(page, target, email, password)
+
+
+def _sign_in_with(page, target, email, password):
+    """v1.5: the body of _sign_in, for an explicit account (the gate's own
+    test users). Behaviour for the two demo seats is unchanged."""
     page.goto(target.rstrip("/") + "/login", wait_until="domcontentloaded")
     # v1.4: a "View as client" left in sessionStorage must not carry into
     # the next sign-in. Clear it and reload so the app starts without it.
@@ -2384,20 +2569,38 @@ PREVIEW_IDENTITY_PATHS = (
 class _ApiSeat:
     """One signed-in seat over HTTP, with its own cookie jar."""
 
-    def __init__(self, cfg, role):
+    def __init__(self, cfg, role, email=None, password=None, login=True):
+        """v1.5: email and password may be given for the gate's own users,
+        and login=False makes a seat that has not signed in (for proving a
+        refused sign-in). The demo seats are signed in exactly as before."""
         import http.cookiejar
         import urllib.request
+        self.cfg = cfg
         self.base = cfg["_target"].rstrip("/") + "/api"
         self.jar = http.cookiejar.CookieJar()
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.jar))
         self.user = None
-        email, password = _credentials(cfg, role)
-        status, body = self.call("POST", "/auth/login", {"email": email, "password": password})
+        self.login_status = None
+        self.login_body = None
+        if email is None:
+            email, password = _credentials(cfg, role)
+        if not login:
+            return
+        status, body = self.login(email, password)
         if status != 200 or not isinstance(body, dict) or not body.get("user"):
-            raise RuntimeError(f"{role} API sign-in returned {status}")
-        self.user = body["user"]
+            raise RuntimeError(f"{role or 'gate user'} API sign-in returned {status}")
 
-    def call(self, method, path, body=None, preview=None):
+    def login(self, email, password):
+        status, body = self.call("POST", "/auth/login", {"email": email, "password": password})
+        self.login_status, self.login_body = status, body
+        if status == 200 and isinstance(body, dict) and body.get("user"):
+            self.user = body["user"]
+        return status, body
+
+    def cookies(self):
+        return sorted((c.name, c.value) for c in self.jar)
+
+    def call(self, method, path, body=None, preview=None, headers=None):
         import urllib.error
         import urllib.request
         data = json.dumps(body).encode("utf-8") if body is not None else None
@@ -2407,6 +2610,8 @@ class _ApiSeat:
             req.add_header("Content-Type", "application/json")
         if preview is not None:
             req.add_header(PREVIEW_HEADER, f"client:{preview}")
+        for k, v in (headers or {}).items():
+            req.add_header(k, v)
         try:
             with self.opener.open(req, timeout=30) as resp:
                 status, raw = resp.status, resp.read()
@@ -2418,13 +2623,23 @@ class _ApiSeat:
             return status, {"_raw": raw[:200].decode("utf-8", "replace")}
 
 
+def _user_org(user):
+    """A user's organisation, under either field name the API uses."""
+    user = user or {}
+    return user.get("orgId") or user.get("clientAccountId")
+
+
 def _preview_org_id(operator):
-    """The first organisation in the operator's account list."""
-    status, body = operator.call("GET", "/admin/accounts")
-    accounts = (body or {}).get("accounts") or [] if status == 200 else []
-    if not accounts:
-        raise RuntimeError(f"GET /api/admin/accounts returned {status} with no accounts")
-    return accounts[0]["id"]
+    """The demo organisation. Until v1.4 this was the first entry of
+    GET /admin/accounts; from v1.5 the list holds the gate's own organisation
+    too (and any real one), so it is the demo client seat's organisation."""
+    if not _GATE.get("demo_org"):
+        seat = _ApiSeat(operator.cfg, "client")
+        org = _user_org(seat.user)
+        if not org:
+            raise RuntimeError("the demo client seat carries no organisation id")
+        _GATE["demo_org"] = org
+    return _GATE["demo_org"]
 
 
 def _json_diff_paths(a, b, path=""):
@@ -2876,6 +3091,949 @@ def drv_client_view_audit(page, cfg, line, res, errors):
                 else "; ".join(problems))
 
 
+# --- v1.5 (FRAGO 05): named accounts, organisations, seed -------------------
+#
+# The live store has no delete. Everything the gate makes is find-or-create
+# under a fixed identity, so a second run reuses what the first made: one
+# organisation, one client user of it, one manager user. Nothing is created in
+# the demo organisation, and the demo's data, users and settings are only read
+# (line 37's toggle-and-restore is v1.4's and unchanged). A gate user is made
+# usable for the length of a line (enabled, reset, password changed) and is
+# disabled again in that line's finally block, and once more at the end of the
+# driven section. The one-time passwords and the per-run passwords the gate
+# sets are never printed or written to the report.
+
+GATE_ORG_NAME = "Gate test organisation"
+GATE_ORG_JURISDICTION = "UK"
+GATE_ORG_JOURNEY_NOTE = "Gate test organisation journey note."
+GATE_CLIENT_EMAIL = "gate-client@gate.invalid"
+GATE_MANAGER_EMAIL = "gate-manager@gate.invalid"
+GATE_EMAILS = (GATE_CLIENT_EMAIL, GATE_MANAGER_EMAIL)
+SEED_FIXTURE = "06_EXECUTION/gate/fixtures/seed_manifest_fixture.json"
+PASSWORD_REQUIRED_CODE = "password_change_required"
+PASSWORD_REQUIRED_ERROR = "Change your password to continue."
+ORG_STORAGE_KEY = "assure.org"
+ORG_HEADER = "X-Assure-Org"
+SESSION_ID_IN_DETAIL = re.compile(r"session=[0-9a-f-]{20,}", re.I)
+
+# Admin routes that do not act on one organisation, so carry no selection.
+ORG_FREE_ADMIN_PATHS = ("/api/admin/organisations", "/api/admin/users", "/api/admin/accounts")
+
+_GATE = {"demo_org": None, "org": None, "org_created": None}
+
+
+def _ok(status, body, *codes):
+    return status in (codes or (200,)) and isinstance(body, dict)
+
+
+def _gate_org(operator):
+    """Find or create the gate's organisation. Returns (organisation, created)."""
+    s, body = operator.call("GET", "/admin/organisations")
+    if not _ok(s, body):
+        raise RuntimeError(f"GET /admin/organisations returned {s}")
+    for o in body.get("organisations") or []:
+        if o.get("name") == GATE_ORG_NAME:
+            if _GATE["org_created"] is None:
+                _GATE["org_created"] = False
+            _GATE["org"] = o["id"]
+            return o, False
+    s, body = operator.call("POST", "/admin/organisations",
+                            {"name": GATE_ORG_NAME, "jurisdiction": GATE_ORG_JURISDICTION})
+    if s != 201 or not (body or {}).get("organisation", {}).get("id"):
+        raise RuntimeError(f"POST /admin/organisations returned {s}")
+    _GATE["org"] = body["organisation"]["id"]
+    _GATE["org_created"] = True
+    operator.call("PUT", f"/admin/settings?org={_GATE['org']}", {"journeyNote": GATE_ORG_JOURNEY_NOTE})
+    return body["organisation"], True
+
+
+def _admin_users(operator):
+    s, body = operator.call("GET", "/admin/users")
+    if not _ok(s, body):
+        raise RuntimeError(f"GET /admin/users returned {s}")
+    return body.get("users") or []
+
+
+def _find_user(operator, email):
+    for u in _admin_users(operator):
+        if str(u.get("email", "")).lower() == email.lower():
+            return u
+    return None
+
+
+def _gate_user(operator, email, role, org_id):
+    """Find or create a gate user, enable it if disabled, and give it a
+    fresh one-time password. Returns (user, one_time_password, actions),
+    actions being the audit actions this call should have written."""
+    actions = []
+    u = _find_user(operator, email)
+    if u is None:
+        payload = {"email": email, "role": role, "displayName": "Gate " + role.replace("_", " ")}
+        if role == "client":
+            payload["orgId"] = org_id
+        s, body = operator.call("POST", "/admin/users", payload)
+        if s != 201 or not (body or {}).get("oneTimePassword"):
+            raise RuntimeError(f"POST /admin/users for a gate {role} returned {s}")
+        return body["user"], body["oneTimePassword"], ["user.create"]
+    if u.get("status") == "disabled":
+        s, _ = operator.call("POST", f"/admin/users/{u['id']}/enable")
+        if s != 200:
+            raise RuntimeError(f"enable gate {role} returned {s}")
+        actions.append("user.enable")
+    s, body = operator.call("POST", f"/admin/users/{u['id']}/reset-password")
+    if s != 200 or not (body or {}).get("oneTimePassword"):
+        raise RuntimeError(f"reset-password for the gate {role} returned {s}")
+    actions.append("user.reset_password")
+    return u, body["oneTimePassword"], actions
+
+
+def _new_password():
+    import secrets
+    return "Gate-" + secrets.token_urlsafe(18)
+
+
+def _gate_seat(cfg, operator, email, role, org_id):
+    """A signed-in seat for a gate user, past its first-sign-in change.
+    Returns (seat, user, password)."""
+    user, otp, _ = _gate_user(operator, email, role, org_id)
+    seat = _ApiSeat(cfg, None, email=email, password=otp)
+    pw = _new_password()
+    s, _ = seat.call("POST", "/auth/password", {"currentPassword": otp, "newPassword": pw})
+    if s != 200:
+        raise RuntimeError(f"first-sign-in password change for the gate {role} returned {s}")
+    return seat, user, pw
+
+
+def _gate_client_seat(cfg, operator):
+    org, _ = _gate_org(operator)
+    seat, user, _ = _gate_seat(cfg, operator, GATE_CLIENT_EMAIL, "client", org["id"])
+    return seat, org["id"]
+
+
+def _disable_gate_users(operator):
+    """Disable every gate user not already disabled. Returns the emails
+    still not disabled afterwards (empty when clean)."""
+    left = []
+    for u in _admin_users(operator):
+        if str(u.get("email", "")).lower() not in GATE_EMAILS:
+            continue
+        if u.get("status") != "disabled":
+            operator.call("POST", f"/admin/users/{u['id']}/disable")
+    for u in _admin_users(operator):
+        if str(u.get("email", "")).lower() in GATE_EMAILS and u.get("status") != "disabled":
+            left.append(u.get("email"))
+    return left
+
+
+def _safe_disable(cfg, operator=None):
+    try:
+        return _disable_gate_users(operator or _ApiSeat(cfg, "admin"))
+    except Exception as exc:
+        return [f"cleanup failed: {type(exc).__name__}"]
+
+
+def _final_gate_cleanup(cfg):
+    if "_target" not in cfg:
+        return
+    left = _safe_disable(cfg)
+    check("driven: every gate user disabled at the end of the run", not left,
+          "none left enabled" if not left else ", ".join(left))
+
+
+def _audit_entries(seat, path):
+    s, body = seat.call("GET", path)
+    if not _ok(s, body):
+        raise RuntimeError(f"GET {path} returned {s}")
+    return body.get("entries") or []
+
+
+def _walk(obj, fn, key=None):
+    fn(key, obj)
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            _walk(v, fn, k)
+    elif isinstance(obj, list):
+        for v in obj:
+            _walk(v, fn, key)
+
+
+def drv_users_lifecycle_audit(page, cfg, line, res, errors):
+    """Line 39 (new at v1.5, FRAGO 05 sections 3.2 and 3.7)."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    operator = _ApiSeat(cfg, "admin")
+    demo_client = _ApiSeat(cfg, "client")
+    problems, notes, otps = [], [], []
+    try:
+        for p in ("/admin/users", "/admin/organisations", "/admin/users/audit"):
+            s, _ = demo_client.call("GET", p)
+            if s != 403:
+                problems.append(f"client seat GET {p}: {s}, expected 403")
+        org, _ = _gate_org(operator)
+        org_id = org["id"]
+        before = {e["id"] for e in _audit_entries(operator, "/admin/users/audit")}
+        org_before = {e["id"] for e in _audit_entries(operator, f"/admin/audit?accountId={org_id}")}
+
+        cu, otp1, acts_c = _gate_user(operator, GATE_CLIENT_EMAIL, "client", org_id)
+        mu, otp2, acts_m = _gate_user(operator, GATE_MANAGER_EMAIL, "mitmark_admin", None)
+        otps += [otp1, otp2]
+        s, _ = operator.call("POST", "/admin/users",
+                             {"email": GATE_CLIENT_EMAIL, "role": "client", "orgId": org_id})
+        if s != 409:
+            problems.append(f"create with an existing email returned {s}, expected 409")
+
+        # The client seat, signed in, is refused once disabled.
+        seat = _ApiSeat(cfg, None, email=GATE_CLIENT_EMAIL, password=otp1)
+        pw = _new_password()
+        s, _ = seat.call("POST", "/auth/password", {"currentPassword": otp1, "newPassword": pw})
+        if s != 200:
+            problems.append(f"gate client password change returned {s}")
+        s, _ = operator.call("POST", f"/admin/users/{cu['id']}/disable")
+        if s != 200:
+            problems.append(f"disable returned {s}")
+        s, _ = seat.call("GET", "/auth/me")
+        if s != 401:
+            problems.append(f"disabled user's live session got {s} on /auth/me, expected 401")
+        s, _ = _ApiSeat(cfg, None, email=GATE_CLIENT_EMAIL, password=pw, login=False).login(GATE_CLIENT_EMAIL, pw)
+        if s != 401:
+            problems.append(f"disabled user's sign-in returned {s}, expected 401")
+        s, _ = operator.call("POST", f"/admin/users/{cu['id']}/enable")
+        if s != 200:
+            problems.append(f"enable returned {s}")
+        s, _ = _ApiSeat(cfg, None, login=False, email="", password="").login(GATE_CLIENT_EMAIL, pw)
+        if s != 200:
+            problems.append(f"re-enabled user's sign-in returned {s}")
+        s, body = operator.call("POST", f"/admin/users/{cu['id']}/reset-password")
+        if s != 200 or not (body or {}).get("oneTimePassword"):
+            problems.append(f"reset-password returned {s}")
+        else:
+            otps.append(body["oneTimePassword"])
+        s, _ = operator.call("POST", f"/admin/users/{cu['id']}/disable")
+        s2, _ = operator.call("POST", f"/admin/users/{mu['id']}/disable")
+        if s != 200 or s2 != 200:
+            problems.append(f"final disables returned {s}/{s2}")
+
+        # Audit: each action present, naming the user id, never the email or a password.
+        new = [e for e in _audit_entries(operator, "/admin/users/audit") if e["id"] not in before]
+        expected = {
+            cu["id"]: set(acts_c) | {"user.disable", "user.enable", "user.reset_password"},
+            mu["id"]: set(acts_m) | {"user.disable"},
+        }
+        for uid, acts in expected.items():
+            got = {e.get("action") for e in new if uid in str(e.get("detail", ""))}
+            missing = acts - got
+            if missing:
+                problems.append(f"user {uid}: no audit entry for {', '.join(sorted(missing))}")
+        for e in new:
+            if not str(e.get("action", "")).startswith("user."):
+                continue
+            d = str(e.get("detail", ""))
+            if any(m.lower() in d.lower() for m in GATE_EMAILS):
+                problems.append(f"audit entry {e['id']} names an email")
+            if str(e.get("actorId")) != str(operator.user.get("id")):
+                problems.append(f"audit entry {e['id']} actor '{e.get('actorId')}', expected the operator")
+        org_new = [e for e in _audit_entries(operator, f"/admin/audit?accountId={org_id}")
+                   if e["id"] not in org_before]
+        org_keys = {(e.get("action"), e.get("detail")) for e in org_new} | {e["id"] for e in org_new}
+        for e in new:
+            if cu["id"] in str(e.get("detail", "")) and str(e.get("action", "")).startswith("user."):
+                if e["id"] not in org_keys and (e.get("action"), e.get("detail")) not in org_keys:
+                    problems.append(f"{e.get('action')} for the client user not in the organisation's audit")
+
+        # The one-time passwords are nowhere after the response that carried them.
+        for p in ("/admin/users", "/admin/users/audit", f"/admin/audit?accountId={org_id}"):
+            s, body = operator.call("GET", p)
+            text = json.dumps(body)
+            if any(o and o in text for o in otps):
+                problems.append(f"a one-time password appears in GET {p}")
+
+        # The last active manager cannot be disabled. Proved only when the
+        # operator seat is the sole active manager; with more than one active
+        # manager the gate would have to disable a real one, which it never does.
+        active = [u for u in _admin_users(operator)
+                  if u.get("role") == "mitmark_admin" and u.get("status") != "disabled"]
+        if len(active) == 1 and str(active[0].get("id")) == str(operator.user.get("id")):
+            s, body = operator.call("POST", f"/admin/users/{active[0]['id']}/disable")
+            err = str((body or {}).get("error", ""))
+            if s != 409 or "last active manager" not in err:
+                problems.append(f"disabling the last active manager returned {s} '{err[:60]}'")
+                if s == 200:
+                    operator.call("POST", f"/admin/users/{active[0]['id']}/enable")
+            else:
+                notes.append("last active manager refused 409")
+        else:
+            notes.append(f"last-manager rule not driven: {len(active)} active managers, "
+                         f"and the gate never disables a real one")
+    finally:
+        left = _safe_disable(cfg, operator)
+        if left:
+            problems.append("gate users left enabled: " + ", ".join(left))
+    ok = not problems
+    return ok, ("create or reset, disable, enable and reset audited by user id with the operator as actor; "
+                "client entries mirrored in the organisation's audit; 409 on a repeat email; disabled "
+                "session and sign-in refused 401; no one-time password in any later response; "
+                + "; ".join(notes)) if ok else "; ".join(problems[:8])
+
+
+def drv_password_change_enforced(page, cfg, line, res, errors):
+    """Line 40 (new at v1.5, FRAGO 05 section 3.3)."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    operator = _ApiSeat(cfg, "admin")
+    problems = []
+    blocked_paths = line.get("blocked_paths", ["/tracker/home", "/tracker/jobs", "/tracker/documents",
+                                               "/clocks", "/policies", "/value/statement"])
+    try:
+        org, _ = _gate_org(operator)
+        _, otp, _ = _gate_user(operator, GATE_CLIENT_EMAIL, "client", org["id"])
+        a = _ApiSeat(cfg, None, email=GATE_CLIENT_EMAIL, password=otp)
+        b = _ApiSeat(cfg, None, email=GATE_CLIENT_EMAIL, password=otp)
+        if (a.login_body or {}).get("user", {}).get("mustChangePassword") is not True:
+            problems.append("login response user.mustChangePassword is not true")
+        for p in ("/auth/session", "/auth/me"):
+            s, body = a.call("GET", p)
+            if s != 200 or ((body or {}).get("user") or {}).get("mustChangePassword") is not True:
+                problems.append(f"GET {p}: {s}, mustChangePassword not true")
+        for p in blocked_paths:
+            s, body = a.call("GET", p)
+            if s != 403 or (body or {}).get("code") != PASSWORD_REQUIRED_CODE \
+                    or (body or {}).get("error") != PASSWORD_REQUIRED_ERROR:
+                problems.append(f"must-change client GET {p}: {s} {str((body or {}).get('code'))}")
+
+        _, motp, _ = _gate_user(operator, GATE_MANAGER_EMAIL, "mitmark_admin", None)
+        m = _ApiSeat(cfg, None, email=GATE_MANAGER_EMAIL, password=motp)
+        for p in ("/admin/users", "/admin/organisations", f"/admin/workplan?org={org['id']}"):
+            s, body = m.call("GET", p)
+            if s != 403 or (body or {}).get("code") != PASSWORD_REQUIRED_CODE:
+                problems.append(f"must-change manager GET {p}: {s}")
+
+        s, body = a.call("POST", "/auth/password", {"currentPassword": otp, "newPassword": "short-pw"})
+        if s != 400 or "12 characters" not in str((body or {}).get("error", "")):
+            problems.append(f"an 8-character password returned {s} '{str((body or {}).get('error', ''))[:50]}'")
+        before = a.cookies()
+        pw = _new_password()
+        s, _ = a.call("POST", "/auth/password", {"currentPassword": otp, "newPassword": pw})
+        if s != 200:
+            problems.append(f"password change returned {s}")
+        if a.cookies() == before:
+            problems.append("no fresh session cookie after the change")
+        s, body = a.call("GET", "/auth/me")
+        if s != 200 or ((body or {}).get("user") or {}).get("mustChangePassword") is not False:
+            problems.append(f"after the change /auth/me {s}, mustChangePassword not false")
+        s, _ = a.call("GET", "/tracker/home")
+        if s != 200:
+            problems.append(f"after the change /tracker/home {s}")
+        for p in ("/auth/me", "/tracker/home"):
+            s, _ = b.call("GET", p)
+            if s != 401:
+                problems.append(f"the other session got {s} on {p}, expected 401")
+        s, _ = _ApiSeat(cfg, None, login=False, email="", password="").login(GATE_CLIENT_EMAIL, otp)
+        if s != 401:
+            problems.append(f"the used one-time password still signs in ({s})")
+    finally:
+        left = _safe_disable(cfg, operator)
+        if left:
+            problems.append("gate users left enabled: " + ", ".join(left))
+    ok = not problems
+    return ok, (f"must-change refused 403 {PASSWORD_REQUIRED_CODE} on {len(blocked_paths)} client and 3 admin "
+                "routes; under 12 characters refused 400; the change issues a fresh cookie, clears the flag "
+                "and ends the other session (401)" if ok else "; ".join(problems[:8]))
+
+
+def drv_change_password_web(page, cfg, line, res, errors):
+    """Line 41 (new at v1.5): a must-change user is held on /change-password
+    whatever she opens; the form and the rule are there; after the change the
+    portal opens; both portals carry the header link."""
+    from urllib.parse import urlparse
+    settle_ms = line.get("settle_ms", 600)
+    target = cfg["_target"].rstrip("/")
+    form_sel = "form[data-testid='change-password-form']"
+    link_sel = "[data-testid='change-password-link']"
+    operator = _ApiSeat(cfg, "admin")
+    problems = []
+    try:
+        org, _ = _gate_org(operator)
+        _, otp, _ = _gate_user(operator, GATE_CLIENT_EMAIL, "client", org["id"])
+        _sign_in_with(page, target, GATE_CLIENT_EMAIL, otp)
+        _wait_for(page, form_sel, 8000)
+        for path in ["", "/"] + line.get("probe_paths", ["/jobs", "/documents", "/statement", "/admin"]):
+            if path:
+                page.goto(target + path, wait_until="domcontentloaded")
+                page.wait_for_timeout(settle_ms)
+                _wait_for(page, form_sel, 6000)
+            at = urlparse(page.url).path.rstrip("/")
+            if at != "/change-password":
+                problems.append(f"opening '{path or 'after sign-in'}' landed on '{at}'")
+            if page.locator("[data-view='tracker']").count() and page.locator("[data-view='tracker']").first.is_visible():
+                problems.append(f"'{path or 'after sign-in'}': client nav visible before the change")
+        form = page.locator(form_sel)
+        if form.count() == 0:
+            return False, "; ".join(problems + ["change-password form absent"])[:600]
+        for n in ("currentPassword", "newPassword", "confirmPassword"):
+            if form.locator(f"input[name='{n}']").count() == 0:
+                problems.append(f"input name='{n}' missing")
+        rule = page.locator("[data-testid='password-rule']")
+        if rule.count() == 0 or "At least 12 characters." not in _text(rule.first):
+            problems.append(f"password rule reads '{_text(rule.first) if rule.count() else ''}'")
+        pw = _new_password()
+        form.locator("input[name='currentPassword']").fill(otp)
+        form.locator("input[name='newPassword']").fill(pw)
+        form.locator("input[name='confirmPassword']").fill(pw)
+        form.locator("button[type='submit']").first.click()
+        page.wait_for_timeout(settle_ms * 2)
+        if not _wait_for(page, "[data-view='tracker']", 8000):
+            problems.append(f"after the change the portal did not open (at '{urlparse(page.url).path}')")
+        link = page.locator(link_sel)
+        if link.count() == 0:
+            problems.append("client portal: change-password-link absent")
+        elif (link.first.get_attribute("href") or "").rstrip("/") not in ("/change-password", target + "/change-password"):
+            problems.append(f"client portal link href '{link.first.get_attribute('href')}'")
+        _sign_in(page, cfg, "admin", cfg["_target"])
+        if not _wait_for(page, link_sel, 8000):
+            problems.append("admin workspace: change-password-link absent")
+    finally:
+        left = _safe_disable(cfg, operator)
+        if left:
+            problems.append("gate users left enabled: " + ", ".join(left))
+        _sign_in(page, cfg, "client", cfg["_target"])
+    ok = not problems
+    return ok, ("held on /change-password from every path tried; form, three inputs and the rule present; "
+                "portal opens after the change; header link on both portals" if ok else "; ".join(problems[:8]))
+
+
+def drv_users_page_one_time_password(page, cfg, line, res, errors):
+    """Line 42 (new at v1.5): the Users page lists users in users-table;
+    a reset shows the one-time password once, with the two statements, and a
+    reload does not show it again."""
+    settle_ms = line.get("settle_ms", 600)
+    table_sel = "[data-testid='users-table']"
+    otp_sel = "[data-testid='one-time-password']"
+    operator = _ApiSeat(cfg, "admin")
+    problems = []
+    accept = lambda d: d.accept()
+    page.on("dialog", accept)
+    try:
+        org, _ = _gate_org(operator)
+        u = _find_user(operator, GATE_CLIENT_EMAIL)
+        if u is None:
+            _gate_user(operator, GATE_CLIENT_EMAIL, "client", org["id"])
+        u = _find_user(operator, GATE_CLIENT_EMAIL)
+        if u.get("status") == "disabled":
+            operator.call("POST", f"/admin/users/{u['id']}/enable")
+        if not _sign_in(page, cfg, "admin", cfg["_target"]):
+            return False, "could not sign in as the operator"
+        nav = page.locator("[data-view='users']")
+        if not _enter_view(page, "users", None, settle_ms, cfg, "admin"):
+            return False, "admin nav item data-view='users' not found"
+        if _text(nav.first) != "Users":
+            problems.append(f"nav label reads '{_text(nav.first)}'")
+        if not _wait_for(page, table_sel, 8000):
+            return False, "users-table absent"
+        row = page.locator(f"{table_sel} tr").filter(has_text=GATE_CLIENT_EMAIL)
+        if row.count() == 0:
+            return False, "the gate client's row is not in users-table"
+        btn = row.first.locator("button").filter(has_text=re.compile(r"reset", re.I))
+        if btn.count() == 0:
+            return False, "no reset control on the gate client's row"
+        btn.first.click()
+        page.wait_for_timeout(settle_ms)
+        if page.locator(otp_sel).count() == 0:
+            confirm = page.locator("[role='dialog'] button, [role='alertdialog'] button").filter(
+                has_text=re.compile(r"^\s*(reset|confirm|yes|continue)", re.I))
+            if confirm.count():
+                confirm.first.click()
+        if not _wait_for(page, otp_sel, 8000):
+            return False, "one-time-password not shown after the reset"
+        n = page.locator(otp_sel).count()
+        if n != 1:
+            problems.append(f"{n} one-time-password elements, expected 1")
+        shown = page.locator(otp_sel).first
+        body_text = " ".join((page.locator("body").text_content() or "").split())
+        for phrase in ("Shown once", "Tessera Assure does not send email"):
+            if phrase not in body_text:
+                problems.append(f"'{phrase}' not on the page with the password")
+        tokens = [t for t in _text(shown).split() if len(t) >= 12]
+        secret = max(tokens, key=len) if tokens else None
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_timeout(settle_ms * 2)
+        if page.locator(otp_sel).count():
+            problems.append("one-time-password shown again after a reload")
+        if secret and secret in (page.content() or ""):
+            problems.append("the one-time password is in the page after a reload")
+        if not secret:
+            problems.append("could not read a password of 12 or more characters from one-time-password")
+    finally:
+        page.remove_listener("dialog", accept)
+        left = _safe_disable(cfg, operator)
+        if left:
+            problems.append("gate users left enabled: " + ", ".join(left))
+    ok = not problems
+    return ok, ("Users page and users-table present; a reset shows the one-time password once with "
+                "both statements; gone after a reload" if ok else "; ".join(problems[:8]))
+
+
+def drv_organisations_api(page, cfg, line, res, errors):
+    """Line 43 (new at v1.5, FRAGO 05 section 3.4)."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    import datetime as _dt
+    operator = _ApiSeat(cfg, "admin")
+    demo = _preview_org_id(operator)
+    problems, notes = [], []
+    org, created = _gate_org(operator)
+    gid = org["id"]
+    s, body = operator.call("GET", "/admin/organisations")
+    listed = {o.get("id"): o for o in (body or {}).get("organisations") or []}
+    for oid in (gid, demo):
+        o = listed.get(oid)
+        if not o:
+            problems.append(f"organisation {oid} not listed")
+            continue
+        missing = [k for k in ("id", "name", "jurisdiction", "regulationLabel", "userCount", "taskCount") if k not in o]
+        if missing:
+            problems.append(f"organisation {oid} lacks {', '.join(missing)}")
+    if created or _GATE["org_created"]:
+        if (listed.get(gid) or {}).get("taskCount") != 0:
+            problems.append(f"a new organisation has {(listed.get(gid) or {}).get('taskCount')} tasks, expected 0")
+        else:
+            notes.append("created this run with 0 tasks")
+    else:
+        notes.append("existing gate organisation reused, so the 0-task rule was proved on its first run only")
+
+    start = _dt.date.today().isoformat()
+    s, prev = operator.call("GET", f"/admin/workplan/apply-library/preview?org={gid}&startDate={start}")
+    s2, applied = operator.call("POST", f"/admin/workplan/apply-library?org={gid}", {"startDate": start})
+    if s != 200 or s2 != 200:
+        problems.append(f"apply-library preview {s}, apply {s2}")
+    elif (prev or {}).get("willCreate") != (applied or {}).get("created"):
+        problems.append(f"preview said {(prev or {}).get('willCreate')}, apply created {(applied or {}).get('created')}")
+    else:
+        notes.append(f"apply library: preview {prev.get('willCreate')} = created {applied.get('created')}")
+
+    for p in ("/admin/workplan", "/admin/settings", "/admin/documents", "/admin/record"):
+        s, _ = operator.call("GET", p)
+        if s != 400:
+            problems.append(f"GET {p} with no organisation returned {s}, expected 400")
+    s, body = operator.call("GET", "/admin/settings", headers={ORG_HEADER: gid})
+    s_q, body_q = operator.call("GET", f"/admin/settings?org={gid}")
+    s_a, body_a = operator.call("GET", f"/admin/settings?accountId={gid}")
+    if not (s == s_q == s_a == 200) or not (body == body_q == body_a):
+        problems.append(f"org, accountId and {ORG_HEADER} do not select the same settings ({s}/{s_q}/{s_a})")
+
+    s, demo_before = operator.call("GET", f"/admin/settings?org={demo}")
+    s2, gate_before = operator.call("GET", f"/admin/settings?org={gid}")
+    if s != 200 or s2 != 200:
+        problems.append(f"GET settings demo {s}, gate {s2}")
+    else:
+        original = ((gate_before or {}).get("settings") or {}).get("journeyNote", "")
+        try:
+            s, _ = operator.call("PUT", f"/admin/settings?org={gid}", {"journeyNote": "gate isolation"})
+            if s != 200:
+                problems.append(f"PUT gate settings {s}")
+            s, demo_after = operator.call("GET", f"/admin/settings?org={demo}")
+            if demo_after != demo_before:
+                problems.append("the demo's settings changed when the gate organisation's were written")
+            s, g = operator.call("GET", f"/admin/settings?org={gid}")
+            if ((g or {}).get("settings") or {}).get("journeyNote") != "gate isolation":
+                problems.append("the gate organisation's journeyNote did not take the write")
+        finally:
+            operator.call("PUT", f"/admin/settings?org={gid}", {"journeyNote": original or GATE_ORG_JOURNEY_NOTE})
+    ok = not problems
+    return ok, ("list carries the six fields; no-organisation admin GETs refused 400; org, accountId and "
+                f"{ORG_HEADER} agree; settings isolated and restored; " + "; ".join(notes)) if ok \
+        else "; ".join(problems[:8])
+
+
+def _select_org(page, label, settle_ms):
+    sw = page.locator("[data-testid='org-switcher']")
+    if sw.count() == 0:
+        return False
+    sw.first.select_option(label=label)
+    page.wait_for_timeout(settle_ms * 2)
+    return True
+
+
+def _org_params(url, headers):
+    from urllib.parse import urlparse, parse_qs
+    q = parse_qs(urlparse(url).query)
+    vals = q.get("org", []) + q.get("accountId", [])
+    h = {k.lower(): v for k, v in (headers or {}).items()}
+    if ORG_HEADER.lower() in h:
+        vals.append(h[ORG_HEADER.lower()])
+    return vals
+
+
+def drv_org_switcher(page, cfg, line, res, errors):
+    """Line 44 (new at v1.5, FRAGO 05 section 3.4)."""
+    from urllib.parse import urlparse
+    settle_ms = line.get("settle_ms", 600)
+    operator = _ApiSeat(cfg, "admin")
+    demo = _preview_org_id(operator)
+    org, _ = _gate_org(operator)
+    gid = org["id"]
+    s, body = operator.call("GET", "/admin/organisations")
+    orgs = {o["id"]: o for o in (body or {}).get("organisations") or []}
+    demo_name = orgs.get(demo, {}).get("name")
+    info = {}
+    for oid in (gid, demo):
+        _, st = operator.call("GET", f"/admin/settings?org={oid}")
+        _, docs = operator.call("GET", f"/admin/documents?org={oid}")
+        _, wp = operator.call("GET", f"/admin/workplan?org={oid}")
+        info[oid] = {"note": ((st or {}).get("settings") or {}).get("journeyNote", ""),
+                     "docs": len((docs or {}).get("documents") or []),
+                     "tasks": len((wp or {}).get("tasks") or []),
+                     "taskCount": orgs.get(oid, {}).get("taskCount")}
+    problems, captured = [], []
+
+    def on_request(req):
+        if "/api/admin" in req.url:
+            captured.append((req.url, req.headers))
+
+    def page_checks(oid, who):
+        g = info[oid]
+        if _enter_view(page, "workplan", None, settle_ms, cfg, "admin"):
+            _wait_for(page, "[data-testid='task-row']", 5000)
+            page.wait_for_timeout(settle_ms)
+            n = page.locator("[data-testid='task-row']").count()
+            if n != g["taskCount"]:
+                problems.append(f"{who} Workplan shows {n} task rows, taskCount {g['taskCount']}")
+        else:
+            problems.append(f"{who}: workplan nav missing")
+        if _enter_view(page, "documents-admin", None, settle_ms, cfg, "admin"):
+            page.wait_for_timeout(settle_ms)
+            n = page.locator("[data-testid='document-row']").count()
+            if n != g["docs"]:
+                problems.append(f"{who} Documents shows {n} rows, API has {g['docs']}")
+        if _enter_view(page, "settings", None, settle_ms, cfg, "admin"):
+            _wait_for(page, "[name='journeyNote']", 5000)
+            f = page.locator("[name='journeyNote']")
+            v = f.first.input_value() if f.count() else None
+            if v != g["note"]:
+                problems.append(f"{who} Settings journey note does not match that organisation's")
+        if not _enter_view(page, "record", None, settle_ms, cfg, "admin"):
+            problems.append(f"{who}: record nav missing")
+
+    try:
+        if not _sign_in(page, cfg, "admin", cfg["_target"]):
+            return False, "could not sign in as the operator"
+        _wait_for(page, "[data-view='queue']", 8000)
+        if not _enter_view(page, "organisations", None, settle_ms, cfg, "admin"):
+            problems.append("admin nav item data-view='organisations' not found")
+        else:
+            if _text(page.locator("[data-view='organisations']").first) != "Organisations":
+                problems.append("organisations nav label")
+            if not _wait_for(page, "[data-testid='organisations-table']", 6000):
+                problems.append("organisations-table absent")
+            elif GATE_ORG_NAME not in _text(page.locator("[data-testid='organisations-table']").first):
+                problems.append("the gate organisation is not in organisations-table")
+        sw = page.locator("[data-testid='org-switcher']")
+        if sw.count() == 0:
+            return False, "; ".join(problems + ["org-switcher absent"])
+        labels = [" ".join(t.split()) for t in sw.first.locator("option").all_text_contents()]
+        for name in (GATE_ORG_NAME, demo_name):
+            if name not in labels:
+                problems.append(f"switcher lacks '{name}'")
+        page.on("request", on_request)
+        _select_org(page, GATE_ORG_NAME, settle_ms)
+        held = page.evaluate(f"() => sessionStorage.getItem('{ORG_STORAGE_KEY}')")
+        if held != gid:
+            problems.append(f"sessionStorage {ORG_STORAGE_KEY} holds '{held}', expected the gate organisation")
+        page_checks(gid, "gate org")
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_timeout(settle_ms * 2)
+        _wait_for(page, "[data-testid='org-switcher']", 6000)
+        if page.evaluate(f"() => sessionStorage.getItem('{ORG_STORAGE_KEY}')") != gid:
+            problems.append("selection not remembered across a reload")
+        page.remove_listener("request", on_request)
+        stray, carried = [], 0
+        for url, headers in captured:
+            path = urlparse(url).path
+            if any(path == p or path.startswith(p + "/") for p in ORG_FREE_ADMIN_PATHS):
+                continue
+            vals = _org_params(url, headers)
+            if vals and all(v == gid for v in vals):
+                carried += 1
+            else:
+                stray.append(f"{path} {vals}")
+        if stray:
+            problems.append(f"{len(stray)} admin requests not bound to the gate organisation: " + "; ".join(stray[:4]))
+        if carried == 0:
+            problems.append("no organisation-bound admin request captured")
+        _select_org(page, demo_name, settle_ms)
+        page_checks(demo, "demo")
+    finally:
+        try:
+            page.remove_listener("request", on_request)
+        except Exception:
+            pass
+        try:
+            if demo_name:
+                _select_org(page, demo_name, settle_ms)
+            page.evaluate(f"() => sessionStorage.setItem('{ORG_STORAGE_KEY}', '{demo}')")
+        except Exception:
+            pass
+    ok = not problems
+    return ok, (f"switcher lists both; with the gate organisation Workplan, Documents and Settings show its "
+                f"data and all {carried} organisation-bound admin requests carry it; remembered across a "
+                "reload; demo data back after switching" if ok else "; ".join(problems[:8]))
+
+
+def drv_client_view_follows_org(page, cfg, line, res, errors):
+    """Line 45 (new at v1.5, FRAGO 05 section 3.6)."""
+    settle_ms = line.get("settle_ms", 600)
+    operator = _ApiSeat(cfg, "admin")
+    demo = _preview_org_id(operator)
+    problems, note, headers_seen = [], "", []
+    try:
+        gate_client, gid = _gate_client_seat(cfg, operator)
+        if _api_only_once(line, res):
+            p, volatile = _identity_against_client(gate_client, operator, PREVIEW_IDENTITY_PATHS, gid)
+            problems.extend(f"API {x}" for x in p)
+            note = f"{len(PREVIEW_IDENTITY_PATHS)} preview GETs equal the gate client seat's; {_volatile_note(volatile)}"
+        s, body = operator.call("GET", "/admin/organisations")
+        demo_name = {o["id"]: o["name"] for o in (body or {}).get("organisations") or []}.get(demo)
+
+        def on_request(req):
+            h = {k.lower(): v for k, v in req.headers.items()}
+            if PREVIEW_HEADER.lower() in h:
+                headers_seen.append(h[PREVIEW_HEADER.lower()])
+
+        _sign_in(page, cfg, "admin", cfg["_target"])
+        _wait_for(page, "[data-view='queue']", 8000)
+        if not _select_org(page, GATE_ORG_NAME, settle_ms):
+            problems.append("org-switcher absent")
+        page.on("request", on_request)
+        try:
+            if not _enter_view(page, "client-view", None, settle_ms, cfg, "admin"):
+                problems.append("client-view nav item not found")
+            elif not _wait_for(page, "[data-testid='client-view-banner']", 8000):
+                problems.append("client view opened without the banner")
+            page.wait_for_timeout(settle_ms * 2)
+        finally:
+            page.remove_listener("request", on_request)
+        wrong = [h for h in headers_seen if h != f"client:{gid}"]
+        if not headers_seen:
+            problems.append("no preview request captured in client view")
+        if wrong:
+            problems.append(f"{len(wrong)} preview requests for another organisation")
+        ret = page.locator("[data-testid='client-view-return']")
+        if ret.count():
+            ret.first.click()
+            page.wait_for_timeout(settle_ms * 2)
+        if demo_name:
+            _select_org(page, demo_name, settle_ms)
+    finally:
+        try:
+            page.evaluate(f"() => {{ sessionStorage.removeItem('{PREVIEW_STORAGE_KEY}');"
+                          f" sessionStorage.setItem('{ORG_STORAGE_KEY}', '{demo}'); }}")
+        except Exception:
+            pass
+        left = _safe_disable(cfg, operator)
+        if left:
+            problems.append("gate users left enabled: " + ", ".join(left))
+        _sign_in(page, cfg, "client", cfg["_target"])
+    ok = not problems
+    return ok, (f"client view with the gate organisation selected sends {len(headers_seen)} preview requests, "
+                f"all for it; {note or 'API identity run at the first resolution'}" if ok else "; ".join(problems[:8]))
+
+
+# The client GETs FRAGO 05 names for isolation are exactly line 33's set.
+ISOLATION_PATHS = PREVIEW_IDENTITY_PATHS
+# Ids shorter than this are not searched for as substrings (a short id such
+# as "t1" would match inside unrelated text and report a false leak).
+MIN_LEAK_ID_LEN = 8
+
+
+def _record_ids(body):
+    """Task and document ids in a response: the id of every object in a list
+    held under a key named tasks or documents, at any depth."""
+    ids = set()
+
+    def fn(key, obj):
+        if key in ("tasks", "documents") and isinstance(obj, list):
+            for x in obj:
+                if isinstance(x, dict) and x.get("id"):
+                    ids.add(str(x["id"]))
+    _walk(body, fn)
+    return ids
+
+
+def _foreign_org_ids(body, own):
+    bad = []
+
+    def fn(key, obj):
+        if isinstance(obj, dict) and "orgId" in obj and obj["orgId"] is not None and str(obj["orgId"]) != str(own):
+            bad.append(str(obj["orgId"]))
+    _walk(body, fn)
+    return bad
+
+
+def drv_client_isolation(page, cfg, line, res, errors):
+    """Line 46 (new at v1.5, FRAGO 05 section 3.7): a client of one
+    organisation never receives a record of another. Both seats driven."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    operator = _ApiSeat(cfg, "admin")
+    demo_seat = _ApiSeat(cfg, "client")
+    demo = _user_org(demo_seat.user)
+    problems = []
+    try:
+        gate_seat, gid = _gate_client_seat(cfg, operator)
+        seats = {"gate": (gate_seat, gid), "demo": (demo_seat, demo)}
+        got, ids = {}, {}
+        for name, (seat, own) in seats.items():
+            got[name], ids[name] = {}, set()
+            for p in ISOLATION_PATHS:
+                s, body = seat.call("GET", p)
+                if s != 200:
+                    problems.append(f"{name} client GET {p}: {s}")
+                    continue
+                got[name][p] = json.dumps(body)
+                ids[name] |= _record_ids(body)
+                bad = _foreign_org_ids(body, own)
+                if bad:
+                    problems.append(f"{name} client GET {p}: {len(bad)} object(s) of another organisation")
+        for a, b in (("gate", "demo"), ("demo", "gate")):
+            leaked = {i for i in ids[b] if len(i) >= MIN_LEAK_ID_LEN
+                      and any(f'"{i}"' in t for t in got[a].values())}
+            if leaked:
+                problems.append(f"{len(leaked)} {b} task or document id(s) in the {a} client's responses")
+        if gid == demo:
+            problems.append("the gate client resolves to the demo organisation")
+    finally:
+        left = _safe_disable(cfg, operator)
+        if left:
+            problems.append("gate users left enabled: " + ", ".join(left))
+    ok = not problems
+    return ok, (f"{len(ISOLATION_PATHS)} client GETs per seat: every orgId is the seat's own; "
+                f"{len(ids.get('demo', ()))} demo and {len(ids.get('gate', ()))} gate task or document ids, "
+                "none crossing" if ok else "; ".join(problems[:8]))
+
+
+def _load_seed_fixture(cfg):
+    p = cfg["root"] / SEED_FIXTURE
+    if not p.is_file():
+        return None
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+def drv_seed_manifest(page, cfg, line, res, errors):
+    """Line 47 (new at v1.5, FRAGO 05 sections 3.5 and 3.7), on the gate's
+    own organisation, never the demo's."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    manifest = _load_seed_fixture(cfg)
+    if manifest is None:
+        return False, f"{SEED_FIXTURE} not found"
+    # v1.5, amended FRAGO 05 3.5: the manifest is Seagull's shape. A clock whose
+    # task is already done becomes one extra open task, so the expected count is
+    # tasks plus those clocks, worked out here from the file, not taken from the
+    # product's answer.
+    tasks = manifest.get("tasks") or []
+    done_refs = {t.get("ref") for t in tasks if t.get("status") == "done"}
+    n = len(tasks) + sum(1 for c in (manifest.get("clocks") or []) if c.get("taskRef") in done_refs)
+    phase = (((manifest.get("organisation") or {}).get("settings") or {}).get("journeyPhase"))
+    operator = _ApiSeat(cfg, "admin")
+    org, _ = _gate_org(operator)
+    gid = org["id"]
+    if gid == _preview_org_id(operator):
+        return False, "refusing to seed: the gate organisation resolved to the demo"
+    problems = []
+    seed = f"/admin/organisations/{gid}/seed?org={gid}"
+
+    def tasks_now():
+        s, body = operator.call("GET", f"/admin/workplan?org={gid}")
+        return len((body or {}).get("tasks") or []) if s == 200 else None
+
+    t0 = tasks_now()
+    s, dry = operator.call("POST", seed, {"manifest": manifest, "dryRun": True, "replace": True})
+    if s != 200:
+        problems.append(f"dry run returned {s}")
+    else:
+        if (dry.get("wouldCreate") or {}).get("tasks") != n:
+            problems.append(f"dry run wouldCreate.tasks {(dry.get('wouldCreate') or {}).get('tasks')}, manifest {n}")
+        if dry.get("after") != dry.get("before") or dry.get("dryRun") is not True:
+            problems.append("dry run reports a change")
+        if tasks_now() != t0:
+            problems.append(f"dry run changed the workplan ({t0} -> {tasks_now()})")
+    s, real = operator.call("POST", seed, {"manifest": manifest, "replace": True})
+    if s != 200:
+        problems.append(f"seed with replace returned {s}")
+    else:
+        if (real.get("after") or {}).get("tasks") != n:
+            problems.append(f"after.tasks {(real.get('after') or {}).get('tasks')}, manifest {n}")
+        if tasks_now() != n:
+            problems.append(f"workplan holds {tasks_now()} tasks after the seed, manifest {n}")
+    s, _ = operator.call("POST", seed, {"manifest": manifest})
+    if s != 409:
+        problems.append(f"a second seed without replace returned {s}, expected 409")
+    if phase is not None:
+        s, st = operator.call("GET", f"/admin/settings?org={gid}")
+        got = ((st or {}).get("settings") or {}).get("journeyPhase")
+        if got != phase:
+            problems.append(f"journeyPhase {got}, manifest {phase}")
+    ok = not problems
+    return ok, (f"dry run would create {n} and changed nothing; replace seeded {n}; repeat refused 409; "
+                "journey stage as the manifest" if ok else "; ".join(problems[:8]))
+
+
+def drv_seeded_org_no_restricted(page, cfg, line, res, errors):
+    """Line 48 (new at v1.5): no restricted term in any field of the seeded
+    organisation, read through the admin API and the gate client's seat.
+    Counts only; a term is never named."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    terms = _restricted_terms_runtime(cfg)
+    if not terms:
+        return False, "the restricted terms could not be read; an absent list is not a pass"
+    operator = _ApiSeat(cfg, "admin")
+    problems, read = [], 0
+    try:
+        seat, gid = _gate_client_seat(cfg, operator)
+        sources = [(operator, f"/admin/{p}?org={gid}") for p in ("workplan", "settings", "documents")]
+        sources += [(seat, "/tracker/home"), (seat, "/tracker/jobs")]
+        for who, p in sources:
+            s, body = who.call("GET", p)
+            if s != 200:
+                problems.append(f"GET {p}: {s}")
+                continue
+            read += 1
+            hits = _restricted_hit_count(json.dumps(body, ensure_ascii=False), terms)
+            if hits:
+                problems.append(f"GET {p}: {hits} restricted term(s) [REDACTED]")
+    finally:
+        left = _safe_disable(cfg, operator)
+        if left:
+            problems.append("gate users left enabled: " + ", ".join(left))
+    ok = not problems
+    return ok, (f"{len(terms)} restricted terms against {read} responses, 0 hits" if ok else "; ".join(problems[:6]))
+
+
+def drv_auth_login_audit_no_session(page, cfg, line, res, errors):
+    """Line 49 (new at v1.5, FRAGO 05 section 4): auth.login entries written
+    from now on carry no session id. Entries older than this run predate the
+    rule and are not read."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    import datetime as _dt
+    t0 = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(seconds=line.get("skew_s", 120))).isoformat()
+    _ApiSeat(cfg, "client")
+    operator = _ApiSeat(cfg, "admin")
+    demo = _preview_org_id(operator)
+    problems, seen = [], 0
+    for p in (f"/admin/audit?accountId={demo}&action=auth.login", "/admin/users/audit"):
+        for e in _audit_entries(operator, p):
+            if e.get("action") != "auth.login" or str(e.get("createdAt", "")) < t0.replace("+00:00", ""):
+                continue
+            seen += 1
+            if SESSION_ID_IN_DETAIL.search(str(e.get("detail", ""))):
+                problems.append(f"{p.split('?')[0]} entry {e.get('id')} carries a session id")
+    if seen == 0:
+        problems.append("no auth.login entry written by this run's sign-ins was found")
+    ok = not problems
+    return ok, (f"{seen} auth.login entries from this run, none with a session id" if ok else "; ".join(problems[:6]))
+
+
 DRIVERS = {
     "sign_in_lands_on_portal": drv_sign_in_lands_on_portal,
     "views_render": drv_views_render,
@@ -2919,6 +4077,18 @@ DRIVERS = {
     "client_view_banner": drv_client_view_banner,
     "preview_ignores_admin_toggle": drv_preview_ignores_admin_toggle,
     "client_view_audit": drv_client_view_audit,
+    # v1.5, named accounts, organisations and seed (FRAGO 05).
+    "users_lifecycle_audit": drv_users_lifecycle_audit,
+    "password_change_enforced": drv_password_change_enforced,
+    "change_password_web": drv_change_password_web,
+    "users_page_one_time_password": drv_users_page_one_time_password,
+    "organisations_api": drv_organisations_api,
+    "org_switcher": drv_org_switcher,
+    "client_view_follows_org": drv_client_view_follows_org,
+    "client_isolation": drv_client_isolation,
+    "seed_manifest": drv_seed_manifest,
+    "seeded_org_no_restricted": drv_seeded_org_no_restricted,
+    "auth_login_audit_no_session": drv_auth_login_audit_no_session,
 }
 
 

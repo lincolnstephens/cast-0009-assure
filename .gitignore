@@ -6,6 +6,11 @@ __pycache__/
 # Restricted material never enters git history
 material/restricted/
 
+# The client's own documents carry the client's name inside them. Only the
+# manifest (roles only, no name) may be committed from this folder.
+material/lurong_documents/*
+!material/lurong_documents/manifest.json
+
 # Build artefacts
 06_EXECUTION/build/app/node_modules/
 06_EXECUTION/build/app/**/node_modules/

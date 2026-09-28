@@ -1,5 +1,5 @@
 {
-  "iteration": "v1.4",
+  "iteration": "v1.5",
   "written": "2026-09-28",
   "lines": [
     {
@@ -782,6 +782,202 @@
         "390x844"
       ],
       "new_v1_4": "FRAGO 04 section 3.3. API level, run once at the first resolution."
+    },
+    {
+      "id": 39,
+      "line": "Users: create, reset, disable and re-enable are each audited by user id; the one-time password is not retrievable afterwards; a disabled user's session is refused; the last manager cannot be disabled.",
+      "drive": "api",
+      "check": "users_lifecycle_audit",
+      "pass": "The demo client seat gets 403 on GET /api/admin/users, /admin/organisations and /admin/users/audit. As the operator: find-or-create the organisation 'Gate test organisation' (UK), gate-client@gate.invalid (client of it) and gate-manager@gate.invalid (manager); an existing user is enabled and reset instead. A repeat POST /admin/users with an existing email returns 409. The gate client signs in with its one-time password, changes it, is disabled (its live session then gets 401 on /auth/me and a fresh sign-in gets 401), re-enabled (sign-in 200) and reset. GET /admin/users/audit holds user.create or user.reset_password, user.disable, user.enable and user.reset_password entries whose detail names the user id, never an email, with the operator as actor; each client-user entry also appears in GET /admin/audit?accountId=<gate org>. No one-time password received appears in GET /admin/users, /admin/users/audit or the organisation's audit. When the operator seat is the only active manager, disabling it returns 409 with 'last active manager'; with more than one active manager the rule is reported as not driven, because the gate never disables a real manager.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_5": "FRAGO 05 section 3.7. API level, run once at the first resolution. Gate users are find-or-create and disabled again in a finally block."
+    },
+    {
+      "id": 40,
+      "line": "A user who must change her password reaches nothing else until she does, enforced by the server; the change ends every other session.",
+      "drive": "api",
+      "check": "password_change_enforced",
+      "pass": "The gate client, reset, signs in on two seats with its one-time password: the login response, /auth/session and /auth/me carry mustChangePassword true; GET /tracker/home, /tracker/jobs, /tracker/documents, /clocks, /policies and /value/statement return 403 {error: 'Change your password to continue.', code: 'password_change_required'}; the reset gate manager gets the same code on /admin/users, /admin/organisations and /admin/workplan. POST /auth/password with an 8-character password returns 400 naming '12 characters'. A valid change returns 200 with a new session cookie, /auth/me then shows mustChangePassword false and /tracker/home 200; the second seat gets 401 on /auth/me and /tracker/home; the old one-time password no longer signs in.",
+      "blocked_paths": [
+        "/tracker/home",
+        "/tracker/jobs",
+        "/tracker/documents",
+        "/clocks",
+        "/policies",
+        "/value/statement"
+      ],
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_5": "FRAGO 05 section 3.7. API level, run once at the first resolution. Gate users are find-or-create and disabled again in a finally block."
+    },
+    {
+      "id": 41,
+      "line": "In the browser, a must-change user is held on the change-password screen; both portals link to it from the header.",
+      "drive": "playwright",
+      "check": "change_password_web",
+      "pass": "The gate client, reset, signs in with its one-time password and lands on /change-password; opening /, /jobs, /documents, /statement and /admin each lands there too, with the client nav not visible. The page has form[data-testid='change-password-form'] with inputs named currentPassword, newPassword and confirmPassword, and [data-testid='password-rule'] reading 'At least 12 characters.'. Submitting a valid change opens the client portal, whose header has [data-testid='change-password-link'] to /change-password; the operator's admin workspace has the same link. The gate client is disabled again in a finally block and the page is left signed in as the demo client.",
+      "probe_paths": [
+        "/jobs",
+        "/documents",
+        "/statement",
+        "/admin"
+      ],
+      "settle_ms": 600,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_5": "FRAGO 05 sections 3.3 and 3.7."
+    },
+    {
+      "id": 42,
+      "line": "The Users page shows a one-time password exactly once, says it is shown once and that nothing is emailed, and does not show it after a reload.",
+      "drive": "playwright",
+      "check": "users_page_one_time_password",
+      "pass": "Signed in as the operator, admin nav data-view='users' (label 'Users') opens a page with data-testid='users-table'. The reset control on the gate client's row (any confirmation accepted) shows exactly one [data-testid='one-time-password'], and the page reads 'Shown once' and 'Tessera Assure does not send email'. After a reload no one-time-password element is present and the password shown is nowhere in the page. The gate client is disabled again in a finally block.",
+      "settle_ms": 600,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_5": "FRAGO 05 sections 3.2 and 3.7."
+    },
+    {
+      "id": 43,
+      "line": "Organisations: create, apply the task library with its count, per-organisation settings isolated, and no silent default to the demo.",
+      "drive": "api",
+      "check": "organisations_api",
+      "pass": "GET /api/admin/organisations lists the gate and demo organisations with id, name, jurisdiction, regulationLabel, userCount and taskCount; a gate organisation created in this run has 0 tasks. The apply-library preview's willCreate for today equals the created count of the apply that follows. GET /admin/workplan, /admin/settings, /admin/documents and /admin/record with no organisation return 400; ?org=, ?accountId= and the X-Assure-Org header select the same settings. PUT journeyNote 'gate isolation' on the gate organisation leaves the demo's GET /admin/settings unchanged; the gate organisation's value is restored in a finally block. The demo organisation is only read.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_5": "FRAGO 05 sections 3.4 and 3.7. API level, run once at the first resolution."
+    },
+    {
+      "id": 44,
+      "line": "The organisation switcher changes every admin page, is remembered for the session, and binds every admin request to the selected organisation.",
+      "drive": "playwright",
+      "check": "org_switcher",
+      "pass": "Signed in as the operator, admin nav data-view='organisations' (label 'Organisations') shows data-testid='organisations-table' naming the gate organisation. [data-testid='org-switcher'] lists the gate and demo organisations by name. With the gate organisation chosen, sessionStorage 'assure.org' holds its id; Workplan shows as many task-row as its taskCount, Documents as many document-row as its documents, Settings' journeyNote field its value, and Record opens; after a reload the choice holds. Every /api/admin request captured meanwhile, apart from the organisation-free /admin/organisations, /admin/users and /admin/accounts, carries org, accountId or X-Assure-Org equal to the gate organisation, and at least one was captured. Switching back to the demo shows the demo's task count and journey note. The switcher is left on the demo.",
+      "settle_ms": 600,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "admin",
+      "new_v1_5": "FRAGO 05 sections 3.4 and 3.7."
+    },
+    {
+      "id": 45,
+      "line": "View as client takes the selected organisation.",
+      "drive": "playwright",
+      "check": "client_view_follows_org",
+      "pass": "At the first resolution, the operator's preview GETs for the gate organisation (line 33's set) equal the gate client seat's, with line 33's control and volatile exclusions. In the browser, with the gate organisation selected, entering client view shows the banner and every request carrying X-Assure-Preview carries 'client:<gate org id>', at least one. Return to admin, the switcher is set back to the demo and the page is left signed in as the demo client.",
+      "settle_ms": 600,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "role": "admin",
+      "new_v1_5": "FRAGO 05 section 3.6."
+    },
+    {
+      "id": 46,
+      "line": "A client user of one organisation never receives a record of another, driven from both seats.",
+      "drive": "api",
+      "check": "client_isolation",
+      "pass": "The gate client (after its first-sign-in change) and the demo client each GET tracker home, areas 1 to 8, documents, jobs, clocks, value/record, value/statement, chat/thread and policies. In every response every object carrying orgId carries the seat's own organisation; no task or document id (8 characters or more) from one seat's responses appears in the other's.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_5": "FRAGO 05 section 3.7. API level, run once at the first resolution. Gate users are find-or-create and disabled again in a finally block."
+    },
+    {
+      "id": 47,
+      "line": "The seed: a dry run changes nothing and counts the manifest; a real run creates exactly the manifest's tasks; a second run without replace is refused.",
+      "drive": "api",
+      "check": "seed_manifest",
+      "pass": "With 06_EXECUTION/gate/fixtures/seed_manifest_fixture.json, POST /api/admin/organisations/<gate org>/seed?org=<gate org> with dryRun true (and replace true) returns wouldCreate.tasks equal to the manifest's task count, after equal to before, and the workplan count unchanged; with replace true, after.tasks and GET /admin/workplan?org= both equal the manifest's task count; again without replace returns 409; settings.journeyPhase equals the manifest's journeyPhase when it gives one. Only the gate organisation is ever seeded.",
+      "fixture": "06_EXECUTION/gate/fixtures/seed_manifest_fixture.json",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_5": "FRAGO 05 sections 3.5 and 3.7. API level, run once at the first resolution. FRAGO 05 says 'on a draft deploy'; the gate runs it on whatever target it is given, against the gate organisation only."
+    },
+    {
+      "id": 48,
+      "line": "No restricted name or address appears in any field of the seeded organisation.",
+      "drive": "api",
+      "check": "seeded_org_no_restricted",
+      "pass": "The restricted terms (read at run time by check_restricted.py's own function, plus any address in the restricted file) are searched case-insensitively in GET /api/admin/workplan, /admin/settings and /admin/documents for the gate organisation and in the gate client's /tracker/home and /tracker/jobs: no hit. A hit is reported as a count against the endpoint, never the term.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_5": "FRAGO 05 section 3.7. API level, run once at the first resolution. Gate users are find-or-create and disabled again in a finally block."
+    },
+    {
+      "id": 49,
+      "line": "Sign-in audit entries no longer carry a session id.",
+      "drive": "api",
+      "check": "auth_login_audit_no_session",
+      "pass": "After fresh demo client and operator sign-ins, every auth.login entry created in this run (createdAt within skew_s of the run) in GET /api/admin/audit?accountId=<demo org>&action=auth.login and GET /admin/users/audit has a detail not matching /session=[0-9a-f-]{20,}/, and at least one such entry is found. Older entries predate the rule and are not read.",
+      "skew_s": 120,
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_5": "FRAGO 05 section 4. API level, run once at the first resolution."
+    },
+    {
+      "id": 50,
+      "line": "No restricted term in the built bundle.",
+      "drive": "static",
+      "check": "restricted_in_bundle",
+      "pass": "The restricted terms (as line 48) are searched case-insensitively in every file under 06_EXECUTION/build/maximus-src/apps/web/dist and in 06_EXECUTION/build/maximus-src/netlify/functions/_api-bundle.mjs: no hit; a missing bundle is a fail. Hits are reported as file and line, redacted.",
+      "paths": [
+        "06_EXECUTION/build/maximus-src/apps/web/dist",
+        "06_EXECUTION/build/maximus-src/netlify/functions/_api-bundle.mjs"
+      ],
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_5": "FRAGO 05 section 3.7. Static, run once in the static section."
+    },
+    {
+      "id": 51,
+      "line": "No server source line logs or audits a password.",
+      "drive": "static",
+      "check": "no_password_logging",
+      "pass": "In packages/server/src, no console.* or writeAudit call has among its arguments (string literal text blanked, template expressions kept) the identifier password, oneTimePassword, newPassword, currentPassword or passwordHash.",
+      "path": "06_EXECUTION/build/maximus-src/packages/server/src",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "new_v1_5": "FRAGO 05 sections 4 and 5. Static, run once in the static section."
     }
   ]
 }

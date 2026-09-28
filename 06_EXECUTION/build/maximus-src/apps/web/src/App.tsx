@@ -12,6 +12,10 @@ import { AdminProceduresPage } from "./pages/admin/Procedures";
 import { AdminRecordPage } from "./pages/admin/Record";
 import { AdminValuePage } from "./pages/admin/Value";
 import { AdminClientViewPage } from "./pages/admin/ClientView";
+import { AdminOrganisationsPage } from "./pages/admin/Organisations";
+import { AdminUsersPage } from "./pages/admin/Users";
+import { ChangePasswordPage } from "./pages/ChangePassword";
+import { RequireSignedIn } from "./components/RequireRole";
 import { AdminSettingsPage } from "./pages/admin/Settings";
 import { AdminReviewQueuePage } from "./pages/admin/ReviewQueue";
 import { AdminWorkplanPage } from "./pages/admin/Workplan";
@@ -52,6 +56,14 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/change-password"
+        element={
+          <RequireSignedIn>
+            <ChangePasswordPage />
+          </RequireSignedIn>
+        }
+      />
 
       <Route
         path="/"
@@ -117,6 +129,8 @@ export default function App() {
         <Route path="alerts" element={<AdminAlertsPage />} />
         <Route path="exports" element={<AdminExportsPage />} />
         <Route path="audit" element={<AdminAuditPage />} />
+        <Route path="organisations" element={<AdminOrganisationsPage />} />
+        <Route path="users" element={<AdminUsersPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

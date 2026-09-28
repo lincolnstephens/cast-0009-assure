@@ -1,4 +1,7 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { adminOrganisationRoutes } from "./routes/adminOrganisations.ts";
+import { adminUserRoutes } from "./routes/adminUsers.ts";
 import type { AppEnv } from "./lib/middleware.ts";
 import { ensureSeeded } from "./lib/seedData.ts";
 import { adminAuditRoutes } from "./routes/adminAudit.ts";
@@ -93,10 +96,13 @@ app.route("/admin", adminPostureRoutes);
 app.route("/admin", adminRecordRoutes);
 app.route("/admin", adminReviewRoutes);
 app.route("/admin", adminWorkplanRoutes);
+app.route("/admin", adminUserRoutes);
+app.route("/admin", adminOrganisationRoutes);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 
 app.onError((err, c) => {
+  if (err instanceof HTTPException) return err.getResponse();
   console.error(`[api] ${c.req.method} ${c.req.path}:`, err);
   return c.json({ error: "Something went wrong. Please try again." }, 500);
 });

@@ -8,7 +8,8 @@
     "test": "vitest run",
     "seed": "tsx scripts/seed.ts --clean",
     "seed:demo": "tsx scripts/seed.ts --demo",
-    "seed:reset": "tsx scripts/seed.ts --reset --demo"
+    "seed:reset": "tsx scripts/seed.ts --reset --demo",
+    "seed-organisation": "tsx scripts/seed-organisation.ts"
   },
   "dependencies": {
     "@maximus/shared": "workspace:*",

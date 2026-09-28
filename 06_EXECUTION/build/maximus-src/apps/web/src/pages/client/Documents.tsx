@@ -148,6 +148,11 @@ function DocumentRow({ item }: { item: ComplianceDocument }) {
         )}
       </div>
       <VersionLine item={item} />
+      {item.description && (
+        <p data-testid="document-description" className="mt-0.5 text-[12px] text-client-muted">
+          {item.description}
+        </p>
+      )}
       {item.updatedAt && (
         <p className="mt-0.5 text-[11px] text-client-muted">
           Last updated {formatDateGB(item.updatedAt.slice(0, 10))}
