@@ -53,8 +53,8 @@ Keep the two roles. `mitmark_admin` with `orgId: null` is a manager and sees eve
 ### 3.5 The client organisation and its content
 
 - The build creates nothing named. It delivers a seed command `seed-organisation --manifest <path>` that a manager runs against the live store, taking the organisation id and a manifest. The manifest format is documented in T18.
-- Seagull supplies `material/lurong_documents/manifest.json` from `00_INTENT/ASSURE_PREPOPULATION_PLAN.md` section 3: the 19 handover activities and the document-implied tasks (module, title, how, owner role, status, due date), the two clocks, the journey stage, and the document list (file, title without the client name, section, module, description) for whichever of the nine files are present in that folder.
-- Sunray places the nine client files in `material/lurong_documents/` under the cleaned names in the manifest. If a file is missing the seed logs it and continues; documents can be filed later through the operator's Documents page.
+- `material/lurong_documents/manifest.json` and the nine renamed client files are already in place (Seagull, 28 Sep 15:05). The seed command implements that manifest's shape (tasks per taskSchema with `ref`, `area`, `phase`, `title`, `how`, `ownerType`, `ownerRole`, `dueAt`, `recurrence`, `status`, optional `notes` and `source`; `clocks`; `documents` with file, title, section, area, status, description; `organisation.settings`), and T18 documents it from the file, not the other way round. It contains: the 19 handover activities and the document-implied tasks (module, title, how, owner role, status, due date), the two clocks, the journey stage, and the document list (file, title without the client name, section, module, description) for whichever of the nine files are present in that folder.
+- The original zip with client-named entries is in `material/restricted/`; never read it from the build. If a file named in the manifest is missing the seed logs it and continues.
 - The seed refuses to run twice against the same organisation without `--replace`. It reports counts either side.
 - The demo organisation is untouched.
 
