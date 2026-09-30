@@ -77,6 +77,7 @@ function toClientDocument(d: DocumentRecord): ComplianceDocument {
     updatedAt: d.updatedAt,
     updatedBy: d.updatedBy,
     description: d.description ?? "",
+    status: d.status ?? "",
   };
 }
 
@@ -110,6 +111,7 @@ function policyDocument(p: PolicyRecord, area: number | null, title: string): Co
     updatedAt: p.approvedAt ?? p.createdAt,
     updatedBy: "MITMARK",
     description: "",
+    status: "approved",
   };
 }
 
@@ -171,6 +173,7 @@ function procedureDocument(area: number, p: ProcedureRecord): ComplianceDocument
     updatedAt: p.publishedAt ?? "",
     updatedBy: "MITMARK",
     description: "",
+    status: "published",
   };
 }
 
@@ -212,6 +215,7 @@ function unfiledTrackerItem(doc: OrgDoc, t: (typeof TRACKER_DOCUMENTS)[number]):
     updatedAt: "",
     updatedBy: "",
     description: "",
+    status: "",
   };
 }
 

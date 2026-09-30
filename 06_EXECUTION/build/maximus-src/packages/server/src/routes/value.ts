@@ -6,7 +6,7 @@ import {
   periodsOf,
   serviceLineViews,
   statementOf,
-  obligationsLine,
+  statementOutlook,
   totalsOf,
 } from "../lib/record.ts";
 import { requireAuth, requireClientSeat, type AppEnv } from "../lib/middleware.ts";
@@ -63,6 +63,6 @@ valueRoutes.get("/statement", async (c) => {
   const entries = applyFilter(visible, { period });
 
   return c.json(
-    statementOf(entries, doc.settings, period || "all periods", new Date(), obligationsLine(doc)),
+    statementOf(entries, doc.settings, period || "all periods", new Date(), statementOutlook(doc)),
   );
 });

@@ -9,7 +9,7 @@ import { mutateOrg, newId, readOrg } from "../db/store.ts";
 import type { EntryRecord, DeadlineLabel } from "../db/model.ts";
 import {
   applyFilter,
-  obligationsLine,
+  statementOutlook,
   periodsOf,
   serviceLineViews,
   statementOf,
@@ -66,7 +66,7 @@ adminRecordRoutes.get("/record/statement", async (c) => {
       doc.settings,
       period || "all periods",
       new Date(),
-      obligationsLine(doc),
+      statementOutlook(doc),
     ),
   );
 });

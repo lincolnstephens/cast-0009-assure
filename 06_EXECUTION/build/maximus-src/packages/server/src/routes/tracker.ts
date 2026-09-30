@@ -34,6 +34,7 @@ import {
   worstRag,
 } from "../lib/tracker.ts";
 import { policyForArea } from "../lib/workplan.ts";
+import { counters, milestones, moduleScore, moduleTiles, overallScore } from "../lib/modulePage.ts";
 
 /**
  * The client's side of the Compliance Tracker. Scoped throughout to
@@ -91,10 +92,11 @@ trackerRoutes.get("/home", async (c) => {
     empty: doc.tasks.length === 0,
     emptyMessage: "MITMARK is preparing your workplan",
     emptyTargetDate: doc.settings.workplanTargetDate,
-    overall: overallStatus(doc, now),
+    // v1.6 (FRAGO 06 3.6): the headline and each tile's colour are the score.
+    overall: { ...overallStatus(doc, now), score: overallScore(doc, now) },
     phases: phaseSummaries(doc, now),
     kpis: kpis(doc, now),
-    areas: areaSummaries(doc, now),
+    areas: areaSummaries(doc, now).map((a) => ({ ...a, score: moduleScore(doc, a.area, now) })),
     forYou: forYou(doc, now),
     forYouEmptyMessage: `Nothing needs your action. MITMARK is working ${openMitmarkCount} items.`,
     journey: journey(doc),
@@ -209,6 +211,10 @@ trackerRoutes.get("/areas/:area", async (c) => {
       procedureTargetDate: procedurePending ? (procedure?.targetDate ?? null) : null,
     },
     history,
+    tiles: moduleTiles(doc, area),
+    score: moduleScore(doc, area, now),
+    milestones: milestones(doc, area, now),
+    counters: counters(doc, area, now),
   });
 });
 

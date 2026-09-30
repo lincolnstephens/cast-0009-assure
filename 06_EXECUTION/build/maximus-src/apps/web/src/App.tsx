@@ -26,6 +26,7 @@ import { ClocksPage } from "./pages/client/Clocks";
 // they arrive, only this import line needs adjusting.
 import { DocumentsPage } from "./pages/client/Documents";
 import { AdminDocumentsPage } from "./pages/admin/Documents";
+import { AdminFiguresPage } from "./pages/admin/Figures";
 import { ExposurePage } from "./pages/client/Exposure";
 import { GuidePage } from "./pages/client/Guide";
 import { JobsPage } from "./pages/client/Jobs";
@@ -126,6 +127,7 @@ export default function App() {
         <Route path="record" element={<AdminRecordPage />} />
         <Route path="value" element={<AdminValuePage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
+        <Route path="figures" element={<AdminFiguresPage />} />
         <Route path="alerts" element={<AdminAlertsPage />} />
         <Route path="exports" element={<AdminExportsPage />} />
         <Route path="audit" element={<AdminAuditPage />} />

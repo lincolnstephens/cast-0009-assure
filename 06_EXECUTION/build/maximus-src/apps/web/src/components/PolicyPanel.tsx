@@ -55,6 +55,7 @@ export function PolicyPanel({
     <div className="fixed inset-0 z-40 flex justify-end bg-black/50" onClick={onClose}>
       <aside
         ref={asideRef}
+        data-testid="policy-panel"
         className="h-full w-full max-w-lg overflow-y-auto border-l border-client-line bg-client-surface p-6 text-client-text"
         onClick={(e) => e.stopPropagation()}
       >
@@ -74,6 +75,7 @@ export function PolicyPanel({
           </div>
           <button
             onClick={onClose}
+            data-testid="policy-panel-close"
             className="text-sm text-client-muted hover:text-client-text"
           >
             Close

@@ -1,8 +1,8 @@
 ---
 document: BUILD_REPORT
 job: CAST-0009 ASSURE
-version: v1.2
-status: v1.2 BUILD COMPLETE, DEPLOYED, GATE PASSED
+version: v1.6
+status: v1.6 BUILD COMPLETE, DEPLOYED, GATE PASSED
 authority: Seagull, executed by the build session under T02 A6
 ---
 
@@ -404,3 +404,94 @@ Changing `SEED_CLIENT_PASSWORD` and `SEED_OFFICER_PASSWORD` in Netlify will not 
 ## The smallest next decision for Sunray
 
 **Who creates the operator's manager account, and when.** It takes one minute in Users. Everything else in section 7 follows from that.
+
+
+---
+
+# v1.6, the module pages as the operator drew them
+
+**Live:** https://assure.tessera-monitor.com (the site's production address; https://tessera-assure.netlify.app serves the same deploy)
+**Production deploy:** `6abd0be1fabe2fb17880b662`, 2026-09-30
+**Gate:** PASS, 172 of 172, against the production URL, on the second run. The first run found a fault in the gate itself; see below.
+**Spend:** no new money committed. Build-session time, local compute, and three deploys on the existing Netlify plan (two drafts, one production). No new dependency. No environment variable or secret changed.
+**Built under:** `06_EXECUTION/FRAGO_06_MODULE_PAGES.md`, issued 10:10 (DC-61). This session was tasked at 13:50, which was already past the order's four hours. It was live at 14:17.
+
+## What v1.6 adds
+
+**Every module page follows the operator's deck.** The seven sections are:
+1. The name and its one line.
+2. **Useful links**, as tiles with a numbered list beneath.
+3. **Compliance status**, under the 3.6 score rule.
+4. **Compliance journey**, drawn from the module's dated tasks. There are at most six milestones and never one that is not a task.
+5. **Counts**, on modules 5 to 8.
+6. **Jobs**, in the six-question table.
+7. What the law asks, how we do it, and history.
+
+**Tiles open something, every one.**
+- A filed file downloads, and a link redirects.
+- A policy opens the policy panel.
+- A register nobody has filed opens a "Not yet filed" card.
+- A retention category opens a card with its period.
+
+**The score (FRAGO 06 3.6)** is dated obligations met on time over dated obligations due, over the twelve months to today.
+- A late completion counts 70 per cent within 30 days and 50 per cent beyond.
+- Green is 90 and above, amber 60 to 89, red below 60.
+- The front page shows the mean of the module scores with "k of 8 modules green". The eight tiles take the score and its colour, and the overdue count stays beneath.
+- `lib/modulePage.ts` holds the rule. `modulePages.test.ts` tests it case by case.
+
+**The Figures form** (admin, **Figures**) lets the operator report counts for DPIAs, project risk assessments, vendors and incidents.
+- Each save is kept with who made it and when.
+- The client sees "Reported by MITMARK on {date}", never who entered it. An empty count reads "No data yet".
+- Data requests and reported concerns are counted from the product's own clocks: "From the request log, as at {date}".
+
+**The retention schedule** is set in Settings and shown as seven tiles on module 3.
+
+**The register list is the operator's.** The old titles are kept as aliases, so filed registers keep their place. The vendor log also shows on module 2.
+
+**The Statement has three parts:** the service, what MITMARK has done (now also item by item, with hours and the cost of her time), and what comes next (the dated open tasks). The "n of m obligations met" opener is gone.
+
+**The seed** reads manifest v2.1's `links` and `organisation.settings.retentionSchedule`. A new `--additions` mode applies only those to an organisation already seeded. It leaves tasks, documents and every other setting alone, and a second run adds nothing.
+
+## Applied to the client organisation
+
+On org-f2b4afdf0d, as the demo manager seat (the seat Seagull used for DC-59):
+1. Dry run: "Would file 2 link(s) (0 already filed) and would set a retention schedule of 7 row(s)."
+2. Real run: tasks 19 before and after; documents 9 before, 11 after.
+3. A snapshot taken either side through the admin API showed the 19 tasks byte-identical (same digest) and the nine filed documents identical. The only change is the two ICO links.
+
+The module pages were then rendered in View as client:
+- **Module 1:** the two ICO links; milestones "done, next".
+- **Module 2:** the five registers, two filed as templates and three not yet filed.
+- **Module 3:** the seven retention periods and the draft Data Retention Policy.
+- **Module 4:** the four policies, version 1 approved and three drafts.
+- **Modules 5 to 8:** their counters, "No data yet" until the operator reports.
+- **Statement:** in three parts with 12 items coming next.
+- No console errors.
+
+The front page reads "Compliance score: 100% (3 of 8 modules green)", with nothing overdue. Five modules have nothing dated that has fallen due yet.
+
+## What the gate caught
+
+The first production run failed line 6 at all three resolutions. The fault was in the gate, and it had touched live data.
+- The admin switcher defaults to the first organisation by name, which since 29 September is the client's.
+- The gate's Settings toggles (lines 6 and 14) therefore switched "show illustrative" off and back on for the client organisation, leaving it **on**.
+- The client organisation has no Record entries, so nothing reached it.
+- The gate now pins the switcher to the demo at every operator sign-in, and refuses to go on if it cannot. The second run passed 172 of 172 and made no change to the client organisation.
+- Putting the client organisation's switch back off was refused to this session by its permission layer, so it waits on Sunray or the operator (DC-63, T17 v1.6).
+
+## Calls the order left to the build (DC-62)
+
+1. **Seed-closed tasks count as met on their date.** The seed closes a "Completed" row at the moment it runs, so without this reading the 2026 ICO renewal and the policy drafting would score as late (50 per cent). A task closed in the Workplan is dated the day it is closed.
+2. **Module 4 shows all four policies**, whichever module each was filed against.
+3. **Module 8 shows its two counts side by side**, the concerns logged in the product and the incidents the operator reports, rather than adding numbers with different bases.
+4. **Operator figures live outside settings.** `/value/record` returns settings to the client, and the figures carry the operator's id.
+
+## Deviations
+
+- **Module descriptions are unchanged.** The order says the slide text becomes the default, but the deck is not in the job folder. The operator can type her own in Settings today.
+- **R01 numbering.** The order says append from DC-61. DC-61 was already Seagull's, so the build appended from DC-62.
+- **The gate's target** is the site's production address, which is now the custom domain. Earlier runs used the netlify.app address, and both serve the same deploy.
+
+## The smallest next decision for Sunray
+
+**Take the score rule to the operator.** The product implements FRAGO 06 3.6 as written. If her conversation settles different bands, the constants are all in `lib/modulePage.ts`, and the change is a short order.

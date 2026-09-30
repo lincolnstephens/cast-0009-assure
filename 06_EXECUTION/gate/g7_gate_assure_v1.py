@@ -97,7 +97,7 @@ import sys
 CONFIG = {
     # Identity of the run, for the report header.
     "codename": "ASSURE",
-    "iteration": "v1.5",
+    "iteration": "v1.6",
 
     # What is gated. Either a deployed URL or a path to a local artefact.
     # Passed on the command line; these are the defaults.
@@ -840,7 +840,27 @@ def _credentials(cfg, role):
 def _sign_in(page, cfg, role, target):
     """Sign out if signed in, then sign in as the account for `role`."""
     email, password = _credentials(cfg, role)
-    return _sign_in_with(page, target, email, password)
+    ok = _sign_in_with(page, target, email, password)
+    if ok and role == "admin":
+        _pin_demo_org(page, cfg)
+    return ok
+
+
+def _pin_demo_org(page, cfg):
+    """v1.6 fix. The switcher defaults to the first organisation by name, and
+    since 29 Sep that is the client's own. Every admin page, Settings above
+    all, acts on the switcher's choice, so an operator sign-in in the gate
+    pins it to the demo before any line toggles anything: the gate must never
+    change a real organisation. Lines 44 and 45 move it on purpose and pick
+    their own organisation. Fails loudly if the demo cannot be selected."""
+    demo = _preview_org_id(_ApiSeat(cfg, "admin"))
+    sw = page.locator("[data-testid='org-switcher']")
+    if not _wait_for(page, "[data-testid='org-switcher']", 8000) or sw.count() == 0:
+        raise RuntimeError("the organisation switcher is not on the admin page; refusing to go on")
+    sw.first.select_option(value=demo)
+    page.wait_for_timeout(600)
+    if sw.first.input_value() != demo:
+        raise RuntimeError("could not pin the admin switcher to the demo organisation")
 
 
 def _sign_in_with(page, target, email, password):
@@ -2009,14 +2029,25 @@ def drv_overall_status_wording(page, cfg, line, res, errors):
         return _text(loc.first) if loc.count() > 0 else None
 
     sentence = read("sentence")
-    m = re.fullmatch(r"Compliance score: (\d+)% \((\d+) of (\d+) obligations met\)", sentence or "")
+    # v1.6 (FRAGO 06 3.6): the headline is the mean of the module scores, with
+    # the modules scoring green as its fraction. It is checked against the
+    # module scores the client's own API returns.
+    m = re.fullmatch(r"Compliance score: (\d+)% \((\d+) of 8 modules green\)", sentence or "")
+    try:
+        s_home, home = _ApiSeat(cfg, "client").call("GET", "/tracker/home")
+    except RuntimeError as exc:
+        s_home, home = None, None
+        problems.append(str(exc))
+    areas = (home or {}).get("areas") or []
+    scored = [a["score"]["pct"] for a in areas if (a.get("score") or {}).get("pct") is not None]
+    greens = sum(1 for a in areas if (a.get("score") or {}).get("rag") == "green")
     if m:
-        pct, n, total = (int(g) for g in m.groups())
-        if total == 0 or n > total:
-            problems.append(f"score fraction is not a real one: '{sentence}'")
-        elif abs(pct - 100.0 * n / total) >= 1:
-            problems.append(f"score {pct}% does not agree with {n} of {total}")
-    elif sentence != "Compliance score: nothing has fallen due yet":
+        pct, green = int(m.group(1)), int(m.group(2))
+        if not scored or abs(pct - sum(scored) / len(scored)) >= 1:
+            problems.append(f"score {pct}% is not the mean of the module scores {scored}")
+        if green != greens:
+            problems.append(f"{green} modules green in the headline, {greens} in the module scores")
+    elif sentence != "Compliance score: no dated obligations yet" or scored:
         problems.append(f"score sentence reads '{sentence}'")
 
     asat = read("asat")
@@ -2240,10 +2271,11 @@ def drv_module_tiles_link(page, cfg, line, res, errors):
         name = tile.locator("[data-testid='module-tile-name']")
         if name.count() == 0 or _text(name.first) != expected[i]:
             problems.append(f"tile {i + 1} name '{_text(name.first) if name.count() else ''}'")
+        # v1.6: the tile states its module's score (FRAGO 06 3.6).
         count = tile.locator("[data-testid='module-tile-count']")
-        cm = re.fullmatch(r"(\d+) of (\d+) done", _text(count.first) if count.count() else "")
-        if not cm or int(cm.group(1)) > int(cm.group(2)):
-            problems.append(f"tile {i + 1} count '{_text(count.first) if count.count() else ''}'")
+        bad = _score_problem(_text(count.first) if count.count() else "")
+        if bad:
+            problems.append(f"tile {i + 1}: {bad}")
 
     from urllib.parse import urlparse
     for i in range(len(expected)):
@@ -4034,6 +4066,502 @@ def drv_auth_login_audit_no_session(page, cfg, line, res, errors):
     return ok, (f"{seen} auth.login entries from this run, none with a session id" if ok else "; ".join(problems[:6]))
 
 
+# --- v1.6 drivers, the module pages as the operator drew them (FRAGO 06). ---
+
+SCORE_SENTENCE_RE = r"(\d+)% \((\d+) of (\d+) on time(?:, (\d+) late)?\)"
+SCORE_EMPTY = "No dated obligations yet"
+SCORE_LABELS = ("On time", "Partly on time", "Behind", "Nothing dated yet")
+TILE_KIND_ORDER = ["retention", "register", "policy", "file", "link"]
+COUNTER_BASIS_RE = (r"(From the request log, as at .+\.|Reported by MITMARK on .+\."
+                    r"|Reported by MITMARK in the monthly figures\. Nothing reported yet\.)")
+
+
+def _score_problem(sentence):
+    """None when a module score sentence is well formed and adds up, else
+    what is wrong. On time counts in full and a late one between 50 and 70
+    per cent, so the percentage must sit inside that band."""
+    if sentence == SCORE_EMPTY:
+        return None
+    m = re.fullmatch(SCORE_SENTENCE_RE, sentence or "")
+    if not m:
+        return f"score reads '{sentence}'"
+    pct, on_time, total = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    late = int(m.group(4) or 0)
+    if total == 0 or on_time + late > total:
+        return f"'{sentence}' is not a real fraction"
+    low = 100.0 * (on_time + 0.5 * late) / total
+    high = 100.0 * (on_time + 0.7 * late) / total
+    if not (low - 1 <= pct <= high + 1):
+        return f"'{sentence}': {pct}% outside {low:.0f} to {high:.0f}"
+    return None
+
+
+def _load_tracker_documents(cfg):
+    """The register list, read from the shared source: key, title, area,
+    aliases and alsoAreas for each entry."""
+    src = (cfg["root"] / TASK_COLUMNS_SOURCE).read_text(encoding="utf-8")
+    m = re.search(r"export const TRACKER_DOCUMENTS[^=]*=\s*\[(.*?)\n\];", src, re.S)
+    if not m:
+        return []
+    out = []
+    for entry in re.finditer(r"\{\s*key:.*?\}", m.group(1), re.S):
+        e = entry.group(0)
+        title = re.search(r'title:\s*"([^"]+)"', e)
+        area = re.search(r"area:\s*(\d+)", e)
+        aliases = re.search(r"aliases:\s*\[([^\]]*)\]", e)
+        also = re.search(r"alsoAreas:\s*\[([^\]]*)\]", e)
+        if title and area:
+            out.append({
+                "title": title.group(1),
+                "area": int(area.group(1)),
+                "aliases": re.findall(r'"([^"]+)"', aliases.group(1)) if aliases else [],
+                "alsoAreas": [int(x) for x in re.findall(r"\d+", also.group(1))] if also else [],
+            })
+    return out
+
+
+def drv_module_page_sections(page, cfg, line, res, errors):
+    """Line 26, rewritten at v1.6 (FRAGO 06 section 3.1): every module page
+    has the seven sections in order: name and introduction; Useful links;
+    Compliance status; Compliance journey; Counters (modules 5 to 8 only);
+    Jobs; then what the law asks, how we do it and history. The status reads
+    "{pct}% ({n} of {m} on time[, {k} late])" or "No dated obligations yet",
+    adds up under the 3.6 rule, carries its label in words and its basis in
+    text and on hover, and matches the module's tile on the tracker."""
+    settle_ms = line.get("settle_ms", 400)
+    expected = _load_tracker_areas(cfg)
+    if not expected:
+        return False, f"could not read AREAS from {TASK_COLUMNS_SOURCE}"
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    if not _enter_view(page, "tracker", None, settle_ms, cfg, "client"):
+        return False, "the client tracker view was not reachable"
+    if not _wait_for(page, "[data-testid='module-tile-count']", 6000):
+        return False, "module tile scores not found on the tracker"
+    counts = page.locator("[data-testid='module-tile-count']")
+    tile_scores = [_text(counts.nth(i)) for i in range(counts.count())]
+
+    problems = []
+    for i, name in enumerate(expected):
+        area = i + 1
+        label = f"module {area}"
+        if not _enter_area_page(page, cfg, settle_ms, i):
+            problems.append(f"{label}: not reachable")
+            continue
+        h1s = page.locator("h1")
+        if h1s.count() == 0 or _text(h1s.first) != name:
+            problems.append(f"{label}: h1 '{_text(h1s.first) if h1s.count() else ''}'")
+        intro = page.locator("[data-testid='module-intro']")
+        if intro.count() == 0 or not _text(intro.first):
+            problems.append(f"{label}: introduction missing or empty")
+
+        score = page.locator("[data-testid='module-score']")
+        sentence = _text(score.first) if score.count() else ""
+        bad = _score_problem(sentence)
+        if bad:
+            problems.append(f"{label}: {bad}")
+        if i < len(tile_scores) and tile_scores[i] != sentence:
+            problems.append(f"{label}: page says '{sentence}', tile says '{tile_scores[i]}'")
+        prog = page.locator("[data-testid='module-progress']")
+        ptext = _text(prog.first) if prog.count() else ""
+        if not any(lbl in ptext for lbl in SCORE_LABELS):
+            problems.append(f"{label}: no score label in words beside the status")
+        basis = page.locator("[data-testid='module-score-basis']")
+        if basis.count() == 0 or not _text(basis.first):
+            problems.append(f"{label}: no basis in text beneath the status")
+        card = page.locator("[data-testid='module-progress-card']")
+        if card.count() == 0 or not (card.first.get_attribute("title") or "").strip():
+            problems.append(f"{label}: no basis on hover")
+
+        counters = page.locator("[data-testid='module-counters']").count()
+        if area >= 5 and counters == 0:
+            problems.append(f"{label}: counters missing")
+        if area < 5 and counters > 0:
+            problems.append(f"{label}: counters shown on a module without them")
+
+        table = ("[data-testid='task-table']" if page.locator("[data-testid='task-table']").count()
+                 else "[data-testid='task-cards']")
+        if page.locator(f"[data-testid='module-jobs'] {table}").count() == 0:
+            problems.append(f"{label}: the six-question table is not inside Jobs")
+        order = ["h1", "[data-testid='module-intro']", "[data-testid='module-links']",
+                 "[data-testid='module-progress']", "[data-testid='module-journey']"]
+        if area >= 5:
+            order.append("[data-testid='module-counters']")
+        order += ["[data-testid='module-jobs']", "[data-testid='obligation']", "#how-we-do-it",
+                  "[data-testid='module-history']", "[data-testid='module-nav']"]
+        order_ok, order_detail = _dom_order(page, order)
+        if not order_ok:
+            problems.append(f"{label}: order: {order_detail}")
+
+    ok = not problems
+    return ok, (f"{len(expected)} module pages carry the seven sections in order; each score adds up "
+                "and matches its tile" if ok else "; ".join(problems[:6]))
+
+
+def drv_module_useful_links(page, cfg, line, res, errors):
+    """Line 52 (new at v1.6, FRAGO 06 3.1 item 2, 3.2 and 3.4): on every
+    module page, Useful links shows its tiles in the order retention,
+    registers, policies, other filed items, links, and the same items as a
+    numbered list beneath. Every tile opens something: a download or link
+    answers 200 or a redirect, a policy opens the policy panel, a register
+    not yet filed or a retention category opens its card showing the tile's
+    detail. Module 2 carries the operator's five registers, each by its
+    title or one of its aliases."""
+    settle_ms = line.get("settle_ms", 400)
+    expected = _load_tracker_areas(cfg)
+    registers = _load_tracker_documents(cfg)
+    if not expected or not registers:
+        return False, f"could not read AREAS or TRACKER_DOCUMENTS from {TASK_COLUMNS_SOURCE}"
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+
+    problems = []
+    opened = {"download": 0, "card": 0, "policy": 0}
+    for i in range(len(expected)):
+        area = i + 1
+        label = f"module {area}"
+        if not _enter_area_page(page, cfg, settle_ms, i):
+            problems.append(f"{label}: not reachable")
+            continue
+        links = page.locator("[data-testid='module-links']")
+        if links.count() == 0:
+            problems.append(f"{label}: Useful links missing")
+            continue
+        tiles = links.first.locator("[data-testid='module-link-tile']")
+        items = links.first.locator("[data-testid='module-doc-item']")
+        n = tiles.count()
+        if n == 0:
+            empty = links.first.locator("[data-testid='module-documents-empty']")
+            if empty.count() == 0:
+                problems.append(f"{label}: no tile and no empty state")
+            continue
+        if items.count() != n:
+            problems.append(f"{label}: {n} tiles but {items.count()} items in the numbered list")
+        kinds = [tiles.nth(j).get_attribute("data-kind") or "" for j in range(n)]
+        ranks = [TILE_KIND_ORDER.index(k) if k in TILE_KIND_ORDER else -1 for k in kinds]
+        if -1 in ranks or ranks != sorted(ranks):
+            problems.append(f"{label}: tile order {kinds}")
+        titles = [_text(tiles.nth(j).locator("span").nth(1)) for j in range(n)]
+        for reg in registers:
+            if reg["area"] != area and area not in reg["alsoAreas"]:
+                continue
+            names = [reg["title"].lower()] + [a.lower() for a in reg["aliases"]]
+            if not any(t.lower() in names for t, k in zip(titles, kinds) if k == "register"):
+                problems.append(f"{label}: register '{reg['title']}' has no tile")
+
+        for j in range(n):
+            tile = tiles.nth(j)
+            opens = tile.get_attribute("data-opens") or ""
+            what = f"{label} tile {j + 1} ({kinds[j]})"
+            if opens == "download":
+                href = tile.get_attribute("href") or ""
+                if tile.evaluate("e => e.tagName.toLowerCase()") != "a" or "/api/tracker/documents/" not in href:
+                    problems.append(f"{what}: download tile with href '{href}'")
+                    continue
+                try:
+                    r = page.request.get(cfg["_target"].rstrip("/") + href if href.startswith("/") else href,
+                                         max_redirects=0)
+                    if r.status not in (200, 301, 302, 303, 307, 308):
+                        problems.append(f"{what}: opens to {r.status}")
+                    else:
+                        opened["download"] += 1
+                except Exception as exc:
+                    problems.append(f"{what}: {type(exc).__name__}")
+            elif opens == "card":
+                detail = tile.locator("[data-testid='module-tile-detail']")
+                want = _text(detail.first) if detail.count() else ""
+                tile.click()
+                page.wait_for_timeout(150)
+                card = page.locator("[data-testid='module-tile-card-detail']")
+                got = _text(card.first) if card.count() else None
+                if got is None or got != want:
+                    problems.append(f"{what}: card shows '{got}', tile says '{want}'")
+                else:
+                    opened["card"] += 1
+                if page.locator("[data-testid='module-tile-card']").count():
+                    tile.click()
+                    page.wait_for_timeout(100)
+            elif opens == "policy":
+                tile.click()
+                if not _wait_for(page, "[data-testid='policy-panel']", 5000):
+                    problems.append(f"{what}: the policy panel did not open")
+                else:
+                    opened["policy"] += 1
+                    page.locator("[data-testid='policy-panel-close']").first.click()
+                    page.wait_for_timeout(150)
+            else:
+                problems.append(f"{what}: data-opens '{opens}'")
+
+    ok = not problems
+    return ok, (f"every tile opens: {opened['download']} downloads or links, {opened['card']} cards, "
+                f"{opened['policy']} policies; order and module 2's registers as the order"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_module_milestones(page, cfg, line, res, errors):
+    """Line 53 (new at v1.6, FRAGO 06 3.1 item 4): the compliance journey on
+    each module is its dated tasks and nothing else: as many milestones as
+    dated tasks up to six, each one a dated task of that module with the
+    same date, oldest first, done exactly when the task is done, at most one
+    marked next; "No dated milestones yet." when there are none. Read from
+    the client's own API and matched against the rendered page."""
+    settle_ms = line.get("settle_ms", 400)
+    expected = _load_tracker_areas(cfg)
+    try:
+        client = _ApiSeat(cfg, "client")
+    except RuntimeError as exc:
+        return False, str(exc)
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+
+    problems = []
+    total = 0
+    for i in range(len(expected)):
+        area = i + 1
+        label = f"module {area}"
+        s, body = client.call("GET", f"/tracker/areas/{area}")
+        if s != 200 or not isinstance(body, dict):
+            problems.append(f"{label}: API returned {s}")
+            continue
+        tasks = {t["id"]: t for t in body.get("tasks") or []}
+        dated = [t for t in tasks.values() if t.get("dueAt") and t.get("status") != "not_applicable"]
+        ms = body.get("milestones") or []
+        total += len(ms)
+        if len(ms) != min(6, len(dated)):
+            problems.append(f"{label}: {len(ms)} milestones for {len(dated)} dated tasks")
+        dates = [m.get("dueAt") for m in ms]
+        if dates != sorted(dates):
+            problems.append(f"{label}: milestones not oldest first")
+        if sum(1 for m in ms if m.get("state") in ("next", "overdue")) > 1:
+            problems.append(f"{label}: more than one next milestone")
+        for m in ms:
+            t = tasks.get(m.get("taskId"))
+            if not t or t.get("dueAt") != m.get("dueAt") or t.get("title") != m.get("title"):
+                problems.append(f"{label}: milestone '{m.get('title')}' is not one of the module's dated tasks")
+                break
+            if (m.get("state") == "done") != (t.get("status") == "done"):
+                problems.append(f"{label}: '{m.get('title')}' state {m.get('state')}, task {t.get('status')}")
+                break
+
+        if not _enter_area_page(page, cfg, settle_ms, i):
+            problems.append(f"{label}: page not reachable")
+            continue
+        drawn = page.locator("[data-testid='module-milestone']")
+        if drawn.count() != len(ms):
+            problems.append(f"{label}: page draws {drawn.count()} milestones, API has {len(ms)}")
+        elif ms:
+            titles = [_text(drawn.nth(j).locator("[data-testid='module-milestone-title']")) for j in range(drawn.count())]
+            if titles != [m.get("title") for m in ms]:
+                problems.append(f"{label}: drawn titles differ from the API's")
+        else:
+            empty = page.locator("[data-testid='module-journey-empty']")
+            if empty.count() == 0 or _text(empty.first) != "No dated milestones yet.":
+                problems.append(f"{label}: no milestones and no 'No dated milestones yet.'")
+
+    ok = not problems
+    return ok, (f"{total} milestones across {len(expected)} modules, each a dated task, drawn as the API has them"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_module_counters(page, cfg, line, res, errors):
+    """Line 54 (new at v1.6, FRAGO 06 3.3): modules 5 to 8 carry counters and
+    modules 1 to 4 none. Every counter group states its basis ("From the
+    request log, as at ..." for records, "Reported by MITMARK on ..." for the
+    operator's figures), and an empty group shows "No data yet", never a
+    zero. Checked on the page and in the client's API."""
+    settle_ms = line.get("settle_ms", 400)
+    expected = _load_tracker_areas(cfg)
+    try:
+        client = _ApiSeat(cfg, "client")
+    except RuntimeError as exc:
+        return False, str(exc)
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+
+    problems = []
+    groups_seen = 0
+    for i in range(len(expected)):
+        area = i + 1
+        label = f"module {area}"
+        s, body = client.call("GET", f"/tracker/areas/{area}")
+        api_groups = (body or {}).get("counters") or [] if s == 200 else None
+        if api_groups is None:
+            problems.append(f"{label}: API returned {s}")
+            continue
+        if (area >= 5) != bool(api_groups):
+            problems.append(f"{label}: {len(api_groups)} counter groups in the API")
+        for g in api_groups:
+            if not re.fullmatch(COUNTER_BASIS_RE, g.get("basis") or ""):
+                problems.append(f"{label}: basis '{g.get('basis')}'")
+            if g.get("source") == "records" and not (g.get("basis") or "").startswith("From the request log"):
+                problems.append(f"{label}: a records group without the request-log basis")
+            if g.get("source") == "operator" and g.get("noData") and any(
+                    it.get("value") is not None for it in g.get("items") or []):
+                problems.append(f"{label}: an empty operator group carries a value")
+
+        if not _enter_area_page(page, cfg, settle_ms, i):
+            problems.append(f"{label}: page not reachable")
+            continue
+        groups = page.locator("[data-testid='counter-group']")
+        if groups.count() != len(api_groups):
+            problems.append(f"{label}: page shows {groups.count()} groups, API {len(api_groups)}")
+            continue
+        for j in range(groups.count()):
+            g = groups.nth(j)
+            groups_seen += 1
+            basis = g.locator("[data-testid='counter-basis']")
+            if basis.count() == 0 or not re.fullmatch(COUNTER_BASIS_RE, _text(basis.first)):
+                problems.append(f"{label} group {j + 1}: basis on the page '{_text(basis.first) if basis.count() else ''}'")
+            if g.get_attribute("data-nodata") == "true":
+                if g.locator("[data-testid='counter-nodata']").count() == 0 or g.locator("[data-testid='counter-item']").count():
+                    problems.append(f"{label} group {j + 1}: empty but not shown as 'No data yet'")
+
+    ok = not problems
+    return ok, (f"{groups_seen} counter groups on modules 5 to 8, each with its basis; none on 1 to 4"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_figures_operator_only(page, cfg, line, res, errors):
+    """Line 55 (new at v1.6, FRAGO 06 3.3 and 3.2): the Figures form and the
+    retention schedule editor are the operator's alone. The client seat is
+    refused on the figures routes and on settings, and in the browser the
+    client never reaches the Figures page. On the gate's own organisation the
+    operator reports a figure: the client's module page then shows it with
+    "Reported by MITMARK on ..." and leaves an unreported count as no data,
+    and never carries who entered it."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    problems = []
+    try:
+        demo_client = _ApiSeat(cfg, "client")
+        operator = _ApiSeat(cfg, "admin")
+    except RuntimeError as exc:
+        return False, str(exc)
+    demo = _user_org(demo_client.user) or _preview_org_id(operator)
+    for method, path, body in (
+        ("GET", f"/admin/figures?org={demo}", None),
+        ("PUT", f"/admin/figures/5?org={demo}", {"groups": {"dpia": {"total": 1}}}),
+        ("PUT", f"/admin/settings?org={demo}", {"retentionSchedule": {"3": []}}),
+    ):
+        s, _ = demo_client.call(method, path, body)
+        if s not in (401, 403):
+            problems.append(f"client {method} {path.split('?')[0]} returned {s}")
+
+    seat = None
+    try:
+        seat, gid = _gate_client_seat(cfg, operator)
+        s, _ = operator.call("PUT", f"/admin/figures/8?org={gid}", {"groups": {"incidents": {"total": 2, "open": 1}}})
+        if s != 200:
+            problems.append(f"operator PUT figures returned {s}")
+        s, page_body = seat.call("GET", "/tracker/areas/8")
+        groups = {g.get("key"): g for g in (page_body or {}).get("counters") or []}
+        inc = groups.get("incidents")
+        if not inc or inc.get("noData") or not (inc.get("basis") or "").startswith("Reported by MITMARK on "):
+            problems.append(f"client sees incidents as {inc}")
+        else:
+            values = {it["key"]: it["value"] for it in inc.get("items") or []}
+            if values.get("total") != 2 or values.get("severity_high") is not None:
+                problems.append(f"incident values {values}")
+        if operator.user and operator.user.get("id") and operator.user["id"] in json.dumps(page_body):
+            problems.append("the client's page carries the operator's id")
+    except RuntimeError as exc:
+        problems.append(str(exc))
+    finally:
+        _safe_disable(cfg, operator)
+
+    if _ensure_role(page, cfg, "client", cfg["_target"]):
+        page.goto(cfg["_target"].rstrip("/") + "/admin/figures")
+        page.wait_for_timeout(line.get("settle_ms", 400) + 600)
+        if page.locator("[data-testid='figures-form']").count() or page.locator("[data-testid='retention-editor']").count():
+            problems.append("the client's browser reached the Figures form")
+    else:
+        problems.append("could not sign in as the client in the browser")
+
+    ok = not problems
+    return ok, ("client refused on figures and settings, and kept out in the browser; a reported figure "
+                "reaches the client with its date and without the operator's id" if ok
+                else "; ".join(problems[:6]))
+
+
+def drv_register_aliases_resolve(page, cfg, line, res, errors):
+    """Line 57 (new at v1.6, FRAGO 06 3.4): a register filed under one of
+    its old names still fills its slot. On the gate's organisation a
+    register is filed as "Vendor list" (the old name of the Vendor log); the
+    client then sees it filed in the Vendor log's place on Compliance
+    Documents and as a filed register tile on modules 7 and 2, where the
+    order puts the vendor log. The document is removed afterwards."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    problems = []
+    try:
+        operator = _ApiSeat(cfg, "admin")
+        seat, gid = _gate_client_seat(cfg, operator)
+    except RuntimeError as exc:
+        return False, str(exc)
+    doc_id = None
+    try:
+        s, body = operator.call("POST", f"/admin/documents?org={gid}", {
+            "section": "trackers", "area": 7, "title": "Vendor list", "kind": "link",
+            "url": "https://example.org/gate-vendor-list", "published": True,
+        })
+        doc_id = ((body or {}).get("document") or {}).get("id") or (body or {}).get("id")
+        if s not in (200, 201) or not doc_id:
+            return False, f"filing the register returned {s}"
+        s, docs = seat.call("GET", "/tracker/documents")
+        trackers = next((x for x in (docs or {}).get("sections") or [] if x.get("id") == "trackers"), {})
+        ids = [it.get("id") for it in trackers.get("items") or []]
+        if doc_id not in ids or "tracker-unfiled:vendor" in ids:
+            problems.append("Compliance Documents does not put the aliased register in the Vendor log's place")
+        for area in (7, 2):
+            s, pg = seat.call("GET", f"/tracker/areas/{area}")
+            tile = next((t for t in (pg or {}).get("tiles") or [] if t.get("ref") == doc_id), None)
+            if not tile or tile.get("kind") != "register" or not tile.get("filed"):
+                problems.append(f"module {area}: no filed register tile for it ({tile})")
+            if any(t.get("id") == "register:vendor" for t in (pg or {}).get("tiles") or []):
+                problems.append(f"module {area}: still shows the Vendor log as not yet filed")
+    finally:
+        if doc_id:
+            operator.call("DELETE", f"/admin/documents/{doc_id}?org={gid}")
+        _safe_disable(cfg, operator)
+    ok = not problems
+    return ok, ("'Vendor list' fills the Vendor log's slot on Documents and on modules 7 and 2" if ok
+                else "; ".join(problems[:6]))
+
+
+def drv_statement_three_parts(page, cfg, line, res, errors):
+    """Line 56 (new at v1.6, FRAGO 06 3.5): the Statement reads in three
+    parts, in order: the service (the twelve lines), what MITMARK has done,
+    what comes next. The planned-against-achieved opener is gone and no text
+    compares achievement with the handover or with obligations met."""
+    settle_ms = line.get("settle_ms", 400)
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    page.goto(cfg["_target"].rstrip("/") + "/value/statement")
+    if not _wait_for(page, "[data-testid='statement']", 8000):
+        return False, "the Statement did not render"
+    page.wait_for_timeout(settle_ms)
+    problems = []
+    order_ok, detail = _dom_order(page, ["[data-testid='statement-service']", "[data-testid='statement-done']",
+                                         "[data-testid='statement-next']"])
+    if not order_ok:
+        problems.append(f"parts: {detail}")
+    lines = page.locator("[data-testid='statement-service-line']").count()
+    if lines != 12:
+        problems.append(f"{lines} service lines, expected 12")
+    if page.locator("[data-testid='statement-obligations']").count():
+        problems.append("the obligations opener is still there")
+    text = _text(page.locator("[data-testid='statement']").first).lower()
+    for phrase in ("handover", "planned versus", "against the plan"):
+        if phrase in text:
+            problems.append(f"the Statement says '{phrase}'")
+    if re.search(r"\d+ of \d+ obligations met", text):
+        problems.append("the Statement counts obligations met against the plan")
+    ok = not problems
+    return ok, ("the service, what MITMARK has done and what comes next, in order; no comparison" if ok
+                else "; ".join(problems[:6]))
+
+
 DRIVERS = {
     "sign_in_lands_on_portal": drv_sign_in_lands_on_portal,
     "views_render": drv_views_render,
@@ -4089,6 +4617,14 @@ DRIVERS = {
     "seed_manifest": drv_seed_manifest,
     "seeded_org_no_restricted": drv_seeded_org_no_restricted,
     "auth_login_audit_no_session": drv_auth_login_audit_no_session,
+    # v1.6 (FRAGO 06)
+    "module_page_sections": drv_module_page_sections,
+    "module_useful_links": drv_module_useful_links,
+    "module_milestones": drv_module_milestones,
+    "module_counters": drv_module_counters,
+    "figures_operator_only": drv_figures_operator_only,
+    "statement_three_parts": drv_statement_three_parts,
+    "register_aliases_resolve": drv_register_aliases_resolve,
 }
 
 

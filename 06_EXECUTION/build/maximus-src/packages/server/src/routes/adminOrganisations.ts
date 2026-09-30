@@ -2,11 +2,11 @@ import { randomBytes } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
 import { jurisdictionSchema } from "@maximus/shared";
-import { emptyOrgDoc, type TaskRecord } from "../db/model.ts";
+import { emptyOrgDoc, type DocumentRecord, type OrgDoc, type TaskRecord } from "../db/model.ts";
 import { listOrgIds, mutateOrg, newId, readOrg, readUsers, writeOrg } from "../db/store.ts";
 import { writeSystemAudit } from "../lib/audit.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
-import { seedManifestSchema, tasksCreatedBy, type SeedManifest } from "../lib/seedManifest.ts";
+import { RETENTION_AREA, seedManifestSchema, tasksCreatedBy, type SeedManifest } from "../lib/seedManifest.ts";
 
 /**
  * Organisations (FRAGO 05 3.4 and 3.5). Managers only. Creating an
@@ -88,7 +88,57 @@ const seedRequestSchema = z.object({
   manifest: seedManifestSchema,
   replace: z.boolean().default(false),
   dryRun: z.boolean().default(false),
+  /**
+   * v1.6 (FRAGO 06). Apply only what a manifest adds beyond tasks and files:
+   * its links and its retention schedule. Tasks, documents and every other
+   * setting are left exactly as they are, so it runs against an organisation
+   * that is already seeded, with no replace.
+   */
+  additionsOnly: z.boolean().default(false),
 });
+
+/** Links not yet filed against the organisation; a link already there (same title and address) is skipped. */
+function newLinks(doc: OrgDoc, m: SeedManifest) {
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  return m.links.filter(
+    (l) => !doc.documents.some((d) => d.kind === "link" && same(d.title, l.title) && same(d.url, l.url)),
+  );
+}
+
+/** Files the manifest's new links and sets its retention schedule. Mutates `doc`. */
+function applyAdditions(doc: OrgDoc, m: SeedManifest, actor: string, now: string) {
+  const links = newLinks(doc, m);
+  for (const l of links) {
+    const record: DocumentRecord = {
+      id: newId(),
+      orgId: doc.id,
+      section: l.section,
+      area: l.area,
+      title: l.title,
+      version: "",
+      asAt: "",
+      owner: "MITMARK",
+      kind: "link",
+      blobKey: null,
+      fileName: "",
+      contentType: "",
+      sizeBytes: 0,
+      url: l.url,
+      published: true,
+      updatedAt: now,
+      updatedBy: actor,
+      description: l.description,
+      status: "published",
+    };
+    doc.documents.push(record);
+  }
+  const schedule = m.organisation.settings.retentionSchedule;
+  if (schedule !== undefined) {
+    doc.settings.retentionSchedule ??= {};
+    doc.settings.retentionSchedule[String(RETENTION_AREA)] = schedule.map((r) => ({ ...r }));
+  }
+  return { links: links.length, retentionRows: schedule?.length ?? 0 };
+}
 
 function taskFromManifest(
   orgId: string,
@@ -175,11 +225,33 @@ adminOrganisationRoutes.post("/organisations/:id/seed", async (c) => {
     const issue = parsed.error.issues[0];
     return c.json({ error: `The manifest does not read: ${issue?.path.join(".") ?? ""} ${issue?.message ?? ""}`.trim() }, 400);
   }
-  const { manifest, replace, dryRun } = parsed.data;
+  const { manifest, replace, dryRun, additionsOnly } = parsed.data;
 
   const current = await readOrg(orgId);
   if (!current) return c.json({ error: "No such organisation." }, 404);
   const before = { tasks: current.tasks.length, documents: current.documents.length };
+
+  if (additionsOnly) {
+    const wouldAdd = {
+      links: newLinks(current, manifest).length,
+      linksAlreadyFiled: manifest.links.length - newLinks(current, manifest).length,
+      retentionRows: manifest.organisation.settings.retentionSchedule?.length ?? 0,
+    };
+    if (dryRun) return c.json({ dryRun: true, additionsOnly: true, before, after: before, wouldAdd });
+    const now = new Date().toISOString();
+    const result = await mutateOrg(orgId, (doc) => {
+      const added = applyAdditions(doc, manifest, actor.displayName, now);
+      return { added, after: { tasks: doc.tasks.length, documents: doc.documents.length } };
+    });
+    await writeSystemAudit({
+      orgId,
+      actorId: actor.id,
+      actorName: actor.displayName,
+      action: "organisation.seed",
+      detail: `Seed additions: ${result.added.links} link(s) filed, retention schedule of ${result.added.retentionRows} row(s) set; tasks and documents untouched.`,
+    });
+    return c.json({ dryRun: false, additionsOnly: true, before, after: result.after, wouldAdd, added: result.added });
+  }
   const alreadySeeded = Boolean(current.settings.seededAt) || current.tasks.length > 0;
   if (alreadySeeded && !replace) {
     return c.json(
@@ -210,6 +282,7 @@ adminOrganisationRoutes.post("/organisations/:id/seed", async (c) => {
     if (o.regulation !== undefined) doc.settings.regulationLabel = o.regulation;
     if (o.settings.journeyPhase !== undefined) doc.settings.journeyPhase = o.settings.journeyPhase ?? null;
     if (o.settings.journeyNote !== undefined) doc.settings.journeyNote = o.settings.journeyNote;
+    applyAdditions(doc, manifest, actor.displayName, now);
     doc.settings.seededAt = now;
     return { tasks: doc.tasks.length, documents: doc.documents.length };
   });

@@ -91,6 +91,7 @@ adminDocumentRoutes.post("/documents", async (c) => {
     updatedAt: now,
     updatedBy: user.displayName,
     description: input.description,
+    status: input.status,
   };
 
   if (input.kind === "file") {
@@ -162,6 +163,7 @@ adminDocumentRoutes.patch("/documents/:id", async (c) => {
     if (p.asAt !== undefined) record.asAt = p.asAt;
     if (p.owner !== undefined) record.owner = p.owner;
     if (p.published !== undefined) record.published = p.published;
+    if (p.status !== undefined) record.status = p.status;
 
     const wasFile = record.kind === "file";
 

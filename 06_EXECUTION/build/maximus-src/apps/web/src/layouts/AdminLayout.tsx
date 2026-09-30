@@ -11,6 +11,7 @@ const navItems = [
   { to: "/admin", label: "Review queue", view: "queue", end: true },
   { to: "/admin/workplan", label: "Workplan", view: "workplan" },
   { to: "/admin/documents", label: "Documents", view: "documents-admin" },
+  { to: "/admin/figures", label: "Figures", view: "figures-admin" },
   { to: "/admin/jobs", label: "Jobs", view: "jobs-admin" },
   { to: "/admin/value", label: "Value", view: "value-admin" },
   { to: "/admin/record", label: "Record", view: "record" },

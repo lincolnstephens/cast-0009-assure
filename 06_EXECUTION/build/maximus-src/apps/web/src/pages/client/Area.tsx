@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { AreaPage } from "@maximus/shared";
+import type { AreaPage, CounterGroup, Milestone, ModuleTile } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { apiHref } from "../../lib/preview";
-import { formatDateGB, formatLondon } from "../../lib/format";
+import { formatDateGB } from "../../lib/format";
 import { PolicyPanel } from "../../components/PolicyPanel";
 import { ModuleNav } from "../../components/tracker/ModuleNav";
 import { RagMark } from "../../components/tracker/RagMark";
 import { TaskTable } from "../../components/tracker/TaskTable";
 
 /**
- * One module's page, same skeleton for all eight (FRAGO 03 section 3.4): the
- * name, a short introduction, the relevant documents and trackers, the
- * compliance status as a fraction and a percentage, the task table, then the
- * module sub-navigation so the reader can move on without going back. Below
- * that sits what v1.2 already carried: the obligation with its citation, how
- * the module is delivered, and history. Prints as a clean document via the
- * house `@media print` rules already in index.css.
+ * One module's page, laid out as the operator's deck (FRAGO 06 section 3.1),
+ * the same seven sections on all eight, top to bottom: the name and its one
+ * line; Useful links as tiles, then the same items as a numbered list; the
+ * compliance status under the 3.6 score rule; the compliance journey drawn
+ * from the module's dated tasks; the counters (modules 5 to 8); the jobs in
+ * the six-question table; then what the law asks, how we do it and history.
+ * The module navigation closes the page. Nothing is drawn that is not stored.
+ * Prints as a clean document via the house `@media print` rules in index.css.
  */
 export function AreaPageView() {
   const { area } = useParams<{ area: string }>();
@@ -69,78 +70,43 @@ export function AreaPageView() {
         {data.introduction}
       </p>
 
-      <section data-testid="module-documents" className="mt-5" aria-labelledby="module-documents-heading">
-        <h2 id="module-documents-heading" className="text-[14px] font-semibold">
-          Relevant documents and trackers
-        </h2>
-        {data.documents.length === 0 ? (
-          <p data-testid="module-documents-empty" className="mt-1.5 text-[13px] text-client-muted">
-            None filed yet
-          </p>
-        ) : (
-          <ul className="mt-1.5 space-y-1">
-            {data.documents.map((d) => (
-              <li key={d.id} className="text-[13px]">
-                {d.kind === "policy" ? (
-                  <button
-                    type="button"
-                    data-testid="module-doc"
-                    onClick={() => setOpenPolicyId(d.id)}
-                    className="text-left text-client-accent underline"
-                  >
-                    {d.title}
-                  </button>
-                ) : (
-                  <a
-                    data-testid="module-doc"
-                    href={apiHref(`/tracker/documents/${d.id}/download`)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-client-accent underline"
-                  >
-                    {d.title}
-                  </a>
-                )}{" "}
-                <span className="ml-2 text-[11px] uppercase tracking-wider text-client-muted">
-                  {SECTION_LABEL[d.section] ?? d.section}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <UsefulLinks tiles={data.tiles} onOpenPolicy={setOpenPolicyId} />
 
       <section
         data-testid="module-progress-card"
-        className="mt-5 rounded border border-client-line bg-client-surface p-4"
+        aria-labelledby="module-status-heading"
+        className="mt-6 rounded border border-client-line bg-client-surface p-4"
+        title={data.score.basis}
       >
+        <h2 id="module-status-heading" className="text-[14px] font-semibold">
+          Compliance status
+        </h2>
         <p
           data-testid="module-progress"
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] font-semibold text-client-text"
+          data-rag={data.score.rag}
+          className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] font-semibold text-client-text"
         >
-          <span>
-            Compliance status: {data.progress.done} of {data.progress.total} done, {data.progress.pct}%
-          </span>{" "}
-          <RagMark rag={data.status.rag} label={data.status.ragLabel} />
+          <span data-testid="module-score">{data.score.sentence}</span>{" "}
+          <RagMark rag={data.score.rag} label={data.score.label} />
         </p>
-        <p className="mt-1.5 text-[12px] text-client-muted">{data.status.basis}</p>
-        <p className="mt-0.5 text-[12px] text-client-muted">
-          As at {formatDateGB(data.status.asAt)}
+        <p data-testid="module-score-basis" className="mt-1.5 max-w-[75ch] text-[12px] text-client-muted">
+          {data.score.basis}
         </p>
+        <p className="mt-0.5 text-[12px] text-client-muted">As at {formatDateGB(data.status.asAt)}</p>
       </section>
 
-      <section className="mt-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
-          Tasks
-        </p>
+      <ModuleJourney milestones={data.milestones} />
+
+      {data.counters.length > 0 && <Counters groups={data.counters} />}
+
+      <section className="mt-6" data-testid="module-jobs" aria-labelledby="module-jobs-heading">
+        <h2 id="module-jobs-heading" className="text-[14px] font-semibold">
+          Jobs
+        </h2>
         <div className="mt-2">
           <TaskTable tasks={data.tasks} />
         </div>
       </section>
-
-      <div className="mt-8">
-        <ModuleNav />
-      </div>
 
       <section className="mt-10 border-t border-client-line pt-6" data-testid="obligation">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
@@ -247,7 +213,7 @@ export function AreaPageView() {
         </Link>
       </section>
 
-      <section className="mt-8">
+      <section className="mt-8" data-testid="module-history">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
           History
         </p>
@@ -271,6 +237,10 @@ export function AreaPageView() {
         )}
       </section>
 
+      <div className="mt-10 print:hidden">
+        <ModuleNav />
+      </div>
+
       {openPolicyId && (
         <PolicyPanel policyId={openPolicyId} onClose={() => setOpenPolicyId(null)} />
       )}
@@ -278,8 +248,275 @@ export function AreaPageView() {
   );
 }
 
-const SECTION_LABEL: Record<string, string> = {
-  policies: "Policy",
-  procedures: "Procedure",
-  trackers: "Tracker",
+// ---------------------------------------------------------------------------
+// Useful links (FRAGO 06 3.1 item 2)
+// ---------------------------------------------------------------------------
+
+const KIND_LABEL: Record<ModuleTile["kind"], string> = {
+  register: "Register",
+  policy: "Policy",
+  file: "Document",
+  link: "Link",
+  retention: "Retention period",
 };
+
+/**
+ * The tiles, then the same items as a numbered list for phones and screen
+ * readers. Every tile opens something: a file or link downloads or redirects,
+ * a policy opens in the policy panel, and a register not yet filed or a
+ * retention category opens its own card beneath the tiles.
+ */
+function UsefulLinks({
+  tiles,
+  onOpenPolicy,
+}: {
+  tiles: ModuleTile[];
+  onOpenPolicy: (id: string) => void;
+}) {
+  const [card, setCard] = useState<ModuleTile | null>(null);
+
+  const open = (t: ModuleTile) => {
+    if (t.opens === "policy" && t.ref) onOpenPolicy(t.ref);
+    else if (t.opens === "card") setCard(card?.id === t.id ? null : t);
+  };
+
+  const tileBody = (t: ModuleTile) => (
+    <>
+      <span className="block font-mono text-[10px] uppercase tracking-wider text-client-muted">
+        {KIND_LABEL[t.kind]}
+      </span>
+      <span className="mt-1 block text-[13px] font-semibold leading-snug text-client-text">{t.title}</span>
+      {t.detail && (
+        <span
+          data-testid="module-tile-detail"
+          className={`mt-1 block text-[12px] ${t.filed ? "text-client-muted" : "text-status-amber"}`}
+        >
+          {t.detail}
+        </span>
+      )}
+    </>
+  );
+
+  const tileClass =
+    "block h-full w-full rounded border border-client-line bg-client-surface p-3 text-left hover:border-client-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-client-accent";
+
+  return (
+    <section data-testid="module-links" className="mt-5" aria-labelledby="module-links-heading">
+      <h2 id="module-links-heading" className="text-[14px] font-semibold">
+        Useful links
+      </h2>
+      {tiles.length === 0 ? (
+        <p data-testid="module-documents-empty" className="mt-1.5 text-[13px] text-client-muted">
+          None filed yet
+        </p>
+      ) : (
+        <>
+          <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 print:hidden">
+            {tiles.map((t) => (
+              <li key={t.id} className="min-w-0">
+                {t.opens === "download" && t.ref ? (
+                  <a
+                    data-testid="module-link-tile"
+                    data-kind={t.kind}
+                    data-opens={t.opens}
+                    href={apiHref(`/tracker/documents/${t.ref}/download`)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={tileClass}
+                  >
+                    {tileBody(t)}
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="module-link-tile"
+                    data-kind={t.kind}
+                    data-opens={t.opens}
+                    aria-expanded={t.opens === "card" ? card?.id === t.id : undefined}
+                    onClick={() => open(t)}
+                    className={tileClass}
+                  >
+                    {tileBody(t)}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          {card && (
+            <div
+              data-testid="module-tile-card"
+              role="region"
+              aria-label={card.title}
+              className="mt-2 rounded border border-dashed border-client-line bg-client-surface p-4"
+            >
+              <p className="font-mono text-[10px] uppercase tracking-wider text-client-muted">
+                {KIND_LABEL[card.kind]}
+              </p>
+              <p className="mt-1 text-[14px] font-semibold text-client-text">{card.title}</p>
+              <p data-testid="module-tile-card-detail" className="mt-1 text-[13px] text-client-text">
+                {card.detail}
+              </p>
+              {card.description && <p className="mt-1 text-[12px] text-client-muted">{card.description}</p>}
+              <button
+                type="button"
+                onClick={() => setCard(null)}
+                className="mt-2 text-[12px] text-client-accent underline print:hidden"
+              >
+                Close
+              </button>
+            </div>
+          )}
+
+          <ol data-testid="module-links-list" className="mt-3 list-decimal space-y-1 pl-5 text-[13px]">
+            {tiles.map((t) => (
+              <li key={t.id} data-testid="module-doc-item">
+                {t.opens === "download" && t.ref ? (
+                  <a
+                    data-testid="module-doc"
+                    href={apiHref(`/tracker/documents/${t.ref}/download`)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-client-accent underline"
+                  >
+                    {t.title}
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="module-doc"
+                    onClick={() => open(t)}
+                    className="text-left text-client-accent underline"
+                  >
+                    {t.title}
+                  </button>
+                )}{" "}
+                <span className="ml-1 text-[12px] text-client-muted">
+                  {KIND_LABEL[t.kind]}
+                  {t.detail ? `, ${t.detail}` : ""}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Compliance journey (FRAGO 06 3.1 item 4)
+// ---------------------------------------------------------------------------
+
+const MILESTONE_FILL: Record<Milestone["state"], string> = {
+  done: "bg-status-green border-status-green",
+  overdue: "bg-status-amber border-status-amber",
+  next: "bg-client-muted border-client-muted",
+  future: "bg-client-surface border-client-muted",
+};
+
+const MILESTONE_LABEL: Record<Milestone["state"], string> = {
+  done: "Done",
+  overdue: "Next, overdue",
+  next: "Next",
+  future: "Planned",
+};
+
+const monthYear = (iso: string) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+
+/**
+ * The module's dated tasks as a line of milestones, oldest left, at most six.
+ * Done is green; the next open one is amber when it is overdue and grey
+ * otherwise; later ones are hollow. Each carries its state in words.
+ */
+function ModuleJourney({ milestones }: { milestones: Milestone[] }) {
+  return (
+    <section data-testid="module-journey" className="mt-6" aria-labelledby="module-journey-heading">
+      <h2 id="module-journey-heading" className="text-[14px] font-semibold">
+        Compliance journey
+      </h2>
+      {milestones.length === 0 ? (
+        <p data-testid="module-journey-empty" className="mt-1.5 text-[13px] text-client-muted">
+          No dated milestones yet.
+        </p>
+      ) : (
+        <ol className="relative mt-4 grid grid-cols-1 gap-3 sm:grid-flow-col sm:auto-cols-fr sm:gap-2">
+          <span
+            aria-hidden
+            className="absolute left-[9px] top-2 bottom-2 w-0.5 bg-client-line sm:left-[8%] sm:right-[8%] sm:top-[9px] sm:bottom-auto sm:h-0.5 sm:w-auto"
+          />
+          {milestones.map((m) => (
+            <li
+              key={m.taskId}
+              data-testid="module-milestone"
+              data-state={m.state}
+              data-task-id={m.taskId}
+              className="relative flex items-start gap-3 sm:flex-col sm:items-center sm:gap-1.5 sm:text-center"
+            >
+              <span aria-hidden className={`h-5 w-5 shrink-0 rounded-full border-2 ${MILESTONE_FILL[m.state]}`} />
+              <span className="min-w-0">
+                <span
+                  data-testid="module-milestone-title"
+                  className="block text-[12px] font-medium leading-snug text-client-text"
+                >
+                  {m.title}
+                </span>{" "}
+                <span className="block font-mono text-[11px] text-client-muted">{monthYear(m.dueAt)}</span>{" "}
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-client-muted">
+                  {MILESTONE_LABEL[m.state]}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Counters (FRAGO 06 3.3), modules 5 to 8
+// ---------------------------------------------------------------------------
+
+function Counters({ groups }: { groups: CounterGroup[] }) {
+  return (
+    <section data-testid="module-counters" className="mt-6" aria-labelledby="module-counters-heading">
+      <h2 id="module-counters-heading" className="text-[14px] font-semibold">
+        Counts
+      </h2>
+      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        {groups.map((g) => (
+          <div
+            key={g.key}
+            data-testid="counter-group"
+            data-source={g.source}
+            data-nodata={g.noData ? "true" : "false"}
+            className="rounded border border-client-line bg-client-surface p-4"
+          >
+            <p className="text-[13px] font-semibold text-client-text">{g.label}</p>
+            {g.noData ? (
+              <p data-testid="counter-nodata" className="mt-1.5 text-[13px] text-client-muted">
+                No data yet
+              </p>
+            ) : (
+              <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[13px]">
+                {g.items.map((i) => (
+                  <div key={i.key} data-testid="counter-item" className="contents">
+                    <dt className="text-client-muted">{i.label}</dt>
+                    <dd className="text-right font-mono tabular-nums text-client-text">
+                      {i.value === null ? "No data yet" : i.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            <p data-testid="counter-basis" className="mt-2 text-[11px] text-client-muted">
+              {g.basis}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

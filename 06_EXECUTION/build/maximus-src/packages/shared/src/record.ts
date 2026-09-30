@@ -108,6 +108,20 @@ export const orgSettingsSchema = z.object({
   journeyNote: z.string().trim().max(300).default(""),
   /** Per-module introductions keyed "1" to "8". Empty means the default. */
   moduleIntroductions: z.record(z.string(), z.string().trim().max(600)).default({}),
+  /** v1.6. Retention schedules keyed by module ("3"): category and period. */
+  retentionSchedule: z
+    .record(
+      z.string(),
+      z
+        .array(
+          z.object({
+            category: z.string().trim().min(1).max(160),
+            period: z.string().trim().min(1).max(200),
+          }),
+        )
+        .max(30),
+    )
+    .default({}),
 });
 export type OrgSettings = z.infer<typeof orgSettingsSchema>;
 
@@ -174,18 +188,24 @@ export const statementResponseSchema = z.object({
   /** True when the statement contains illustrative entries and says so. */
   illustrative: z.boolean(),
   /**
-   * Obligations met in the period, taken from the Compliance Tracker, so the
-   * statement opens with where the client stands and not only with what
-   * MITMARK did. Null when no obligation has fallen due yet.
+   * v1.6 (FRAGO 06 3.5). The Statement reads in three parts: the service,
+   * what MITMARK has done, and what comes next. There is no planned-against-
+   * achieved comparison. `service` is the twelve lines with their status from
+   * Settings, live first.
    */
-  obligations: z
-    .object({
-      n: z.number().int(),
-      m: z.number().int(),
-      sentence: z.string(),
-      basis: z.string(),
-    })
-    .nullable(),
+  service: z.array(z.object({ id: z.number().int(), name: z.string(), status: lineStatusSchema })),
+  /** What MITMARK has done: each reviewed Record entry in the period, oldest first. */
+  items: z.array(recordEntrySchema),
+  /** What comes next: the open dated tasks in the workplan, soonest first. */
+  next: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      areaName: z.string(),
+      owner: z.string(),
+      dueAt: z.string(),
+    }),
+  ),
 });
 export type StatementResponse = z.infer<typeof statementResponseSchema>;
 

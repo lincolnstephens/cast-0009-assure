@@ -151,6 +151,176 @@ export const JURISDICTION_REGULATION: Record<Jurisdiction, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// v1.6: the module score, the module page's tiles, milestones and counters
+// ---------------------------------------------------------------------------
+
+/**
+ * One module's compliance score (FRAGO 06 3.6). Dated obligations met on time
+ * over dated obligations due in the cycle; a late completion earns part credit.
+ * `pct` is null when the module has no dated obligation in the cycle, and the
+ * sentence then says so instead of showing a number.
+ */
+export const moduleScoreSchema = z.object({
+  pct: z.number().int().nullable(),
+  /** Obligations met on or before their date. */
+  onTime: z.number().int(),
+  /** Obligations met after their date (part credit). */
+  late: z.number().int(),
+  /** Dated obligations counted. */
+  m: z.number().int(),
+  rag: ragSchema,
+  label: z.string(),
+  /** "83% (2 of 3 on time, 1 late)", or "No dated obligations yet". */
+  sentence: z.string(),
+  basis: z.string(),
+});
+export type ModuleScore = z.infer<typeof moduleScoreSchema>;
+
+/** The words beside a score's colour. Colour never carries the meaning alone. */
+export const SCORE_LABEL: Record<Rag, string> = {
+  green: "On time",
+  amber: "Partly on time",
+  red: "Behind",
+  grey: "Nothing dated yet",
+};
+
+export const SCORE_GREEN_AT = 90;
+export const SCORE_AMBER_AT = 60;
+
+export const overallScoreSchema = z.object({
+  /** Mean of the module scores that have a dated obligation; null when none has. */
+  pct: z.number().int().nullable(),
+  /** Modules scoring green. */
+  green: z.number().int(),
+  /** Modules with at least one dated obligation, i.e. the ones in the mean. */
+  counted: z.number().int(),
+  /** "Compliance score: 87% (5 of 8 modules green)" */
+  sentence: z.string(),
+  basis: z.string(),
+});
+export type OverallScore = z.infer<typeof overallScoreSchema>;
+
+/**
+ * One tile on a module page's Useful links. Every tile opens something: a
+ * file, a policy, a link, a register's "Not yet filed" card, or a retention
+ * category's card.
+ */
+export const moduleTileKindSchema = z.enum(["register", "policy", "file", "link", "retention"]);
+export type ModuleTileKind = z.infer<typeof moduleTileKindSchema>;
+
+export const moduleTileSchema = z.object({
+  id: z.string(),
+  kind: moduleTileKindSchema,
+  title: z.string(),
+  /** Version and status for a policy, period for a retention category, "Not yet filed" for a missing register. */
+  detail: z.string(),
+  /** One plain line about the item, when there is one. */
+  description: z.string(),
+  /** How the tile opens: a document id to download, a policy id for the panel, or a card. */
+  opens: z.enum(["download", "policy", "card"]),
+  /** The document or policy id the tile opens, or null for a card. */
+  ref: z.string().nullable(),
+  filed: z.boolean(),
+});
+export type ModuleTile = z.infer<typeof moduleTileSchema>;
+
+/** One milestone on a module's compliance journey. Only ever a task. */
+export const milestoneSchema = z.object({
+  taskId: z.string(),
+  title: z.string(),
+  dueAt: z.string(),
+  state: z.enum(["done", "next", "overdue", "future"]),
+});
+export type Milestone = z.infer<typeof milestoneSchema>;
+
+/** One counter group on modules 5 to 8. */
+export const counterGroupSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  source: z.enum(["records", "operator"]),
+  /** "From the request log, as at ..." or "Reported by MITMARK on ..." */
+  basis: z.string(),
+  noData: z.boolean(),
+  items: z.array(z.object({ key: z.string(), label: z.string(), value: z.number().int().nullable() })),
+});
+export type CounterGroup = z.infer<typeof counterGroupSchema>;
+
+/**
+ * The counts the operator enters for what the product does not yet hold as
+ * records (FRAGO 06 3.3). Keyed by module; each group names its counts. The
+ * first count in a group is its total.
+ */
+export const MODULE_FIGURES: Record<number, { key: string; label: string; items: { key: string; label: string }[] }[]> = {
+  5: [
+    {
+      key: "dpia",
+      label: "Data protection impact assessments",
+      items: [
+        { key: "total", label: "Total" },
+        { key: "started", label: "Started" },
+        { key: "in_progress", label: "In progress" },
+        { key: "completed", label: "Completed" },
+      ],
+    },
+    {
+      key: "pra",
+      label: "Project risk assessments",
+      items: [
+        { key: "total", label: "Total" },
+        { key: "started", label: "Started" },
+        { key: "in_progress", label: "In progress" },
+        { key: "completed", label: "Completed" },
+      ],
+    },
+  ],
+  7: [
+    {
+      key: "vendors",
+      label: "Vendors",
+      items: [
+        { key: "total", label: "Total" },
+        { key: "severity_low", label: "Low severity" },
+        { key: "severity_moderate", label: "Moderate severity" },
+        { key: "severity_high", label: "High severity" },
+        { key: "compliant", label: "Compliant" },
+        { key: "non_compliant", label: "Non-compliant" },
+      ],
+    },
+  ],
+  8: [
+    {
+      key: "incidents",
+      label: "Incidents",
+      items: [
+        { key: "total", label: "Total" },
+        { key: "severity_low", label: "Low severity" },
+        { key: "severity_moderate", label: "Moderate severity" },
+        { key: "severity_high", label: "High severity" },
+        { key: "open", label: "Open" },
+        { key: "in_progress", label: "In progress" },
+        { key: "closed", label: "Closed" },
+      ],
+    },
+  ],
+};
+
+/** What the operator sends for one module's figures. Null or absent means not reported. */
+export const figuresInputSchema = z.object({
+  groups: z.record(
+    z.string(),
+    z.record(z.string(), z.coerce.number().int().min(0).max(100000).nullable()),
+  ),
+});
+export type FiguresInput = z.infer<typeof figuresInputSchema>;
+
+/** One row of a retention schedule. */
+export const retentionRowSchema = z.object({
+  category: z.string().trim().min(1).max(160),
+  period: z.string().trim().min(1).max(200),
+});
+export type RetentionRow = z.infer<typeof retentionRowSchema>;
+
+// ---------------------------------------------------------------------------
 // Task
 // ---------------------------------------------------------------------------
 
@@ -330,6 +500,8 @@ export const overallStatusSchema = z.object({
     red: z.number().int(),
     grey: z.number().int(),
   }),
+  /** v1.6 (FRAGO 06 3.6): the headline. Mean of the module scores, with its fraction of modules green. */
+  score: overallScoreSchema,
 });
 export type OverallStatus = z.infer<typeof overallStatusSchema>;
 
@@ -356,6 +528,8 @@ export const areaSummarySchema = z.object({
   openCount: z.number().int(),
   doneCount: z.number().int(),
   totalCount: z.number().int(),
+  /** v1.6: the module's score; the tile's colour is the score's. */
+  score: moduleScoreSchema,
 });
 export type AreaSummary = z.infer<typeof areaSummarySchema>;
 
@@ -429,6 +603,7 @@ export const trackerHomeSchema = z.object({
 });
 export type TrackerHome = z.infer<typeof trackerHomeSchema>;
 
+
 // ---------------------------------------------------------------------------
 // The area page
 // ---------------------------------------------------------------------------
@@ -485,6 +660,14 @@ export const areaPageSchema = z.object({
       reviewer: z.string(),
     }),
   ),
+  /** v1.6 (FRAGO 06 3.1): Useful links, in the operator's order. */
+  tiles: z.array(moduleTileSchema),
+  /** v1.6: the compliance status under the 3.6 rule. */
+  score: moduleScoreSchema,
+  /** v1.6: at most six dated tasks, oldest first. Empty means "No dated milestones yet." */
+  milestones: z.array(milestoneSchema),
+  /** v1.6: modules 5 to 8 only; empty elsewhere. */
+  counters: z.array(counterGroupSchema),
 });
 export type AreaPage = z.infer<typeof areaPageSchema>;
 
@@ -527,15 +710,34 @@ export const DOCUMENT_SECTIONS: { id: DocumentSection; name: string; blurb: stri
 export const documentKindSchema = z.enum(["file", "link", "policy"]);
 export type DocumentKind = z.infer<typeof documentKindSchema>;
 
-/** The registers the Trackers section expects, so an empty one can still be named. */
-export const TRACKER_DOCUMENTS: { key: string; title: string; area: number; aliases?: string[] }[] = [
+/**
+ * The registers the Trackers section expects, so an empty one can still be named.
+ *
+ * v1.6 (FRAGO 06 3.4): the operator's list and her titles. The old titles stay
+ * as aliases, so a register filed under either name still matches. `alsoAreas`
+ * puts a register on another module's Useful links as well (her module 2 page
+ * shows the vendor log beside the other registers she reviews there).
+ */
+export const TRACKER_DOCUMENTS: {
+  key: string;
+  title: string;
+  area: number;
+  aliases?: string[];
+  alsoAreas?: number[];
+}[] = [
   { key: "ropa", title: "Record of processing activities", area: 2 },
   // v1.5: the client's own register is called a matrix; it is the same register.
   { key: "access", title: "Employee access tracker", area: 2, aliases: ["Employee access matrix"] },
-  { key: "transfers", title: "International transfers register", area: 2 },
+  {
+    key: "transfers",
+    title: "Cross-border transfer assessment",
+    area: 2,
+    aliases: ["International transfers register"],
+  },
+  { key: "infosec", title: "Information security risk register", area: 2 },
+  { key: "vendor", title: "Vendor log", area: 7, aliases: ["Vendor list"], alsoAreas: [2] },
   { key: "dsar", title: "Data request log", area: 6 },
-  { key: "breach", title: "Breach register", area: 8 },
-  { key: "vendor", title: "Vendor list", area: 7 },
+  { key: "breach", title: "Breach register", area: 8, aliases: ["Incident log"] },
 ];
 
 export const documentSchema = z.object({
@@ -562,6 +764,8 @@ export const documentSchema = z.object({
   updatedBy: z.string(),
   /** v1.5. One plain line about the state of the document. */
   description: z.string().default(""),
+  /** v1.6. Approved, draft, published or template; empty when not stated. */
+  status: z.string().default(""),
 });
 export type ComplianceDocument = z.infer<typeof documentSchema>;
 
@@ -592,6 +796,8 @@ export const documentInputSchema = z.object({
   contentType: z.string().trim().max(200).default(""),
   published: z.boolean().default(true),
   description: z.string().trim().max(300).default(""),
+  /** v1.6. The document's state, as the seed manifest or the operator states it. */
+  status: z.enum(["approved", "draft", "published", "template", ""]).default(""),
 });
 export type DocumentInput = z.infer<typeof documentInputSchema>;
 

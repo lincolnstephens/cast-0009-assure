@@ -3,7 +3,11 @@ import type { AreaSummary, OverallStatus, Rag } from "@maximus/shared";
 import { formatDateGB } from "../../lib/format";
 
 /**
- * The score, then the eight modules as tiles filled with their RAG colour.
+ * The score, then the eight modules as tiles filled with their score's colour.
+ *
+ * v1.6 (FRAGO 06 3.6): the headline is the mean of the module scores with its
+ * fraction, the modules that score green; each tile is filled with its module's
+ * score colour and states the score. The overdue count stays beneath.
  *
  * The percentage and its fraction are one string in one element, so they can
  * never be separated. The tile fill is the status ramp and nothing else; the
@@ -46,10 +50,7 @@ export function OverallCompliance({
   areas: AreaSummary[];
 }) {
   const clear = overall.standing === "Nothing overdue";
-  const score =
-    overall.m === 0
-      ? "Compliance score: nothing has fallen due yet"
-      : `Compliance score: ${overall.pct}% (${overall.n} of ${overall.m} obligations met)`;
+  const score = overall.score.sentence;
 
   return (
     <section aria-labelledby="overall-heading" data-testid="tracker-overall">
@@ -64,7 +65,7 @@ export function OverallCompliance({
           as at {formatDateGB(overall.asAt)}
         </p>
         <p data-testid="overall-basis" className="mt-1.5 max-w-[75ch] text-[12px] text-client-muted">
-          {overall.basis}
+          {overall.score.basis}
         </p>
         <p
           data-testid="overall-standing"
@@ -91,17 +92,17 @@ export function OverallCompliance({
             key={a.area}
             to={`/tracker/areas/${a.area}`}
             data-testid="module-tile"
-            data-rag={a.rag}
-            className={`module-tile block rounded-lg p-4 shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-client-text ${TILE_FILL[a.rag]} ${TILE_TEXT[a.rag]}`}
+            data-rag={a.score.rag}
+            className={`module-tile block rounded-lg p-4 shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-client-text ${TILE_FILL[a.score.rag]} ${TILE_TEXT[a.score.rag]}`}
           >
             <span data-testid="module-tile-name" className="block text-[15px] font-semibold leading-snug">
               {a.name}
             </span>{" "}
             <span data-testid="module-tile-count" className="mt-1.5 block font-mono text-[12px]">
-              {a.doneCount} of {a.totalCount} done
+              {a.score.sentence}
             </span>{" "}
-            <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-wider">
-              {a.ragLabel}
+            <span data-testid="module-tile-label" className="mt-0.5 block font-mono text-[10px] uppercase tracking-wider">
+              {a.score.label}
             </span>
           </Link>
         ))}

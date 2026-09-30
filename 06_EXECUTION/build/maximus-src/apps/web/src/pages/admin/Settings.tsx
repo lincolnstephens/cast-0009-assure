@@ -12,6 +12,7 @@ import type { Jurisdiction, LineStatus, OrgSettings as BaseOrgSettings } from "@
 import { LINES } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { useAdmin } from "../../store/admin";
+import { RetentionScheduleEditor } from "../../components/RetentionScheduleEditor";
 
 const STATUS_OPTS = lineStatusSchema.options;
 const JURISDICTION_OPTS = jurisdictionSchema.options;
@@ -575,6 +576,14 @@ export function AdminSettingsPage() {
           )}
         </div>
       </div>
+
+      {selectedAccountId && (
+        <RetentionScheduleEditor
+          orgId={selectedAccountId}
+          schedule={settings.retentionSchedule}
+          onSaved={(next) => setSettings({ ...settings, retentionSchedule: next })}
+        />
+      )}
 
       <div className="mt-4 rounded border border-hud-line bg-hud-panel/60 p-4">
         <h2 className="text-sm font-semibold">Service line status</h2>

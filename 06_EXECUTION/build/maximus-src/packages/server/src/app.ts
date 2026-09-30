@@ -6,6 +6,7 @@ import type { AppEnv } from "./lib/middleware.ts";
 import { ensureSeeded } from "./lib/seedData.ts";
 import { adminAuditRoutes } from "./routes/adminAudit.ts";
 import { adminDocumentRoutes } from "./routes/adminDocuments.ts";
+import { adminFigureRoutes } from "./routes/adminFigures.ts";
 import { adminExportRoutes } from "./routes/adminExports.ts";
 import { adminExposureRoutes } from "./routes/adminExposure.ts";
 import { adminRoutes } from "./routes/adminClocks.ts";
@@ -98,6 +99,7 @@ app.route("/admin", adminReviewRoutes);
 app.route("/admin", adminWorkplanRoutes);
 app.route("/admin", adminUserRoutes);
 app.route("/admin", adminOrganisationRoutes);
+app.route("/admin", adminFigureRoutes);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 

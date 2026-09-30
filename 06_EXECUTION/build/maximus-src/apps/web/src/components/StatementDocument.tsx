@@ -6,6 +6,12 @@ import { formatDateGB, formatGBP } from "../lib/format";
  * standard and is reproduced verbatim, including the limitations paragraph
  * and the sentence shown when the retainer fee has not been entered. Do not
  * rewrite, shorten or improve any of it.
+ *
+ * v1.6 (FRAGO 06 3.5, DC-61): three parts. The service (the twelve lines,
+ * live first); what MITMARK has done (the Record, item by item with hours and
+ * cost, then the totals and comparators as before); what comes next (the open
+ * dated tasks in the workplan). There is no comparison of what was planned
+ * against what was achieved.
  */
 export function StatementDocument({ data }: { data: StatementResponse }) {
   const { totals } = data;
@@ -33,21 +39,61 @@ export function StatementDocument({ data }: { data: StatementResponse }) {
           : ""}
       </div>
 
-      <h3 className="text-[15px] font-semibold">What was done</h3>
-      {data.obligations ? (
-        <p className="mb-2 max-w-[58ch] font-medium" data-testid="statement-obligations">
-          {data.obligations.sentence}
-          <span className="mt-1 block text-[12px] font-normal text-client-muted">
-            {data.obligations.basis}
-          </span>
+      <section data-testid="statement-service" className="mb-6">
+        <h3 className="text-[15px] font-semibold">The service</h3>
+        <p className="max-w-[58ch]">
+          MITMARK provides the data protection officer function to {clientName} under a retainer,
+          across twelve service lines. Their status for this client is set out below, live lines
+          first.
         </p>
-      ) : null}
+        <table className="my-3 w-full border-collapse text-[13px]">
+          <thead>
+            <tr>
+              <StH>Service line</StH>
+              <StH>Status</StH>
+            </tr>
+          </thead>
+          <tbody>
+            {data.service.map((l) => (
+              <tr key={l.id} data-testid="statement-service-line">
+                <StTd>{l.name}</StTd>
+                <StTd>{l.status}</StTd>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section data-testid="statement-done">
+      <h3 className="text-[15px] font-semibold">What MITMARK has done</h3>
       <p className="max-w-[58ch]">
         In {data.period} MITMARK completed {totals.items} items of work under the retainer across{" "}
         {totals.byLine.length} of the twelve service lines. {totals.deadlinesMet} of them carried a
         statutory or governance deadline; all were met. Each item was reviewed by a named MITMARK
         person before it was recorded.
       </p>
+      {data.items.length > 0 && (
+        <table className="my-3 w-full border-collapse text-[13px]" data-testid="statement-items">
+          <thead>
+            <tr>
+              <StH>Date</StH>
+              <StH>Work</StH>
+              <StH align="right">Hours</StH>
+              <StH align="right">Officer's time at £{data.ioRate}/hour</StH>
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.map((e) => (
+              <tr key={e.id}>
+                <StTd className="whitespace-nowrap font-mono">{formatDateGB(e.date)}</StTd>
+                <StTd>{e.what}</StTd>
+                <StTd align="right">{e.hours}</StTd>
+                <StTd align="right">{formatGBP(e.hours * data.ioRate)}</StTd>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
       <table className="my-3 w-full border-collapse text-[13px]">
         <thead>
           <tr>
@@ -154,6 +200,42 @@ export function StatementDocument({ data }: { data: StatementResponse }) {
       ) : (
         <p className="max-w-[58ch]">No statutory deadlines fell in this period.</p>
       )}
+      </section>
+
+      <section data-testid="statement-next" className="mt-6">
+        <h3 className="text-[15px] font-semibold">What comes next</h3>
+        {data.next.length ? (
+          <>
+            <p className="max-w-[58ch]">
+              The work planned next, with its dates, from the workplan MITMARK keeps for {clientName},
+              as at the date of this statement.
+            </p>
+            <table className="my-3 w-full border-collapse text-[13px]">
+              <thead>
+                <tr>
+                  <StH>Date</StH>
+                  <StH>Work</StH>
+                  <StH>Module</StH>
+                  <StH>Who</StH>
+                </tr>
+              </thead>
+              <tbody>
+                {data.next.map((t) => (
+                  <tr key={t.id} data-testid="statement-next-item">
+                    <StTd className="whitespace-nowrap font-mono">{formatDateGB(t.dueAt)}</StTd>
+                    <StTd>{t.title}</StTd>
+                    <StTd>{t.areaName}</StTd>
+                    <StTd>{t.owner}</StTd>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        ) : (
+          <p className="max-w-[58ch]">No dated work is planned in the workplan yet.</p>
+        )}
+      </section>
+
 
       <h3 className="text-[15px] font-semibold">Limitations</h3>
       <p className="max-w-[58ch]">

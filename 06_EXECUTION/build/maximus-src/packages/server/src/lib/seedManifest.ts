@@ -59,6 +59,25 @@ export const seedDocumentSchema = z.object({
 });
 export type SeedDocument = z.infer<typeof seedDocumentSchema>;
 
+/**
+ * v2.1 (FRAGO 06 section 4). A link filed as a document of kind "link",
+ * shown as a tile on its module's page.
+ */
+export const seedLinkSchema = z.object({
+  title: z.string().trim().min(1).max(300),
+  url: z.string().trim().url().max(1000),
+  area: z.number().int().min(1).max(8).nullable().default(null),
+  section: z.enum(["policies", "procedures", "trackers"]).default("procedures"),
+  description: z.string().trim().max(300).default(""),
+});
+export type SeedLink = z.infer<typeof seedLinkSchema>;
+
+/** v2.1. One row of the retention schedule. The seed files it against module 3. */
+export const seedRetentionRowSchema = z.object({
+  category: z.string().trim().min(1).max(160),
+  period: z.string().trim().min(1).max(200),
+});
+
 export const seedManifestSchema = z.object({
   manifest: z.string().max(500).optional(),
   organisation: z
@@ -70,6 +89,7 @@ export const seedManifestSchema = z.object({
         .object({
           journeyPhase: z.number().int().min(1).max(5).nullable().optional(),
           journeyNote: z.string().trim().max(300).optional(),
+          retentionSchedule: z.array(seedRetentionRowSchema).max(30).optional(),
         })
         .default({}),
     })
@@ -84,6 +104,7 @@ export const seedManifestSchema = z.object({
   tasks: z.array(seedTaskSchema).max(500),
   clocks: z.array(seedClockSchema).max(50).default([]),
   documents: z.array(seedDocumentSchema).max(100).default([]),
+  links: z.array(seedLinkSchema).max(50).default([]),
   /** What the manifest deliberately leaves out, for the record. Not seeded. */
   notSeeded: z.array(z.unknown()).optional(),
 });
@@ -98,3 +119,6 @@ export function tasksCreatedBy(m: SeedManifest): number {
   const done = new Set(m.tasks.filter((t) => t.status === "done").map((t) => t.ref));
   return m.tasks.length + m.clocks.filter((c) => done.has(c.taskRef)).length;
 }
+
+/** The module a manifest's retention schedule belongs to. */
+export const RETENTION_AREA = 3;

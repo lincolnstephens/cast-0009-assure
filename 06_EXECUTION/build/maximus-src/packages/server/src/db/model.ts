@@ -325,6 +325,28 @@ export interface DocumentRecord {
   updatedBy: string;
   /** v1.5. One plain line about the state of the document ("Template with one row. Not yet populated."). */
   description?: string;
+  /**
+   * v1.6. Approved, draft, published or template, as the seed manifest states
+   * it. Absent on documents filed before v1.6; the module page then reads the
+   * state from the title and description (see lib/modulePage.ts).
+   */
+  status?: 'approved' | 'draft' | 'published' | 'template' | '';
+}
+
+/**
+ * v1.6 (FRAGO 06 3.3). Counts the operator reports for one module, for what
+ * the product does not yet hold as records. Append-only: the newest per
+ * module is shown. Who entered it stays on the operator's side; the client
+ * sees "Reported by MITMARK on {date}".
+ */
+export interface ModuleFiguresRecord {
+  id: string;
+  area: number;
+  /** Group key to count key to value; null means not reported. */
+  groups: Record<string, Record<string, number | null>>;
+  enteredById: string;
+  enteredByName: string;
+  enteredAt: Iso;
 }
 
 /** How MITMARK does the work in an area, for the client to read. */
@@ -428,6 +450,12 @@ export interface OrgSettings {
   journeyNote: string;
   /** Per-module introductions keyed "1" to "8". Empty means the default. */
   moduleIntroductions: Record<string, string>;
+  /**
+   * v1.6 (FRAGO 06 3.2). Retention schedules keyed by module ("3"): category
+   * and period, set by the operator in Settings or by the seed. Empty means
+   * none recorded.
+   */
+  retentionSchedule?: Record<string, { category: string; period: string }[]>;
 }
 
 /** Everything belonging to one organisation. One blob, one tenant. */
@@ -455,6 +483,8 @@ export interface OrgDoc {
   tasks: TaskRecord[];
   procedures: ProcedureRecord[];
   documents: DocumentRecord[];
+  /** v1.6. Operator-reported counts per module, newest last. */
+  figures?: ModuleFiguresRecord[];
 }
 
 export const DEFAULT_LINE_STATUS: Record<string, LineStatus> = {
@@ -498,6 +528,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   journeyPhase: null,
   journeyNote: '',
   moduleIntroductions: {},
+  retentionSchedule: {},
 };
 
 export function emptyOrgDoc(id: string, name: string): OrgDoc {
@@ -524,5 +555,6 @@ export function emptyOrgDoc(id: string, name: string): OrgDoc {
     tasks: [],
     procedures: [],
     documents: [],
+    figures: [],
   };
 }

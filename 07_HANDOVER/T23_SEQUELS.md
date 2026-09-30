@@ -90,3 +90,9 @@ Owned by G5. Each sequel has a next action and a next date, and none requires a 
 ## Held against the tests
 
 *Numbered, one per test in the operation's Interpretation Note quality bar. State the evidence in this document, then Pass or the shortfall.*
+
+---
+
+## Product sequels recorded by the build
+
+- **Structured registers for DPIAs, project risk assessments, vendors and incidents** (FRAGO 06 3.3, added 30 Sep 2026). v1.6 shows these counts from figures the operator reports each month in the Figures form, and the client page says "Reported by MITMARK on {date}". The next step, if the operator wants the counts to come from records rather than from her entry, is a register for each, like the request log. Each entry would carry its state and severity, and the counters would read from those entries with the basis "From the register". Next action: ask the operator whether her monthly entry is enough, at the score conversation Sunray is holding with her. Next date: that conversation.

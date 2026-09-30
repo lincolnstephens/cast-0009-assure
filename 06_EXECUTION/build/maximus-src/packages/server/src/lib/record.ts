@@ -6,7 +6,7 @@
  * reviewer: no claim without a record.
  */
 
-import { LINES, lineOf, priority } from "@maximus/shared";
+import { LINES, areaName, lineOf, priority } from "@maximus/shared";
 import type {
   LineTotal,
   RecordTotals,
@@ -14,7 +14,7 @@ import type {
   StatementResponse,
 } from "@maximus/shared";
 import type { EntryRecord, OrgDoc, OrgSettings } from "../db/model.ts";
-import { overallStatus } from "./tracker.ts";
+import { isOpen, ownerLabel } from "./tracker.ts";
 
 /** 2026-09-12 becomes 2026 Q3. */
 export function quarterOf(date: string): string {
@@ -106,12 +106,18 @@ export function monthsCovered(rows: EntryRecord[], period: string): number {
  * The statement's model. A ratio against the retainer is shown only when the
  * fee has been entered; otherwise the statement says why there is none.
  */
+/** The Statement's outlook: the service, and what comes next. Everything but the Record entries. */
+export interface StatementOutlook {
+  service: StatementResponse["service"];
+  next: StatementResponse["next"];
+}
+
 export function statementOf(
   rows: EntryRecord[],
   s: OrgSettings,
   period: string,
   now: Date = new Date(),
-  obligations: StatementResponse["obligations"] = null,
+  outlook: StatementOutlook = { service: [], next: [] },
 ): StatementResponse {
   const totals = totalsOf(rows, s);
   const months = monthsCovered(rows, period);
@@ -139,22 +145,31 @@ export function statementOf(
       year: "numeric",
     }),
     illustrative: totals.anyIllustrative,
-    obligations,
+    service: outlook.service,
+    items: rows.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)),
+    next: outlook.next,
   };
 }
 
+const LINE_STATUS_ORDER: Record<string, number> = { Live: 0, Available: 1, Recommended: 2, "Not in scope": 3 };
+
 /**
- * The obligations line the statement opens with, from the Compliance Tracker.
- *
- * It is stated as at today, not scoped to the statement's period: the tracker
- * measures where the client stands now, and pretending it could be rewound to
- * the end of a past quarter would be a figure without a basis. The sentence
- * carries its own date so a reader is never in doubt which it is.
+ * The Statement's first and third parts (FRAGO 06 3.5). The service is the
+ * twelve lines with their status from Settings, live ones first. What comes
+ * next is the workplan's open dated tasks, soonest first, as the operator
+ * loaded them; it is stated as at today, not scoped to the period.
  */
-export function obligationsLine(doc: OrgDoc, now: Date = new Date()) {
-  const o = overallStatus(doc, now);
-  if (o.m === 0) return null;
-  return { n: o.n, m: o.m, sentence: o.sentence, basis: o.basis };
+export function statementOutlook(doc: OrgDoc): StatementOutlook {
+  const service = LINES.map((l) => ({
+    id: l.id,
+    name: l.name,
+    status: doc.settings.lineStatus[String(l.id)] ?? "Available",
+  })).sort((a, b) => (LINE_STATUS_ORDER[a.status] ?? 9) - (LINE_STATUS_ORDER[b.status] ?? 9) || a.id - b.id);
+  const next = doc.tasks
+    .filter((t): t is typeof t & { dueAt: string } => isOpen(t) && t.dueAt !== null)
+    .sort((a, b) => (a.dueAt < b.dueAt ? -1 : a.dueAt > b.dueAt ? 1 : 0))
+    .map((t) => ({ id: t.id, title: t.title, areaName: areaName(t.area), owner: ownerLabel(t), dueAt: t.dueAt }));
+  return { service, next };
 }
 
 export { lineOf };

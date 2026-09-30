@@ -1,8 +1,8 @@
 ---
 document: OPERATOR_BRIEF
 job: CAST-0009 ASSURE
-product: Tessera Assure v1.5
-version: v1.5
+product: Tessera Assure v1.6
+version: v1.6
 status: FOR THE MITMARK OPERATOR
 authority: Seagull, written by the build session under T02 A6
 register_id: T18
@@ -378,6 +378,51 @@ The organisation's own name on every page, and its own workplan and documents. T
 - **Changing `SEED_CLIENT_PASSWORD` and `SEED_OFFICER_PASSWORD` in Netlify will not change the demo accounts' passwords.** Those variables are read only by the very first seed of an empty store, which has long since run and will not run again. To change or retire the demo accounts, use **Users**: reset their passwords, or disable them.
 - **Rotating `SESSION_SECRET` signs everyone out, and that is intended.** Audit entries written before v1.5 contain raw session ids, and rotating the secret makes every one of them worthless. Since v1.5 the audit records only a one-way reference to a session.
 
+## 5k. The module pages as you drew them (v1.6)
+
+Every module page now follows your deck, top to bottom: the name and its one line; **Useful links**; **Compliance status**; **Compliance journey**; **Counts** (modules 5 to 8); **Jobs**; then what the law asks, how we do it and history. The descriptions under each name are still the v1.3 ones, because your deck's wording is not in the job folder. Send the slide text and it goes in as the default, or type your own now in **Settings**, module introductions.
+
+### Useful links
+
+The tiles are made from what you have filed. Nothing appears that is not stored.
+- **Registers** come first. Each module shows the registers that belong to it. A register you have not filed yet still shows, marked "Not yet filed", and opens a card saying so. The list is yours now: Record of processing activities, Employee access tracker, Cross-border transfer assessment, Information security risk register (new), Vendor log, Data request log, Breach register. The Vendor log also shows on module 2, as on your slide. A register filed under its old name still fills its place: Employee access matrix, International transfers register, Vendor list and Incident log all count.
+- **Policies** come next, each with its version and whether it is approved or a draft. Module 4 shows all four policies, whichever module each was filed against.
+- **Other documents** you have filed against the module follow, such as templates and guidance.
+- **Links** come last. To add one, file a document in **Documents**, choose "link", pick the module and give the address. The two ICO links on module 1 went in this way.
+
+Beneath the tiles the same items are repeated as a numbered list, for phones and screen readers.
+
+A document's status (approved, draft, template) is read from what you filed. The nine documents filed on 29 September carry it in their title or description line ("Draft.", "Approved policy, version 1"), and the page reads it from there.
+
+### The retention schedule
+
+**Settings**, "Retention schedule, module 3". Each row is a category of data and how long it is kept. Every row shows as a tile on Data retention practice, with the period on the tile and on the card it opens. Add, change or remove rows and press "Save schedule". The seven categories from your deck were loaded on 30 September. The client reads the schedule but cannot change it.
+
+### The compliance status, and how it is worked out
+
+Each module shows "{pct}% ({n} of {m} on time)", with "and {k} late" when any were late, and a colour with its word beside it. This is the rule Sunray is taking into your conversation about the score. It stands until that conversation settles something else.
+- Only tasks with a date count. A task with no date is not in the score, so adding undated tasks cannot move it.
+- A task counts once its date has passed, or once it is done, even if done early. Anything with a date more than twelve months ago drops out.
+- Done on or before its date counts in full. Done late counts 70 per cent if within 30 days of its date and 50 per cent beyond. Still open after its date counts nothing.
+- Green is 90 and above, amber 60 to 89, red below 60. With nothing dated, it says "No dated obligations yet".
+- A task the seed closed (your "Completed" rows) counts as done on its date, because the seed records when it ran, not when the work was done. A task you close in **Workplan** is dated the day you close it. Close work on the day it is done, or the score will count it as late.
+
+The front page takes the mean of the module scores and shows how many modules are green: "Compliance score: {pct}% ({k} of 8 modules green)". The eight tiles show each module's score in its colour. The overdue count is beneath, as before.
+
+### The compliance journey
+
+This line is made from the module's dated tasks and nothing else. There are at most six milestones, the oldest on the left. Done ones are green. The next one is amber if it is overdue and grey if not. Later ones are hollow. Date a task in **Workplan** and it joins the line. A module with no dated task says "No dated milestones yet."
+
+### The Figures form
+
+**Figures**, in the admin menu. Some counts are not records in the product yet: DPIAs and project risk assessments (module 5), vendors by severity and by compliance (module 7), and incidents by severity and by state (module 8). Enter these counts here, once a month or whenever they change.
+- Each save is a new report, kept with your name and the time. The client sees the newest one with "Reported by MITMARK on {date}". She never sees your name there.
+- Leave a count empty if you do not know it. The client then sees "No data yet", never a zero.
+- Data subject requests (module 6) and concerns reported through the product (module 8) are counted from the product's own intakes and clocks, and say "From the request log". You do not enter those.
+- The client can see the figures but cannot change them.
+
+If you would rather these counts came from registers than from your monthly entry, that is the next step (T23).
+
 ## 6. Importing the v0.1 export
 
 If you have a record file from the earlier single-page version, **Record** has an import.
@@ -398,12 +443,12 @@ This is the mandatory MITMARK review. It has not been relaxed and should not be.
 
 **Value** in the client portal, or **Record** then the statement view in admin.
 
-The Statement is the thing she forwards to her CFO unedited. It states, for the period:
-- what MITMARK did, by service line, with the hours of her time it replaced,
-- what that would have cost two ways: her own time at her rate, and a contractor at the day rate,
-- the retainer for the period, and the two comparators against it, **only if you have entered the fee**,
-- the statutory and governance deadlines met,
-- its own limitations.
+The Statement is the thing she forwards to her CFO unedited. Since v1.6 it has three parts, as you asked:
+- **The service**: the twelve service lines and their status for this client, from **Settings**, live ones first.
+- **What MITMARK has done**: each reviewed Record entry in the period with its hours and the cost of her time, then the totals by service line, what that would have cost two ways (her own time at her rate, and a contractor at the day rate), the retainer and the two comparators against it **only if you have entered the fee**, and the statutory and governance deadlines met.
+- **What comes next**: the open dated tasks in the workplan, soonest first, as at the day it is printed.
+
+Then its own limitations. It no longer opens with "n of m obligations met", and nothing in it compares what was done with the March handover plan. Until you supply the deliverables agreed in May, "what comes next" is the dated list you gave on 29 September.
 
 Print it with "Print or save as PDF". It prints as a plain document: no navigation, no colour, no product furniture.
 

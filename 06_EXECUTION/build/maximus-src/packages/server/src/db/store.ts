@@ -200,7 +200,9 @@ export function migrateOrg(doc: OrgDoc): OrgDoc {
   s.journeyPhase = s.journeyPhase === undefined ? null : s.journeyPhase;
   s.journeyNote ??= '';
   s.moduleIntroductions ??= {};
+  s.retentionSchedule ??= {};
   doc.settings = s;
+  doc.figures ??= [];
 
   // v1.2 re-scoped two modules. Tasks move with their library id so nothing is
   // lost and no task ends up in a module that no longer means what it did:

@@ -4,7 +4,11 @@
  *
  *   pnpm --filter @maximus/server seed-organisation -- \
  *     --url https://tessera-assure.netlify.app --org <organisation id> \
- *     --manifest <path to manifest.json> [--dry-run] [--replace]
+ *     --manifest <path to manifest.json> [--dry-run] [--replace] [--additions]
+ *
+ * --additions (v1.6) applies only the manifest's links and retention schedule
+ * to an organisation that is already seeded. Its tasks, its documents and its
+ * other settings are not touched, and no file is uploaded.
  *
  * It signs in as a manager (ASSURE_SEED_EMAIL and ASSURE_SEED_PASSWORD in the
  * shell running it; nothing is stored), then:
@@ -44,6 +48,8 @@ async function main(): Promise<void> {
   const manifestPath = arg("manifest");
   const dryRun = flag("dry-run");
   const replace = flag("replace");
+  const additions = flag("additions");
+  if (additions && replace) fail("--additions and --replace do not go together.");
   if (!url || !org || !manifestPath) fail("give --url, --org and --manifest.");
 
   const email = process.env.ASSURE_SEED_EMAIL;
@@ -57,7 +63,10 @@ async function main(): Promise<void> {
   }
   const manifest = parsed.data;
   const baseDir = path.dirname(path.resolve(manifestPath));
-  console.log(`Manifest: ${manifest.tasks.length} task(s), ${manifest.documents.length} document(s).`);
+  console.log(
+    `Manifest: ${manifest.tasks.length} task(s), ${manifest.documents.length} document(s), ${manifest.links.length} link(s), ` +
+      `${manifest.organisation.settings.retentionSchedule?.length ?? 0} retention row(s).`,
+  );
 
   // Sign in. The cookie is held in memory for this run only.
   const login = await fetch(`${url}/api/auth/login`, {
@@ -82,9 +91,24 @@ async function main(): Promise<void> {
 
   const seed = await api(`/admin/organisations/${encodeURIComponent(org!)}/seed?org=${encodeURIComponent(org!)}`, {
     method: "POST",
-    body: JSON.stringify({ manifest, replace, dryRun }),
+    body: JSON.stringify({ manifest, replace, dryRun, additionsOnly: additions }),
   });
   if (seed.status !== 200) fail(String(seed.body.error ?? `the site answered ${seed.status}.`));
+
+  if (additions) {
+    const r = seed.body as {
+      before: { tasks: number; documents: number };
+      after: { tasks: number; documents: number };
+      wouldAdd: { links: number; linksAlreadyFiled: number; retentionRows: number };
+    };
+    console.log(`Tasks before: ${r.before.tasks}. Documents before: ${r.before.documents}.`);
+    console.log(
+      `${dryRun ? "Dry run. Would file" : "Filed"} ${r.wouldAdd.links} link(s) (${r.wouldAdd.linksAlreadyFiled} already filed) ` +
+        `and ${dryRun ? "would set" : "set"} a retention schedule of ${r.wouldAdd.retentionRows} row(s).`,
+    );
+    console.log(`Tasks after: ${r.after.tasks}. Documents after: ${r.after.documents}.${dryRun ? " Nothing written." : ""}`);
+    return;
+  }
   const result = seed.body as {
     before: { tasks: number; documents: number };
     after: { tasks: number; documents: number };
@@ -126,6 +150,7 @@ async function main(): Promise<void> {
         fileName: path.basename(d.file),
         contentType: contentTypeOf(d.file),
         published: d.clientVisible,
+        status: d.status,
       }),
     });
     if (res.status >= 300) {

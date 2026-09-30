@@ -178,7 +178,7 @@ export function overallStatus(
   doc: OrgDoc,
   now: Date = new Date(),
   mode: DenominatorMode = "overdue",
-): OverallStatus {
+): Omit<OverallStatus, "score"> {
   const asAt = today(now);
   const live = liveAreas(doc);
   const due = doc.tasks.filter((t) => hasFallenDue(t, asAt, mode, live));
@@ -324,7 +324,7 @@ export function ownerLabel(t: TaskRecord): string {
   return t.ownerType === "mitmark" ? "MITMARK" : t.ownerRole || "Client";
 }
 
-export function areaSummaries(doc: OrgDoc, now: Date = new Date()): AreaSummary[] {
+export function areaSummaries(doc: OrgDoc, now: Date = new Date()): Omit<AreaSummary, "score">[] {
   const asAt = today(now);
   return AREA_IDS.map((area) => {
     const of = doc.tasks.filter((t) => t.area === area);
