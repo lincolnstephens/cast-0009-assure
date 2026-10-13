@@ -51,28 +51,6 @@ export const AREA_DEFAULT_HOURS: Record<AreaId, number> = {
 };
 
 /**
- * The service line a task's Record entry books against on close, by area.
- * Where an area maps cleanly onto one of the twelve vDPO service lines (see
- * packages/shared/src/lines.ts) that line is used - areas 2, 5, 6, 7 and 8
- * have an exact match. Areas 1, 3 and 4 have no dedicated line: area 3
- * (retention) books against "Policy and procedure suite" since the
- * retention schedule is one of the six documents on that cycle; areas 1 and
- * 4 book against "Ad hoc assurance and advisory" rather than inventing a
- * line that does not exist in the reference data.
- */
-export const AREA_LINE: Record<AreaId, number> = {
-  1: 12,
-  2: 2,
-  3: 3,
-  // Module 4 is policy review from v1.2, so its work books to the policy line.
-  4: 3,
-  5: 1,
-  6: 4,
-  7: 6,
-  8: 5,
-};
-
-/**
  * The Record hours a task books when it closes as done.
  *
  * Client-owned tasks always book 0 hours, whatever their source: the

@@ -4,7 +4,7 @@ import { PolicyPanel } from "../../components/PolicyPanel";
 import { StatusLamp } from "../../components/StatusLamp";
 import { api, ApiError } from "../../lib/api";
 import { formatLondon } from "../../lib/format";
-import { PREVIEW_READ_ONLY } from "../../lib/preview";
+import { apiHref } from "../../lib/preview";
 import { usePreviewing } from "../../lib/usePreviewing";
 
 interface ChatMessage {
@@ -14,13 +14,27 @@ interface ChatMessage {
   status: "green" | "amber" | "red" | null;
   citations: StoredCitation[];
   createdAt: string;
+  /** v1.7. "answer" when the model composed it, "passages" when the passages are shown as they are. */
+  mode?: "answer" | "passages" | null;
+  escalated?: boolean;
 }
+
+type GuidePath = "model" | "passages";
 
 interface ThreadResponse {
   threadId: string;
   officerName: string;
   messages: ChatMessage[];
+  guidePath?: GuidePath;
 }
+
+/** v1.7 (FRAGO 07 3.5). The page says what the live path does, and nothing else. */
+const INTRO: Record<GuidePath, string> = {
+  model:
+    "Answers are written from the approved policies and published documents, and cite them. Where they do not answer, the question goes to MITMARK.",
+  passages:
+    "Quick questions shows the passages from the approved policies and published documents that match your question, with where each comes from. Where nothing matches, the question goes to MITMARK.",
+};
 
 const ASK_HINT =
   "Ask anything about how we handle data - e.g. 'Can I share the tenant list with our letting agent?'";
@@ -28,6 +42,7 @@ const ASK_HINT =
 export function GuidePage() {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [officerName, setOfficerName] = useState("your compliance officer");
+  const [guidePath, setGuidePath] = useState<GuidePath>("passages");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<{ text: string; retryBody: string | null } | null>(null);
@@ -40,6 +55,7 @@ export function GuidePage() {
       const res = await api<ThreadResponse>("/chat/thread");
       setMessages(res.messages);
       setOfficerName(res.officerName);
+      if (res.guidePath) setGuidePath(res.guidePath);
     } catch {
       setNotice({ text: "Unable to load the Guide. Refresh to try again.", retryBody: null });
     }
@@ -50,12 +66,27 @@ export function GuidePage() {
   }, [loadThread]);
 
   // Officer replies arrive out of band - poll quietly while the tab is open.
+  // Not in client view: nothing asked there is saved, so a reload would
+  // clear the answers the operator has just been shown.
   useEffect(() => {
+    if (previewing) return;
     const timer = setInterval(() => {
       if (document.visibilityState === "visible" && !sending) void loadThread();
     }, 12_000);
     return () => clearInterval(timer);
-  }, [loadThread, sending]);
+  }, [loadThread, sending, previewing]);
+
+  async function escalate(id: string) {
+    try {
+      const res = await api<{ messages: ChatMessage[] }>(`/chat/messages/${id}/escalate`, { method: "POST" });
+      setMessages((prev) => [
+        ...(prev ?? []).map((m) => (m.id === id ? { ...m, escalated: true } : m)),
+        ...res.messages,
+      ]);
+    } catch (err) {
+      setNotice({ text: err instanceof ApiError ? err.message : "That didn't go through. Please try again.", retryBody: null });
+    }
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
@@ -95,9 +126,8 @@ export function GuidePage() {
     <div className="flex h-full max-w-3xl flex-col">
       <div>
         <h1 className="text-lg font-semibold">Quick questions</h1>
-        <p data-testid="quick-questions-intro" className="mt-0.5 text-sm text-client-muted">
-          Answers come from the approved policies and procedures. Where they do not answer, the
-          question goes to MITMARK.
+        <p data-testid="quick-questions-intro" data-path={guidePath} className="mt-0.5 text-sm text-client-muted">
+          {INTRO[guidePath]}
         </p>
         <div className="mt-1.5 h-px w-12 bg-client-line" />
       </div>
@@ -115,11 +145,18 @@ export function GuidePage() {
           </div>
         )}
         {messages?.map((m) => (
-          <MessageBubble key={m.id} message={m} officerName={officerName} onCite={setPanel} />
+          <MessageBubble
+            key={m.id}
+            message={m}
+            officerName={officerName}
+            onCite={setPanel}
+            canEscalate={!previewing}
+            onEscalate={(id) => void escalate(id)}
+          />
         ))}
         {sending && (
           <p className="text-sm text-client-muted" role="status">
-            Checking the policies…
+            Checking the policies and documents…
           </p>
         )}
         {notice && (
@@ -151,13 +188,17 @@ export function GuidePage() {
         />
         <button
           type="submit"
-          disabled={sending || previewing || draft.trim().length === 0}
-          title={previewing ? PREVIEW_READ_ONLY : undefined}
+          disabled={sending || draft.trim().length === 0}
           className="rounded bg-client-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-client-accent/90 disabled:opacity-50"
         >
           Ask
         </button>
       </form>
+      {previewing && (
+        <p data-testid="guide-preview-note" className="mt-1.5 text-[12px] text-client-muted">
+          Client view: questions are answered here and nothing is saved or sent.
+        </p>
+      )}
 
       {panel && (
         <PolicyPanel
@@ -174,10 +215,14 @@ function MessageBubble({
   message,
   officerName,
   onCite,
+  canEscalate,
+  onEscalate,
 }: {
   message: ChatMessage;
   officerName: string;
   onCite: (target: { policyId: string; sectionRef: string }) => void;
+  canEscalate: boolean;
+  onEscalate: (id: string) => void;
 }) {
   if (message.sender === "client") {
     return (
@@ -207,7 +252,7 @@ function MessageBubble({
             </span>
           ) : (
             <span className="text-[11px] uppercase tracking-wider text-client-muted">
-              From the policies
+              From the policies and documents
             </span>
           )}
           {message.status && <StatusLamp status={message.status} />}
@@ -217,17 +262,44 @@ function MessageBubble({
         </p>
         {message.citations.length > 0 && (
           <div className="mt-2.5 flex flex-wrap gap-2">
-            {message.citations.map((c) => (
-              <button
-                key={`${c.policyId}-${c.sectionRef}`}
-                onClick={() => onCite({ policyId: c.policyId, sectionRef: c.sectionRef })}
-                className="rounded border border-client-accent/60 px-2 py-1 text-[12px] text-client-accent hover:bg-client-accent hover:text-white"
-                title={c.heading}
-              >
-                {c.policyCode} §{c.sectionRef}
-              </button>
-            ))}
+            {message.citations.map((c) =>
+              c.sourceKind === "document" ? (
+                <a
+                  key={`${c.policyId}-${c.sectionRef}`}
+                  data-testid="guide-citation"
+                  data-kind="document"
+                  href={apiHref(`/tracker/documents/${c.policyId}/download`)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded border border-client-accent/60 px-2 py-1 text-[12px] text-client-accent hover:bg-client-accent hover:text-white"
+                  title={c.heading}
+                >
+                  {c.title ?? c.policyCode}, section {c.sectionRef}
+                </a>
+              ) : (
+                <button
+                  key={`${c.policyId}-${c.sectionRef}`}
+                  data-testid="guide-citation"
+                  data-kind="policy"
+                  onClick={() => onCite({ policyId: c.policyId, sectionRef: c.sectionRef })}
+                  className="rounded border border-client-accent/60 px-2 py-1 text-[12px] text-client-accent hover:bg-client-accent hover:text-white"
+                  title={c.heading}
+                >
+                  {c.policyCode} §{c.sectionRef}
+                </button>
+              ),
+            )}
           </div>
+        )}
+        {message.mode === "passages" && !message.escalated && canEscalate && (
+          <button
+            type="button"
+            data-testid="guide-escalate"
+            onClick={() => onEscalate(message.id)}
+            className="mt-2.5 rounded border border-client-line px-2.5 py-1 text-[12px] text-client-text hover:border-client-accent hover:text-client-accent"
+          >
+            Send to MITMARK
+          </button>
         )}
         <p className="mt-1.5 text-[11px] text-client-muted">{formatLondon(message.createdAt)}</p>
       </div>

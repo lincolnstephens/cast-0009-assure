@@ -69,11 +69,11 @@ export const isOpen = (t: TaskRecord): boolean =>
 export function liveAreas(doc: OrgDoc): Set<number> {
   const live = new Set<number>();
   for (const c of doc.clocks) {
-    if (c.closedAt) continue;
+    if (c.closedAt || c.test) continue;
     live.add(CLOCK_AREA[c.kind] ?? 0);
   }
   for (const item of doc.review) {
-    if (item.state !== "pending") continue;
+    if (item.state !== "pending" || item.test) continue;
     if (item.type === "intake") {
       const intake = doc.intakes.find((i) => i.id === item.refId);
       if (intake) live.add(intake.type === "breach" ? 8 : 6);
@@ -425,7 +425,7 @@ export function kpis(doc: OrgDoc, now: Date = new Date()): KpiFigure[] {
   const sarBasis =
     "Data request clocks closed this year, counting those answered inside the statutory month.";
   const sars = doc.clocks.filter(
-    (c) => c.kind === "sar_1_month" && closed(c) && yearOf(c.closedAt!) === year,
+    (c) => c.kind === "sar_1_month" && !c.test && closed(c) && yearOf(c.closedAt!) === year,
   );
   const sarsOnTime = sars.filter((c) => c.insideStatute === true).length;
   const dsar: KpiFigure =
@@ -444,7 +444,7 @@ export function kpis(doc: OrgDoc, now: Date = new Date()): KpiFigure[] {
   const breachBasis =
     "Concerns reported this year, those notified to the ICO, and the median hours from report to assessment.";
   const breaches = doc.clocks.filter(
-    (c) => c.kind === "breach_72h" && yearOf(c.startedAt) === year,
+    (c) => c.kind === "breach_72h" && !c.test && yearOf(c.startedAt) === year,
   );
   const breachesClosed = breaches.filter(closed);
   const median = medianHours(

@@ -1,27 +1,68 @@
-import { useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import type { ComplianceDocument, DocumentsResponse } from "@maximus/shared";
-import { areaName } from "@maximus/shared";
+import { AREAS, areaName } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { apiHref } from "../../lib/preview";
 import { formatDateGB } from "../../lib/format";
 import { PolicyPanel } from "../../components/PolicyPanel";
+import { usePreviewing } from "../../lib/usePreviewing";
+
+/** v1.7 (FRAGO 07 3.1). One of the client's own submissions, as the page lists it. */
+interface Submission {
+  id: string;
+  title: string;
+  area: number | null;
+  kind: "file" | "link" | "policy";
+  note: string;
+  state: "submitted" | "returned" | "accepted";
+  stateLabel: string;
+  submittedAt: string;
+  decidedAt: string | null;
+  returnReason: string;
+  supersedesTitle: string | null;
+  test: boolean;
+}
+
+interface ClientDocumentsResponse extends DocumentsResponse {
+  submissions: Submission[];
+  replaceable: { id: string; title: string; area: number | null }[];
+  uploadMaxMb: number;
+  testSeat: boolean;
+}
+
+const UPLOAD_READ_ONLY = "Read only in client view. The client uploads documents from her own sign-in.";
+
+/** Read a File into the base64 string the submission body carries. */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Unable to read that file."));
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 /**
  * Compliance Documents: the repository (V12_BRIEF.md, FRAGO_02 §4.2). Three
  * sections - Policies, Procedures, Trackers - each showing what the operator
  * has published, and an honest empty or "not yet filed" state for what has
- * not. Read and download only: this page has no create, edit or delete
- * control anywhere, by design - the client confirms a task and does
- * nothing else, and the same rule holds for a document.
+ * not. v1.7 (FRAGO 07 3.1): the client may also offer a document. It is an
+ * offer, not a filing: it waits in MITMARK's review queue and nothing is
+ * published until MITMARK accepts it. She cannot edit, replace or delete
+ * anything once submitted or published; a new version is a new submission.
  */
 export function DocumentsPage() {
-  const [data, setData] = useState<DocumentsResponse | null>(null);
+  const [data, setData] = useState<ClientDocumentsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openPolicyId, setOpenPolicyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setData(await api<DocumentsResponse>("/tracker/documents"));
+      setData(await api<ClientDocumentsResponse>("/tracker/documents"));
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to load the documents.");
@@ -49,8 +90,8 @@ export function DocumentsPage() {
       <h1 className="text-lg font-semibold">Compliance Documents</h1>
       <p className="mt-0.5 text-[13px] text-client-muted">
         What MITMARK has published for this organisation: the approved policies, how the work is
-        done, and the registers that record what happened. You can read and download here; MITMARK
-        files and publishes everything you see.
+        done, and the registers that record what happened. You can read and download here, and send
+        MITMARK a document; MITMARK reviews it and publishes it if it belongs here.
       </p>
 
       {data.sections.map((section) => (
@@ -84,6 +125,8 @@ export function DocumentsPage() {
           )}
         </section>
       ))}
+
+      <UploadPanel data={data} onSubmitted={load} />
 
       {openPolicyId && (
         <PolicyPanel policyId={openPolicyId} onClose={() => setOpenPolicyId(null)} />
@@ -245,5 +288,207 @@ function PolicyItemList({
         <DocumentRow key={item.id} item={item} />
       ))}
     </ul>
+  );
+}
+
+/**
+ * v1.7. "Upload a document" and the client's own submissions. A file up to the
+ * cap, or a link; a title, its module and one line of what it is; optionally
+ * the published document it is a new version of.
+ */
+function UploadPanel({ data, onSubmitted }: { data: ClientDocumentsResponse; onSubmitted: () => Promise<void> }) {
+  const previewing = usePreviewing();
+  const [kind, setKind] = useState<"file" | "link">("file");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (previewing) return;
+    const formEl = e.currentTarget;
+    const form = new FormData(formEl);
+    setError(null);
+    setDone(false);
+    const body: Record<string, unknown> = {
+      title: String(form.get("title") ?? "").trim(),
+      area: Number(form.get("area")),
+      note: String(form.get("note") ?? "").trim(),
+      kind,
+      url: "",
+      fileBase64: "",
+      fileName: "",
+      contentType: "",
+      supersedes: String(form.get("supersedes") ?? "") || null,
+    };
+    if (kind === "file") {
+      const file = form.get("file");
+      if (!(file instanceof File) || file.size === 0) {
+        setError("Choose a file, or send a link instead.");
+        return;
+      }
+      if (file.size > data.uploadMaxMb * 1024 * 1024) {
+        setError(`That file is larger than ${data.uploadMaxMb} MB. Send it as a link instead.`);
+        return;
+      }
+      body.fileBase64 = await fileToBase64(file);
+      body.fileName = file.name;
+      body.contentType = file.type || "application/octet-stream";
+    } else {
+      body.url = String(form.get("url") ?? "").trim();
+      if (!body.url) {
+        setError("Add the link, or send a file instead.");
+        return;
+      }
+    }
+    setBusy(true);
+    try {
+      await api("/tracker/documents", { method: "POST", body: JSON.stringify(body) });
+      formEl.reset();
+      setKind("file");
+      setDone(true);
+      await onSubmitted();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That did not go through. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const input = "w-full rounded border border-client-line bg-client-bg px-2 py-1.5 text-[13px] disabled:opacity-60";
+
+  return (
+    <>
+      <section className="mt-6 rounded border border-client-line bg-client-surface">
+        <div className="border-b border-client-line px-4 py-3">
+          <h2 className="text-sm font-semibold">Upload a document</h2>
+          <p className="mt-0.5 text-[12px] text-client-muted">
+            Send MITMARK a document for the record. Nothing is published until MITMARK accepts it. Files
+            up to {data.uploadMaxMb} MB; send anything larger as a link.
+          </p>
+        </div>
+        <form data-testid="client-upload-form" onSubmit={(e) => void submit(e)} className="grid gap-3 px-4 py-4 sm:grid-cols-2">
+          <fieldset disabled={previewing || busy} className="contents">
+            <label className="block text-[13px] sm:col-span-2">
+              <span className="mb-1 block text-[11px] uppercase tracking-wider text-client-muted">Title</span>
+              <input name="title" required maxLength={300} className={input} />
+            </label>
+            <label className="block text-[13px]">
+              <span className="mb-1 block text-[11px] uppercase tracking-wider text-client-muted">Module</span>
+              <select name="area" required defaultValue="" className={input}>
+                <option value="" disabled>
+                  Choose a module
+                </option>
+                {AREAS.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.id}. {areaName(a.id)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[13px]">
+              <span className="mb-1 block text-[11px] uppercase tracking-wider text-client-muted">File or link</span>
+              <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as "file" | "link")} className={input}>
+                <option value="file">A file</option>
+                <option value="link">A link</option>
+              </select>
+            </label>
+            <label className="block text-[13px] sm:col-span-2">
+              <span className="mb-1 block text-[11px] uppercase tracking-wider text-client-muted">What it is, in one line</span>
+              <input name="note" required maxLength={300} className={input} />
+            </label>
+            {kind === "file" ? (
+              <label className="block text-[13px] sm:col-span-2">
+                <span className="mb-1 block text-[11px] uppercase tracking-wider text-client-muted">
+                  File (up to {data.uploadMaxMb} MB)
+                </span>
+                <input name="file" type="file" className="w-full text-[13px] disabled:opacity-60" />
+              </label>
+            ) : (
+              <label className="block text-[13px] sm:col-span-2">
+                <span className="mb-1 block text-[11px] uppercase tracking-wider text-client-muted">Link</span>
+                <input name="url" type="url" placeholder="https://" className={input} />
+              </label>
+            )}
+            {data.replaceable.length > 0 && (
+              <label className="block text-[13px] sm:col-span-2">
+                <span className="mb-1 block text-[11px] uppercase tracking-wider text-client-muted">
+                  This is a new version of (optional)
+                </span>
+                <select name="supersedes" defaultValue="" className={input}>
+                  <option value="">Not a new version</option>
+                  {data.replaceable.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+              <button
+                type="submit"
+                data-testid="client-upload-submit"
+                title={previewing ? UPLOAD_READ_ONLY : undefined}
+                className="rounded bg-client-accent px-4 py-2 text-[13px] font-medium text-white hover:bg-client-accent/90 disabled:opacity-50"
+              >
+                {busy ? "Sending…" : "Send to MITMARK"}
+              </button>
+              {previewing && (
+                <span data-testid="client-upload-readonly" className="text-[12px] text-client-muted">
+                  {UPLOAD_READ_ONLY}
+                </span>
+              )}
+            </div>
+          </fieldset>
+          {done && (
+            <p role="status" className="text-[13px] text-client-text sm:col-span-2">
+              Submitted. Nothing is published until MITMARK accepts it.
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="border-l-2 border-status-red pl-3 text-[13px] text-status-red sm:col-span-2">
+              {error}
+            </p>
+          )}
+        </form>
+      </section>
+
+      <section data-testid="client-submissions" className="mt-6 rounded border border-client-line bg-client-surface">
+        <div className="border-b border-client-line px-4 py-3">
+          <h2 className="text-sm font-semibold">Your submissions</h2>
+          {data.testSeat && (
+            <p className="mt-0.5 text-[12px] text-client-muted">Test seat: these are visible to no client.</p>
+          )}
+        </div>
+        {data.submissions.length === 0 ? (
+          <p className="px-4 py-4 text-[13px] text-client-muted">Nothing sent yet.</p>
+        ) : (
+          <ul className="divide-y divide-client-line">
+            {data.submissions.map((sub) => (
+              <li key={sub.id} data-testid="client-submission" data-state={sub.state} className="px-4 py-3 text-[13px]">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-medium text-client-text">{sub.title}</span>
+                  {sub.area && (
+                    <span className="font-mono text-[11px] uppercase tracking-wider text-client-muted">
+                      {areaName(sub.area)}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-[12px] text-client-text">{sub.stateLabel}</p>
+                {sub.supersedesTitle && (
+                  <p className="mt-0.5 text-[12px] text-client-muted">New version of {sub.supersedesTitle}</p>
+                )}
+                {sub.note && <p className="mt-0.5 text-[12px] text-client-muted">{sub.note}</p>}
+                {sub.state === "returned" && sub.returnReason && (
+                  <p className="mt-0.5 text-[12px] text-client-text">Reason: {sub.returnReason}</p>
+                )}
+                <p className="mt-0.5 text-[11px] text-client-muted">Sent {formatDateGB(sub.submittedAt.slice(0, 10))}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
   );
 }

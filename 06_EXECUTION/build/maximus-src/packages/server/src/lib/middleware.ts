@@ -54,6 +54,28 @@ export function requireRole(role: "client" | "mitmark_admin") {
 export const PREVIEW_HEADER = "x-assure-preview";
 export const PREVIEW_READ_ONLY = "Read only in client view";
 
+/**
+ * v1.7 (FRAGO 07 3.3). What a refused control says in client view. The
+ * request form and Confirm both carry it, so the refusal explains itself.
+ */
+export const PREVIEW_SUBMIT_MESSAGE = "Read only in client view. The client submits requests from her own sign-in.";
+export const PREVIEW_CONFIRM_MESSAGE = "Read only in client view. The client confirms from her own sign-in.";
+export const PREVIEW_UPLOAD_MESSAGE = "Read only in client view. The client uploads documents from her own sign-in.";
+
+/**
+ * The one write-shaped request client view lets through: asking Quick
+ * questions. The handler answers it as a pure read in client view, saving
+ * nothing, raising nothing and starting nothing (routes/chat.ts).
+ */
+const PREVIEW_READ_POSTS = new Set(["/api/chat/messages"]);
+
+function previewRefusal(path: string): string {
+  if (path.startsWith("/api/requests")) return PREVIEW_SUBMIT_MESSAGE;
+  if (/^\/api\/tracker\/tasks\/[^/]+\/confirm$/.test(path)) return PREVIEW_CONFIRM_MESSAGE;
+  if (path.startsWith("/api/tracker/documents")) return PREVIEW_UPLOAD_MESSAGE;
+  return PREVIEW_READ_ONLY;
+}
+
 /** The organisation a preview header names, or null when it names none. */
 export function previewOrgOf(c: Context<AppEnv>): string | null {
   // The header for API calls; the query parameter for a plain download link,
@@ -86,13 +108,15 @@ export async function requireClientSeat(c: Context<AppEnv>, next: Next) {
 
   const orgId = previewOrgOf(c);
   if (!orgId) return c.json({ error: "Forbidden" }, 403);
-  if (c.req.method !== "GET" && c.req.method !== "HEAD") {
-    return c.json({ error: PREVIEW_READ_ONLY }, 403);
+  const readPost = c.req.method === "POST" && PREVIEW_READ_POSTS.has(c.req.path);
+  if (c.req.method !== "GET" && c.req.method !== "HEAD" && !readPost) {
+    return c.json({ error: previewRefusal(c.req.path), code: "read_only_client_view" }, 403);
   }
 
   const doc = await readOrg(orgId);
   if (!doc) return c.json({ error: "No organisation" }, 404);
-  const seat = (await readUsers()).users.find((u) => u.role === "client" && u.orgId === orgId);
+  // The client's own seat, never the organisation's test seat (v1.7).
+  const seat = (await readUsers()).users.find((u) => u.role === "client" && u.orgId === orgId && !u.testSeat);
   if (!seat) return c.json({ error: "This organisation has no client seat yet." }, 404);
 
   const ref = sessionRef(user.sessionId);
@@ -114,6 +138,7 @@ export async function requireClientSeat(c: Context<AppEnv>, next: Next) {
     role: "client",
     clientAccountId: orgId,
     mustChangePassword: false,
+    testSeat: false,
   });
   c.set("preview", true);
   await next();

@@ -90,7 +90,7 @@ describe("defence-file export lifecycle", () => {
     expect(entry).toBeTruthy();
     expect(entry.source).toBe("export");
     expect(entry.sourceRef).toBe(exportId);
-    expect(entry.line).toBe(11);
+    expect(entry.area).toBe(4); // v1.7: the policy pack, module 4
     expect(entry.what).toContain("defence file");
     expect(entry.outcome).toBe("Defence file generated and released");
     expect(entry.hours).toBe(12);
@@ -247,7 +247,7 @@ describe("unified review queue", () => {
 
     const guideEntries = org!.entries.filter((e) => e.source === "guide" && e.sourceRef === escalationId);
     expect(guideEntries).toHaveLength(1);
-    expect(guideEntries[0].line).toBe(12);
+    expect(guideEntries[0].area).toBe(1);
     expect(guideEntries[0].outcome).toBe("Officer guidance here.");
     expect(guideEntries[0].reviewer).toBe("Test Admin User");
   });

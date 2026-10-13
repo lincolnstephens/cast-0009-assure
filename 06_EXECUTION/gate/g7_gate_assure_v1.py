@@ -97,11 +97,11 @@ import sys
 CONFIG = {
     # Identity of the run, for the report header.
     "codename": "ASSURE",
-    "iteration": "v1.6",
+    "iteration": "v1.7",
 
     # What is gated. Either a deployed URL or a path to a local artefact.
     # Passed on the command line; these are the defaults.
-    "target": "https://tessera-assure.netlify.app",
+    "target": "https://assure.tessera-monitor.com",
     "local_build": "06_EXECUTION/build/dist/index.html",
 
     # The root of the job folder. This gate script lives two levels below it,
@@ -1174,6 +1174,23 @@ def drv_statement_excludes_illustrative_when_off(page, cfg, line, res, errors):
         page.wait_for_timeout(settle_ms * 5)
     if toggle.is_checked():
         return False, "the demo switch did not stay off"
+    # v1.7 (DC-67): prove the switch that moved is the demo's. Gate run 1
+    # found the Settings page could act on another organisation while a
+    # switch of organisation was loading.
+    try:
+        _op = _ApiSeat(cfg, "admin")
+        _demo = _preview_org_id(_op)
+        _st, _body = _op.call("GET", f"/admin/settings?org={_demo}")
+        _stored = ((_body or {}).get("settings") or {}).get("showIllustrative")
+    except Exception as exc:
+        _stored = type(exc).__name__
+    sw = page.locator("[data-testid='org-switcher']")
+    _shown = sw.first.input_value() if sw.count() else None
+    if _stored is not False:
+        _wrong = f"the demo's stored switch is {_stored} after switching it off (switcher shows {_shown})"
+        _sign_in(page, cfg, "admin", cfg["_target"])
+        _ApiSeat(cfg, "admin").call("PUT", f"/admin/settings?org={_preview_org_id(_ApiSeat(cfg, 'admin'))}", {"showIllustrative": True})
+        return False, _wrong
 
     if not _sign_in(page, cfg, "client", cfg["_target"]):
         return False, "could not sign back in as the Information Officer"
@@ -1188,6 +1205,15 @@ def drv_statement_excludes_illustrative_when_off(page, cfg, line, res, errors):
     text = loc.first.inner_text()
     forbidden = line.get("forbidden_text", "illustrative")
     hit = forbidden.lower() in text.lower()
+    diag = ""
+    if hit:
+        i = text.lower().find(forbidden.lower())
+        try:
+            st, body = _ApiSeat(cfg, "admin").call("GET", f"/admin/settings?org={_preview_org_id(_ApiSeat(cfg, 'admin'))}")
+            stored = ((body or {}).get("settings") or {}).get("showIllustrative")
+        except Exception as exc:
+            stored = type(exc).__name__
+        diag = f" [stored showIllustrative={stored}; url {page.url}; text: ...{' '.join(text[max(0, i - 160):i + 60].split())}...]"
 
     restored = False
     # Put the demo switch back as it was. The store is shared across the whole
@@ -1212,7 +1238,7 @@ def drv_statement_excludes_illustrative_when_off(page, cfg, line, res, errors):
 
     if not restored:
         return False, "the demo switch could not be put back on after the check"
-    return not hit, f"'{forbidden}' in the client statement with the switch off: {hit}"
+    return not hit, f"'{forbidden}' in the client statement with the switch off: {hit}{diag}"
 
 
 def drv_print_hides_chrome_shows_statement(page, cfg, line, res, errors):
@@ -1837,12 +1863,21 @@ def drv_documents_read_only(page, cfg, line, res, errors):
     if n != 3:
         problems.append(f"expected 3 {section_sel}, found {n}")
 
-    if page.locator("input[type='file']").count() > 0:
-        problems.append("input[type='file'] present")
+    # v1.7 (FRAGO 07 3.1): the client may offer a document through the
+    # upload form, and nothing else on the page writes. A file input or an
+    # upload control outside that form fails; edit, delete, remove and
+    # replace fail anywhere.
+    form = "[data-testid='client-upload-form']"
+    if page.locator("input[type='file']").count() > page.locator(f"{form} input[type='file']").count():
+        problems.append("input[type='file'] present outside the upload form")
+    if page.locator("[data-testid='client-upload-form']").count() != 1:
+        problems.append("no single client-upload-form")
 
     controls = page.locator("button, a")
     for i in range(controls.count()):
         try:
+            if controls.nth(i).evaluate("e => !!e.closest(\"[data-testid='client-upload-form']\")"):
+                continue
             text = controls.nth(i).inner_text().strip()
         except Exception:
             continue
@@ -1850,7 +1885,7 @@ def drv_documents_read_only(page, cfg, line, res, errors):
             problems.append(f"forbidden control: '{text}'")
 
     ok = not problems
-    detail = ("three sections present, no upload input, no write control"
+    detail = ("three sections present, the upload form the only write, no edit, delete or replace control"
               if ok else "; ".join(problems[:8]))
     return ok, detail
 
@@ -2460,9 +2495,14 @@ def drv_quick_questions(page, cfg, line, res, errors):
     h1_texts = [_text(h1s.nth(i)) for i in range(h1s.count())]
     if h1_texts != [title]:
         problems.append(f"h1 reads {h1_texts}")
-    intro = _text(page.locator("[data-testid='quick-questions-intro']").first)
-    if intro != intro_text:
-        problems.append(f"intro reads '{intro}'")
+    # v1.7 (FRAGO 07 3.5): the wording follows the live path, named on the
+    # element; each path has its own fixed sentence.
+    el = page.locator("[data-testid='quick-questions-intro']").first
+    path = el.get_attribute("data-path") or ""
+    want = line.get(f"intro_text_{path}", intro_text)
+    intro = _text(el)
+    if intro != want:
+        problems.append(f"intro on the '{path}' path reads '{intro}'")
     ok = not problems
     return ok, (f"h1 '{title}', intro matches" if ok else "; ".join(problems))
 
@@ -2887,15 +2927,22 @@ def drv_preview_writes_refused(page, cfg, line, res, errors):
     task_id = pick["id"]
     before = _client_task_state(client, task_id)
 
+    # v1.7 (FRAGO 07 3.3): each refusal states why; Ask is let through as a
+    # pure read (line 63), so an empty Guide message is refused as invalid
+    # and writes nothing.
     probes = [
-        ("POST", f"/tracker/tasks/{task_id}/confirm", "confirm"),
-        ("POST", "/chat/messages", "Guide message"),
-        ("POST", "/requests", "raise request"),
+        ("POST", f"/tracker/tasks/{task_id}/confirm", "confirm", 403,
+         "Read only in client view. The client confirms from her own sign-in."),
+        ("POST", "/requests", "raise request", 403,
+         "Read only in client view. The client submits requests from her own sign-in."),
+        ("POST", "/tracker/documents", "upload", 403,
+         "Read only in client view. The client uploads documents from her own sign-in."),
+        ("POST", "/chat/messages", "empty Guide message", 400, "Type a question first."),
     ]
-    for method, path, label in probes:
+    for method, path, label, want_status, want_err in probes:
         s, body = operator.call(method, path, {}, preview=org)
         err = (body or {}).get("error") if isinstance(body, dict) else None
-        if s != 403 or err != PREVIEW_READ_ONLY:
+        if s != want_status or err != want_err:
             problems.append(f"{label}: {s} '{err}'")
 
     after = _client_task_state(client, task_id)
@@ -2908,7 +2955,7 @@ def drv_preview_writes_refused(page, cfg, line, res, errors):
 
     ok = not problems
     which = "an open for-you task" if open_for_you else "a task (no open for-you row)"
-    return ok, (f"confirm on {which}, Guide message and request refused 403 '{PREVIEW_READ_ONLY}'; "
+    return ok, (f"confirm on {which}, request and upload refused 403 with their stated messages; empty Ask 400; "
                 f"task state unchanged; unmarked operator refused 403" if ok else "; ".join(problems))
 
 
@@ -2998,8 +3045,10 @@ def drv_client_view_banner(page, cfg, line, res, errors):
                 if n and page.locator("[data-testid='preview-read-only']").count() and \
                         PREVIEW_READ_ONLY not in _text(page.locator("[data-testid='preview-read-only']").first):
                     problems.append("jobs: preview-read-only note wording")
-            if v in ("guide", "request"):
-                pattern = r"^\s*Ask\s*$" if v == "guide" else r"^\s*Submit request\s*$"
+            # v1.7 (FRAGO 07 3.3): Ask is enabled in client view (line 63);
+            # Submit request stays disabled and says why.
+            if v == "request":
+                pattern = r"^\s*Submit request\s*$"
                 btns = page.locator("button").filter(has_text=re.compile(pattern))
                 if any(btns.nth(i).is_enabled() for i in range(btns.count())):
                     problems.append(f"{v}: submit control enabled in client view")
@@ -3140,7 +3189,8 @@ GATE_ORG_JURISDICTION = "UK"
 GATE_ORG_JOURNEY_NOTE = "Gate test organisation journey note."
 GATE_CLIENT_EMAIL = "gate-client@gate.invalid"
 GATE_MANAGER_EMAIL = "gate-manager@gate.invalid"
-GATE_EMAILS = (GATE_CLIENT_EMAIL, GATE_MANAGER_EMAIL)
+# v1.7: the gate organisation's test seat (FRAGO 07 3.3) is disabled with the rest.
+GATE_EMAILS = (GATE_CLIENT_EMAIL, GATE_MANAGER_EMAIL, "gate-test-seat@gate.invalid", "gate-second-seat@gate.invalid")
 SEED_FIXTURE = "06_EXECUTION/gate/fixtures/seed_manifest_fixture.json"
 PASSWORD_REQUIRED_CODE = "password_change_required"
 PASSWORD_REQUIRED_ERROR = "Change your password to continue."
@@ -4546,9 +4596,10 @@ def drv_statement_three_parts(page, cfg, line, res, errors):
                                          "[data-testid='statement-next']"])
     if not order_ok:
         problems.append(f"parts: {detail}")
-    lines = page.locator("[data-testid='statement-service-line']").count()
-    if lines != 12:
-        problems.append(f"{lines} service lines, expected 12")
+    # v1.7 (FRAGO 07 3.4): the service is the eight modules.
+    modules = page.locator("[data-testid='statement-module']").count()
+    if modules != 8:
+        problems.append(f"{modules} modules in the service, expected 8")
     if page.locator("[data-testid='statement-obligations']").count():
         problems.append("the obligations opener is still there")
     text = _text(page.locator("[data-testid='statement']").first).lower()
@@ -4560,6 +4611,766 @@ def drv_statement_three_parts(page, cfg, line, res, errors):
     ok = not problems
     return ok, ("the service, what MITMARK has done and what comes next, in order; no comparison" if ok
                 else "; ".join(problems[:6]))
+
+
+# =============================================================================
+# v1.7 (FRAGO 07, the working programme). Lines 58 to 70.
+#
+# Every write goes to the gate's own organisation, through the gate's own
+# seats (the gate client, and from v1.7 the gate test seat). Nothing is
+# created in the demo organisation or in any real one. Documents the gate
+# files are removed again; gate users are disabled at the end as before. The
+# migrations are read in dry-run mode against every organisation, which
+# writes nothing.
+# =============================================================================
+
+GATE_TEST_SEAT_EMAIL = "gate-test-seat@gate.invalid"
+PREVIEW_SUBMIT_MESSAGE = "Read only in client view. The client submits requests from her own sign-in."
+PREVIEW_CONFIRM_MESSAGE = "Read only in client view. The client confirms from her own sign-in."
+PREVIEW_UPLOAD_MESSAGE = "Read only in client view. The client uploads documents from her own sign-in."
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+GATE_DOC_PHRASE = "The gate visitor ledger is retained for twenty months and then shredded."
+
+
+def _gate_docx_b64(heading="Gate ledger", paragraph=GATE_DOC_PHRASE):
+    """A minimal .docx built here, so the gate needs no fixture file: an
+    opening paragraph, then a heading with one paragraph under it. Quick
+    questions reads it as two sections; the second is the heading's."""
+    import base64
+    import io
+    import zipfile
+    def p(t, style=""):
+        ppr = f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>' if style else ""
+        return f"<w:p>{ppr}<w:r><w:t>{t}</w:t></w:r></w:p>"
+    xml = ('<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+           f"<w:body>{p('Gate document.')}{p(heading, 'Heading1')}{p(paragraph)}</w:body></w:document>")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("word/document.xml", xml)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def _file_gate_doc(operator, gid, title, section="procedures", area=3, b64=None, file_name="gate-ledger.docx",
+                   content_type=DOCX_TYPE, published=True):
+    s, body = operator.call("POST", f"/admin/documents?org={gid}", {
+        "section": section, "area": area, "title": title, "kind": "file", "published": published,
+        "fileBase64": b64 or _gate_docx_b64(), "fileName": file_name, "contentType": content_type,
+    })
+    doc_id = (body or {}).get("id")
+    if s != 201 or not doc_id:
+        raise RuntimeError(f"filing a gate document returned {s}")
+    return body
+
+
+def _raw_get(seat, path, preview=None, follow=True):
+    """GET returning (status, headers, bytes), for downloads."""
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(seat.base + path, method="GET")
+    if preview is not None:
+        req.add_header(PREVIEW_HEADER, f"client:{preview}")
+    opener = seat.opener
+    if not follow:
+        class _NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *a, **k):
+                return None
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(seat.jar), _NoRedirect)
+    try:
+        with opener.open(req, timeout=30) as resp:
+            return resp.status, dict(resp.headers), resp.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, dict(exc.headers or {}), exc.read()
+
+
+def _pending(operator, gid, type_=None):
+    q = f"/admin/review?accountId={gid}" + (f"&type={type_}" if type_ else "")
+    s, body = operator.call("GET", q)
+    if not _ok(s, body):
+        raise RuntimeError(f"GET {q} returned {s}")
+    return body.get("items") or []
+
+
+def _client_doc_ids(seat):
+    s, body = seat.call("GET", "/tracker/documents")
+    if not _ok(s, body):
+        raise RuntimeError(f"GET /tracker/documents returned {s}")
+    return [i.get("id") for sec in body.get("sections") or [] for i in sec.get("items") or []], body
+
+
+def _submit_as(seat, title, area=3, supersedes=None, kind="file"):
+    payload = {"title": title, "area": area, "note": "Gate submission, one line.", "kind": kind,
+               "supersedes": supersedes}
+    if kind == "file":
+        payload.update({"fileBase64": _gate_docx_b64(), "fileName": "gate-submission.docx", "contentType": DOCX_TYPE})
+    else:
+        payload["url"] = "https://example.org/gate-submission"
+    return seat.call("POST", "/tracker/documents", payload)
+
+
+def _remove_gate_docs(operator, gid, prefix="Gate v1.7"):
+    s, body = operator.call("GET", f"/admin/documents?org={gid}")
+    for d in (body or {}).get("documents") or []:
+        if str(d.get("title", "")).startswith(prefix):
+            operator.call("DELETE", f"/admin/documents/{d['id']}?org={gid}")
+
+
+def drv_documents_download(page, cfg, line, res, errors):
+    """Line 58: the operator downloads every filed file (stored bytes, the
+    original name and type) and a link redirects; each download is audited
+    as document.download; the client downloads a published document and is
+    refused an unpublished one."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    problems = []
+    try:
+        operator = _ApiSeat(cfg, "admin")
+        seat, gid = _gate_client_seat(cfg, operator)
+    except RuntimeError as exc:
+        return False, str(exc)
+    try:
+        pub = _file_gate_doc(operator, gid, "Gate v1.7 download", file_name="Gate ledger é.docx")
+        hidden = _file_gate_doc(operator, gid, "Gate v1.7 unpublished", published=False)
+        s, link = operator.call("POST", f"/admin/documents?org={gid}", {
+            "section": "procedures", "area": 3, "title": "Gate v1.7 link", "kind": "link",
+            "url": "https://example.org/gate-link", "published": True})
+        before = len(_audit_entries(operator, f"/admin/audit?accountId={gid}&action=document.download"))
+        st, hd, data = _raw_get(operator, f"/admin/documents/{pub['id']}/download?org={gid}")
+        hd = {k.lower(): v for k, v in hd.items()}
+        if st != 200 or hd.get("content-type") != DOCX_TYPE or "filename*=UTF-8''Gate%20ledger%20%C3%A9.docx" not in hd.get("content-disposition", ""):
+            problems.append(f"operator file download: {st} {hd.get('content-type')} {hd.get('content-disposition')}")
+        if len(data) != pub.get("sizeBytes"):
+            problems.append(f"downloaded {len(data)} bytes, filed {pub.get('sizeBytes')}")
+        st, hd, _ = _raw_get(operator, f"/admin/documents/{(link or {}).get('id')}/download?org={gid}", follow=False)
+        if st != 302:
+            problems.append(f"operator link download: {st}, expected a redirect")
+        after = len(_audit_entries(operator, f"/admin/audit?accountId={gid}&action=document.download"))
+        if after - before != 2:
+            problems.append(f"{after - before} document.download audit entries, expected 2")
+        st, _, data = _raw_get(seat, f"/tracker/documents/{pub['id']}/download")
+        if st != 200 or len(data) != pub.get("sizeBytes"):
+            problems.append(f"client download of a published file: {st}")
+        st, _, _ = _raw_get(seat, f"/tracker/documents/{hidden['id']}/download")
+        if st != 404:
+            problems.append(f"client download of an unpublished file: {st}, expected 404")
+    except RuntimeError as exc:
+        problems.append(str(exc))
+    finally:
+        _remove_gate_docs(operator, gid)
+        _safe_disable(cfg, operator)
+    ok = not problems
+    return ok, ("operator downloads file (name, type, bytes) and link, each audited; client gets published, not unpublished"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_client_upload_queue(page, cfg, line, res, errors):
+    """Line 59: a client upload lands in the review queue and is not visible
+    as published nor counted until accepted; a return with its reason reaches
+    the client; an acceptance publishes it under the section the operator
+    chose; a superseding upload keeps the earlier version's history. The
+    queue states working days waited and flags amber at five."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    problems = []
+    try:
+        operator = _ApiSeat(cfg, "admin")
+        seat, gid = _gate_client_seat(cfg, operator)
+    except RuntimeError as exc:
+        return False, str(exc)
+    try:
+        area_before = seat.call("GET", "/tracker/areas/3")[1] or {}
+        s, b = _submit_as(seat, "Gate v1.7 first")
+        if s != 201 or (b or {}).get("stateLabel") != "Submitted, awaiting MITMARK review":
+            return False, f"client upload returned {s} {b}"
+        first_id = b["id"]
+        s, b2 = _submit_as(seat, "Gate v1.7 returned", kind="link")
+        second_id = (b2 or {}).get("id")
+
+        ids, docs = _client_doc_ids(seat)
+        if first_id in ids or second_id in ids:
+            problems.append("a submission is listed in a section before acceptance")
+        subs = {x.get("id"): x for x in docs.get("submissions") or []}
+        if (subs.get(first_id) or {}).get("state") != "submitted":
+            problems.append("the client does not see her submission as awaiting review")
+        if _raw_get(seat, f"/tracker/documents/{first_id}/download")[0] != 404:
+            problems.append("a submission downloads before acceptance")
+        area_now = seat.call("GET", "/tracker/areas/3")[1] or {}
+        if len(area_now.get("tiles") or []) != len(area_before.get("tiles") or []) or \
+                len(area_now.get("documents") or []) != len(area_before.get("documents") or []):
+            problems.append("module 3's tiles or documents changed before acceptance (counted)")
+
+        items = {i["context"].get("documentId"): i for i in _pending(operator, gid, "document_submission")}
+        it1, it2 = items.get(first_id), items.get(second_id)
+        if not it1 or not it2:
+            return False, "the submissions are not in the operator's review queue"
+        for it in (it1, it2):
+            wd = it.get("workingDaysWaiting")
+            if not isinstance(wd, int) or it.get("overdue") is not (wd >= 5):
+                problems.append(f"queue item {it['id']}: workingDaysWaiting {wd}, overdue {it.get('overdue')}")
+
+        s, _ = operator.call("POST", f"/admin/review/{it2['id']}/return-document", {"reason": "Gate: send the signed copy."})
+        s1, _ = operator.call("POST", f"/admin/review/{it1['id']}/accept-document", {"section": "trackers"})
+        if s != 200 or s1 != 200:
+            problems.append(f"return {s}, accept {s1}")
+        ids, docs = _client_doc_ids(seat)
+        subs = {x.get("id"): x for x in docs.get("submissions") or []}
+        trackers = next((x for x in docs.get("sections") or [] if x.get("id") == "trackers"), {})
+        if first_id not in [i.get("id") for i in trackers.get("items") or []]:
+            problems.append("the accepted document is not published under the chosen section")
+        if (subs.get(second_id) or {}).get("returnReason") != "Gate: send the signed copy." or second_id in ids:
+            problems.append("the return and its reason did not reach the client, or it was published")
+
+        s, b3 = _submit_as(seat, "Gate v1.7 second version", supersedes=first_id)
+        third_id = (b3 or {}).get("id")
+        it3 = next((i for i in _pending(operator, gid, "document_submission")
+                    if i["context"].get("documentId") == third_id), None)
+        if not it3 or it3["context"].get("supersedesTitle") != "Gate v1.7 first":
+            problems.append("the new version's queue item does not name the version it supersedes")
+        else:
+            operator.call("POST", f"/admin/review/{it3['id']}/accept-document", {"section": "trackers"})
+        ids, _ = _client_doc_ids(seat)
+        if third_id not in ids or first_id in ids:
+            problems.append("after acceptance the new version does not replace the earlier one for the client")
+        s, body = operator.call("GET", f"/admin/documents?org={gid}")
+        earlier = next((d for d in (body or {}).get("documents") or [] if d.get("id") == first_id), None)
+        if not earlier or earlier.get("supersededBy") != third_id:
+            problems.append("the earlier version is not kept with its supersededBy history")
+    except RuntimeError as exc:
+        problems.append(str(exc))
+    finally:
+        _remove_gate_docs(operator, gid)
+        _safe_disable(cfg, operator)
+    ok = not problems
+    return ok, ("queued, unpublished and uncounted until accepted; return reason reaches the client; accept publishes "
+                "under the chosen section; supersede keeps history; working days and amber flag stated"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_documents_pages(page, cfg, line, res, errors):
+    """Line 60: in the browser, the operator's Documents page has a download
+    control per filed item opening in a new tab; the client's Documents page
+    has the upload form and her submissions; in client view the form is
+    disabled with the stated message."""
+    settle_ms = line.get("settle_ms", 500)
+    problems = []
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator"
+    try:
+        operator = _ApiSeat(cfg, "admin")
+        org, _ = _gate_org(operator)
+        _file_gate_doc(operator, org["id"], "Gate v1.7 page")
+        _select_org(page, GATE_ORG_NAME, settle_ms)
+        page.goto(cfg["_target"].rstrip("/") + "/admin/documents")
+        if not _wait_for(page, "[data-testid='admin-doc-download']", 8000):
+            problems.append("operator Documents: no admin-doc-download control")
+        else:
+            a = page.locator("[data-testid='admin-doc-download']").first
+            href, tgt = a.get_attribute("href") or "", a.get_attribute("target")
+            if "/api/admin/documents/" not in href or "/download" not in href or f"org={org['id']}" not in href or tgt != "_blank":
+                problems.append(f"operator download control: href '{href}', target '{tgt}'")
+    finally:
+        _pin_demo_org(page, cfg)
+        _remove_gate_docs(operator, org["id"])
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    page.goto(cfg["_target"].rstrip("/") + "/documents")
+    if not _wait_for(page, "[data-testid='client-upload-form']", 8000):
+        problems.append("client Documents: no upload form")
+    else:
+        for name in ("title", "area", "note"):
+            if page.locator(f"[data-testid='client-upload-form'] [name='{name}']").count() == 0:
+                problems.append(f"upload form has no '{name}' field")
+        if page.locator("[data-testid='client-upload-submit']").count() == 0:
+            problems.append("upload form has no submit control")
+    if not _sign_in(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator"
+    if not _enter_view(page, "client-view", None, settle_ms, cfg, "admin"):
+        return False, "admin nav item data-view='client-view' not found"
+    page.goto(cfg["_target"].rstrip("/") + "/documents")
+    if not _wait_for(page, "[data-testid='client-upload-readonly']", 8000):
+        problems.append("client view: no read-only line on the upload form")
+    else:
+        if _text(page.locator("[data-testid='client-upload-readonly']").first) != PREVIEW_UPLOAD_MESSAGE:
+            problems.append("client view: upload read-only line wording")
+        if page.locator("[data-testid='client-upload-submit']").first.is_enabled():
+            problems.append("client view: upload submit enabled")
+    _leave_client_view(page, settle_ms)
+    ok = not problems
+    return ok, ("operator download opens in a new tab; client upload form present; disabled in client view with the stated line"
+                if ok else "; ".join(problems[:6]))
+
+
+def _leave_client_view(page, settle_ms):
+    ret = page.locator("[data-testid='client-view-return']")
+    if ret.count():
+        ret.first.click()
+        page.wait_for_timeout(settle_ms * 2)
+
+
+def drv_operator_board_drag(page, cfg, line, res, errors):
+    """Line 61: on the operator's Job management board a card dragged to
+    another column changes the task's status, writes the audit entry and
+    moves the client's tracker; Completed dates it today; the status select
+    is the keyboard equivalent. Run on the gate organisation, at the first
+    resolution only, and the task is put back afterwards."""
+    if res["name"] != line.get("applies_to", [res["name"]])[0]:
+        return True, "drag runs once, at the first resolution"
+    settle_ms = line.get("settle_ms", 700)
+    problems = []
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator"
+    operator = _ApiSeat(cfg, "admin")
+    seat, gid = _gate_client_seat(cfg, operator)
+    task_id, original = None, None
+    try:
+        s, body = operator.call("GET", f"/admin/workplan?org={gid}")
+        tasks = (body or {}).get("tasks") or []
+        pick = next((t for t in tasks if t.get("status") == "not_started"), None)
+        if not pick:
+            return False, "the gate organisation has no not-started task to drag"
+        task_id, original = pick["id"], pick["status"]
+        home_before = (seat.call("GET", "/tracker/jobs")[1] or {})
+        _select_org(page, GATE_ORG_NAME, settle_ms)
+        page.goto(cfg["_target"].rstrip("/") + "/admin/jobs")
+        if not _wait_for(page, "[data-testid='admin-board']", 8000):
+            return False, "no admin-board on /admin/jobs"
+        card = f"[data-testid='board-card'][data-task-id='{task_id}']"
+        target = "[data-testid='board-column'][data-group='in_progress']"
+        if page.locator(card).count() == 0:
+            return False, "the task's card is not on the board"
+        if page.locator(card).first.get_attribute("draggable") != "true":
+            problems.append("the card is not draggable")
+        audit_before = len(_audit_entries(operator, f"/admin/audit?accountId={gid}&action=workplan.edit"))
+        page.drag_and_drop(card, target)
+        page.wait_for_timeout(settle_ms * 3)
+        s, body = operator.call("GET", f"/admin/workplan?org={gid}")
+        now = next((t for t in (body or {}).get("tasks") or [] if t["id"] == task_id), {})
+        if now.get("status") != "in_progress":
+            problems.append(f"after the drop the status is {now.get('status')}, expected in_progress")
+        if page.locator(f"{target} {card}").count() == 0:
+            problems.append("the card is not in the In progress column after the drop")
+        audits = _audit_entries(operator, f"/admin/audit?accountId={gid}&action=workplan.edit")
+        if len(audits) <= audit_before or not any("Not started to In progress" in str(a.get("detail")) for a in audits):
+            problems.append("no audit entry for the move")
+        jobs_after = seat.call("GET", "/tracker/jobs")[1] or {}
+        def group_of(j):
+            for g in j.get("groups") or []:
+                if any(t.get("id") == task_id for t in g.get("tasks") or []):
+                    return g.get("id")
+        if group_of(jobs_after) != "in_progress" or group_of(home_before) != "not_started":
+            problems.append(f"the client's tracker did not follow ({group_of(home_before)} to {group_of(jobs_after)})")
+        # Keyboard equivalent, to Completed: dated today.
+        sel = page.locator(f"{card} [data-testid='card-status']")
+        if sel.count() == 0:
+            problems.append("no status select on the card")
+        else:
+            sel.first.select_option("done")
+            page.wait_for_timeout(settle_ms * 3)
+            s, body = operator.call("GET", f"/admin/workplan?org={gid}")
+            now = next((t for t in (body or {}).get("tasks") or [] if t["id"] == task_id), {})
+            today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+            if now.get("status") != "done" or str(now.get("closedAt", ""))[:10] != today:
+                problems.append(f"status select to Completed: {now.get('status')}, closed {now.get('closedAt')}")
+    finally:
+        if task_id:
+            operator.call("PATCH", f"/admin/workplan/{task_id}?org={gid}", {"status": original})
+        _pin_demo_org(page, cfg)
+        _safe_disable(cfg, operator)
+    ok = not problems
+    return ok, ("drag moves status, audits it and moves the client's tracker; status select closes it dated today"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_no_drag_client_side(page, cfg, line, res, errors):
+    """Line 62: no drag exists on the client's Job management or in client
+    view, where the banner says so."""
+    settle_ms = line.get("settle_ms", 500)
+    problems = []
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    page.goto(cfg["_target"].rstrip("/") + "/jobs")
+    page.wait_for_timeout(settle_ms * 2)
+    if page.locator("[draggable='true']").count():
+        problems.append("client Job management has draggable elements")
+    if not _sign_in(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator"
+    if not _enter_view(page, "client-view", None, settle_ms, cfg, "admin"):
+        return False, "admin nav item data-view='client-view' not found"
+    page.goto(cfg["_target"].rstrip("/") + "/jobs")
+    page.wait_for_timeout(settle_ms * 2)
+    if page.locator("[draggable='true']").count():
+        problems.append("client view Job management has draggable elements")
+    banner = _text(page.locator("[data-testid='client-view-banner']").first) if page.locator("[data-testid='client-view-banner']").count() else ""
+    if "Cards cannot be dragged here." not in banner:
+        problems.append("the client-view banner does not say cards cannot be dragged")
+    _leave_client_view(page, settle_ms)
+    ok = not problems
+    return ok, "no draggable element for the client or in client view; the banner says so" if ok else "; ".join(problems)
+
+
+def drv_ask_in_client_view(page, cfg, line, res, errors):
+    """Line 63: Ask works in client view as a pure read (it answers; no
+    thread, message, escalation, intake, clock or review item is created),
+    and Submit request is refused with the stated message, in the API and on
+    the page."""
+    settle_ms = line.get("settle_ms", 500)
+    problems = []
+    operator = _ApiSeat(cfg, "admin")
+    org = _preview_org_id(operator)
+    if _api_only_once(line, res):
+        def counts():
+            q = len(_pending(operator, org))
+            s, c = operator.call("GET", f"/admin/clocks?accountId={org}")
+            t = operator.call("GET", "/chat/thread", preview=org)[1] or {}
+            return q, len((c or {}).get("clocks") or []), len(t.get("messages") or [])
+        before = counts()
+        for q in ("What should I do if my laptop was stolen?", "How long do we keep CCTV recordings?"):
+            s, body = operator.call("POST", "/chat/messages", {"body": q}, preview=org)
+            msgs = (body or {}).get("messages") or []
+            if s != 200 or not (body or {}).get("preview") or len(msgs) != 2 or not msgs[1].get("body"):
+                problems.append(f"Ask in client view: {s}")
+        after = counts()
+        if after != before:
+            problems.append(f"Ask in client view wrote something: queue, clocks, thread {before} to {after}")
+        s, body = operator.call("POST", "/requests", {"type": "data_request", "details": "gate"}, preview=org)
+        if s != 403 or (body or {}).get("error") != PREVIEW_SUBMIT_MESSAGE:
+            problems.append(f"Submit request in client view: {s} '{(body or {}).get('error')}'")
+    if not _sign_in(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator"
+    if not _enter_view(page, "client-view", None, settle_ms, cfg, "admin"):
+        return False, "admin nav item data-view='client-view' not found"
+    if _enter_view(page, "guide", None, settle_ms):
+        page.fill("input[aria-label='Ask a quick question']", "How long do we keep CCTV recordings?")
+        ask = page.locator("button[type='submit']").filter(has_text=re.compile(r"^\s*Ask\s*$"))
+        if ask.count() == 0 or not ask.first.is_enabled():
+            problems.append("Ask is not enabled in client view")
+    else:
+        problems.append("guide: client nav item missing in client view")
+    if _enter_view(page, "request", None, settle_ms):
+        _wait_for(page, "[data-testid='request-readonly']", 8000)
+        ro = page.locator("[data-testid='request-readonly']")
+        if ro.count() == 0 or _text(ro.first) != PREVIEW_SUBMIT_MESSAGE:
+            problems.append("request: the stated read-only line is missing or worded differently")
+        raise_btn = page.locator("button").filter(has_text=re.compile(r"^\s*Raise a request\s*$"))
+        if raise_btn.count():
+            raise_btn.first.click()
+            page.wait_for_timeout(settle_ms)
+            sub = page.locator("button").filter(has_text=re.compile(r"^\s*Submit request\s*$"))
+            if sub.count() == 0 or sub.first.is_enabled():
+                problems.append("request form: Submit request missing or enabled in client view")
+            ro2 = page.locator("[data-testid='request-readonly-form']")
+            if ro2.count() == 0 or _text(ro2.first) != PREVIEW_SUBMIT_MESSAGE:
+                problems.append("request form: the stated read-only line is missing")
+            page.keyboard.press("Escape")
+        else:
+            problems.append("request: no Raise a request control")
+    _leave_client_view(page, settle_ms)
+    ok = not problems
+    return ok, ("Ask answers in client view and writes nothing; Submit request refused with the stated message"
+                if ok else "; ".join(problems[:6]))
+
+
+def _gate_test_seat(cfg, operator, gid):
+    """Find or create the gate organisation's test seat, past its first
+    sign-in. Returns (seat, user)."""
+    u = _find_user(operator, GATE_TEST_SEAT_EMAIL)
+    if u is None:
+        s, body = operator.call("POST", "/admin/users", {"email": GATE_TEST_SEAT_EMAIL, "role": "client",
+                                                          "orgId": gid, "testSeat": True, "displayName": "Gate test seat"})
+        if s != 201:
+            raise RuntimeError(f"creating the gate test seat returned {s} {body}")
+    seat, user, _ = _gate_seat(cfg, operator, GATE_TEST_SEAT_EMAIL, "client", gid)
+    return seat, user
+
+
+def drv_test_seat_excluded(page, cfg, line, res, errors):
+    """Line 64: a test seat's writes are tagged test and kept out of the
+    Record, the counters and the Statement; the client never sees them; one
+    active test seat per organisation; the flag shows on the Users page's
+    data and in the audit."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    problems = []
+    try:
+        operator = _ApiSeat(cfg, "admin")
+        client, gid = _gate_client_seat(cfg, operator)
+        tseat, tuser = _gate_test_seat(cfg, operator, gid)
+    except RuntimeError as exc:
+        return False, str(exc)
+    try:
+        u = _find_user(operator, GATE_TEST_SEAT_EMAIL) or {}
+        if not u.get("testSeat"):
+            problems.append("the Users list does not flag the test seat")
+        s, _ = operator.call("POST", "/admin/users", {"email": "gate-second-seat@gate.invalid", "role": "client",
+                                                       "orgId": gid, "testSeat": True})
+        if s != 409:
+            problems.append(f"a second active test seat was not refused ({s})")
+        rec_before = operator.call("GET", f"/admin/record?org={gid}")[1] or {}
+        stmt_before = client.call("GET", "/value/statement")[1] or {}
+        home_before = client.call("GET", "/tracker/home")[1] or {}
+        area6_before = client.call("GET", "/tracker/areas/6")[1] or {}
+        s, body = tseat.call("POST", "/requests", {"type": "data_request", "details": "Gate test seat request"})
+        clock_id = (body or {}).get("clockId")
+        if s != 201 or not clock_id:
+            return False, f"test seat request returned {s}"
+        c_list = client.call("GET", "/clocks")[1] or {}
+        if any(c.get("id") == clock_id for c in (c_list.get("active") or []) + (c_list.get("closed") or [])):
+            problems.append("the client sees the test seat's request")
+        s, adm = operator.call("GET", f"/admin/clocks?accountId={gid}")
+        row = next((c for c in (adm or {}).get("clocks") or [] if c.get("id") == clock_id), {})
+        if not row.get("test"):
+            problems.append("the operator's clock list does not tag the request test")
+        s, _ = operator.call("POST", f"/admin/clocks/{clock_id}/close", {"outcome": "Gate test seat close.", "insideStatute": True})
+        if s != 200:
+            problems.append(f"closing the test clock returned {s}")
+        rec_after = operator.call("GET", f"/admin/record?org={gid}")[1] or {}
+        stmt_after = client.call("GET", "/value/statement")[1] or {}
+        home_after = client.call("GET", "/tracker/home")[1] or {}
+        area6_after = client.call("GET", "/tracker/areas/6")[1] or {}
+        if len(rec_after.get("entries") or []) != len(rec_before.get("entries") or []):
+            problems.append("closing the test clock booked a Record entry")
+        if (stmt_after.get("totals") or {}) != (stmt_before.get("totals") or {}):
+            problems.append("the Statement's totals moved")
+        if home_after.get("kpis") != home_before.get("kpis"):
+            problems.append("the tracker's figures moved")
+        if area6_after.get("counters") != area6_before.get("counters"):
+            problems.append("module 6's counters moved")
+        audits = _audit_entries(operator, f"/admin/audit?accountId={gid}&action=intake.create")
+        if not any("test seat (test)" in str(a.get("detail")) for a in audits):
+            problems.append("the audit does not tag the test seat's request")
+    finally:
+        _safe_disable(cfg, operator)
+        if tuser and tuser.get("id"):
+            operator.call("POST", f"/admin/users/{tuser['id']}/disable")
+    ok = not problems
+    return ok, ("test seat flagged and single; its request is tagged test, hidden from the client, and books nothing; "
+                "Record, Statement, tracker figures and counters unchanged" if ok else "; ".join(problems[:6]))
+
+
+LINES_WORDS = re.compile(r"service lines?|\btwelve\b|\blines\b", re.I)
+
+
+def drv_no_service_lines_wording(page, cfg, line, res, errors):
+    """Line 65: no 'service line', 'twelve' or 'lines' on any client page,
+    for the client and in client view; the Statement lists the eight
+    modules."""
+    settle_ms = line.get("settle_ms", 500)
+    problems = []
+    paths = line.get("paths", ["/", "/documents", "/jobs", "/clocks", "/guide", "/value", "/value/statement",
+                               "/tracker/areas/1", "/tracker/areas/4", "/tracker/areas/8"])
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    for p in paths:
+        page.goto(cfg["_target"].rstrip("/") + p)
+        page.wait_for_timeout(settle_ms * 2)
+        text = page.locator("body").inner_text()
+        m = LINES_WORDS.search(text)
+        if m:
+            problems.append(f"{p}: '{m.group(0)}'")
+    page.goto(cfg["_target"].rstrip("/") + "/value/statement")
+    if _wait_for(page, "[data-testid='statement-module']", 8000):
+        n = page.locator("[data-testid='statement-module']").count()
+        if n != 8:
+            problems.append(f"the Statement lists {n} modules, expected 8")
+    else:
+        problems.append("the Statement has no statement-module rows")
+    ok = not problems
+    return ok, (f"{len(paths)} client pages carry no 'service line', 'twelve' or 'lines'; the Statement lists 8 modules"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_migration_counts_equal(page, cfg, line, res, errors):
+    """Line 66: the line-to-module migration has run on every organisation
+    with Record counts and hours equal either side. A dry run per
+    organisation (which writes nothing) shows nothing left to migrate and
+    the two counts equal; the demo's client-facing totals by module add up
+    to its items."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    problems = []
+    operator = _ApiSeat(cfg, "admin")
+    s, body = operator.call("GET", "/admin/migrations/v1-7/organisations")
+    orgs = (body or {}).get("organisations") or []
+    if s != 200 or not orgs:
+        return False, f"listing organisations for the migration returned {s}"
+    for oid in orgs:
+        s, m = operator.call("POST", f"/admin/migrations/v1-7/modules?org={oid}&dryRun=1")
+        if s != 200 or not (m or {}).get("equal"):
+            problems.append(f"{oid}: {s} equal={(m or {}).get('equal')}")
+            continue
+        b, a = m["before"], m["after"]
+        if b["entries"] != a["entries"] or abs(b["hours"] - a["hours"]) > 1e-9:
+            problems.append(f"{oid}: {b['entries']}/{b['hours']} to {a['entries']}/{a['hours']}")
+        if b["withModule"] != b["entries"] or not b.get("moduleStatusSet"):
+            problems.append(f"{oid}: not yet migrated ({b['withModule']} of {b['entries']} entries carry a module)")
+    client = _ApiSeat(cfg, "client")
+    rec = client.call("GET", "/value/record?period=all")[1] or {}
+    t = rec.get("totals") or {}
+    if sum(x.get("items", 0) for x in t.get("byModule") or []) != t.get("items"):
+        problems.append("the demo's totals by module do not add up to its items")
+    ok = not problems
+    return ok, (f"{len(orgs)} organisations: every entry carries a module, counts and hours equal either side"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_corpus_every_file(page, cfg, line, res, errors):
+    """Line 67: every filed file in every organisation is either searchable
+    (its text extracted) or marked not searchable; links are not read; the
+    marker is the operator's alone."""
+    if not _api_only_once(line, res):
+        return True, "API level; run once, at the first resolution"
+    problems = []
+    operator = _ApiSeat(cfg, "admin")
+    orgs = (operator.call("GET", "/admin/migrations/v1-7/organisations")[1] or {}).get("organisations") or []
+    files = searchable = 0
+    for oid in orgs:
+        s, body = operator.call("GET", f"/admin/documents?org={oid}")
+        for d in (body or {}).get("documents") or []:
+            if d.get("kind") == "file":
+                files += 1
+                if d.get("searchable") == "yes":
+                    searchable += 1
+                elif d.get("searchable") != "no":
+                    problems.append(f"{oid}: file {d.get('id')} neither searchable nor marked")
+            elif d.get("kind") == "link" and d.get("searchable"):
+                problems.append(f"{oid}: link {d.get('id')} carries a searchable marker")
+    client = _ApiSeat(cfg, "client")
+    raw = json.dumps(client.call("GET", "/tracker/documents")[1] or {})
+    if "searchNote" in raw or '"searchable"' in raw:
+        problems.append("the client's documents response carries the searchable marker")
+    ok = not problems
+    return ok, (f"{files} filed files across {len(orgs)} organisations: {searchable} searchable, {files - searchable} marked not searchable"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_guide_cites_documents(page, cfg, line, res, errors):
+    """Line 68: Quick questions answers from a published document and cites
+    it by document and section on the live path (passages, no key set);
+    the model path is gated by the unit tests (guidePaths.test.ts), run here
+    and required to pass; the page's wording names the live path."""
+    problems = []
+    settle_ms = line.get("settle_ms", 500)
+    if _api_only_once(line, res):
+        try:
+            operator = _ApiSeat(cfg, "admin")
+            seat, gid = _gate_client_seat(cfg, operator)
+        except RuntimeError as exc:
+            return False, str(exc)
+        try:
+            d = _file_gate_doc(operator, gid, "Gate v1.7 guide ledger")
+            if d.get("searchable") != "yes":
+                problems.append(f"the gate document was not made searchable ({d.get('searchNote')})")
+            thread = seat.call("GET", "/chat/thread")[1] or {}
+            path = thread.get("guidePath")
+            s, body = seat.call("POST", "/chat/messages", {"body": "How long is the gate visitor ledger retained before it is shredded?"})
+            msgs = (body or {}).get("messages") or []
+            reply = msgs[1] if len(msgs) == 2 else {}
+            cites = reply.get("citations") or []
+            hit = next((c for c in cites if c.get("policyId") == d["id"]), None)
+            if s != 200 or reply.get("status") != "green" or not hit:
+                problems.append(f"no cited answer from the document ({s}, {reply.get('status')}, {len(cites)} citations)")
+            elif hit.get("sourceKind") != "document" or hit.get("sectionRef") != "2" or hit.get("title") != "Gate v1.7 guide ledger":
+                problems.append(f"citation not by document and section: {hit}")
+            want_mode = "passages" if path == "passages" else "answer"
+            if reply.get("mode") != want_mode:
+                problems.append(f"reply mode {reply.get('mode')} on the {path} path")
+            if path == "passages" and not str(reply.get("body", "")).startswith("No AI answer is switched on"):
+                problems.append("the passages reply does not say no AI answer is switched on")
+        finally:
+            _remove_gate_docs(operator, gid)
+            _safe_disable(cfg, operator)
+        import subprocess
+        server = cfg["root"] / "06_EXECUTION/build/maximus-src/packages/server"
+        try:
+            run = subprocess.run("npx vitest run test/guidePaths.test.ts", cwd=str(server), shell=True,
+                                 capture_output=True, text=True, timeout=300)
+            if run.returncode != 0:
+                problems.append("guidePaths.test.ts failed (model path)")
+        except Exception as exc:
+            problems.append(f"could not run guidePaths.test.ts: {type(exc).__name__}")
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    page.goto(cfg["_target"].rstrip("/") + "/guide")
+    if _wait_for(page, "[data-testid='quick-questions-intro']", 8000):
+        intro = page.locator("[data-testid='quick-questions-intro']").first
+        path_attr = intro.get_attribute("data-path")
+        words = _text(intro)
+        expect = "shows the passages" if path_attr == "passages" else "Answers are written"
+        if path_attr not in ("passages", "model") or expect not in words:
+            problems.append(f"the intro does not match the live path ({path_attr}: '{words[:60]}')")
+    else:
+        problems.append("no quick-questions-intro on the page")
+    ok = not problems
+    return ok, ("live path cites the document by section; model path passes its unit tests; the page names the live path"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_review_queue_page(page, cfg, line, res, errors):
+    """Line 69: in the browser, a client submission on the operator's review
+    queue offers download, a section choice, Accept, and Return with a
+    reason that is required."""
+    settle_ms = line.get("settle_ms", 600)
+    problems = []
+    operator = _ApiSeat(cfg, "admin")
+    seat, gid = _gate_client_seat(cfg, operator)
+    try:
+        s, b = _submit_as(seat, "Gate v1.7 queue page")
+        if s != 201:
+            return False, f"client upload returned {s}"
+        if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+            return False, "could not sign in as the operator"
+        _select_org(page, GATE_ORG_NAME, settle_ms)
+        page.goto(cfg["_target"].rstrip("/") + "/admin")
+        item = "[data-testid='review-item'][data-type='document_submission']"
+        if not _wait_for(page, item, 8000):
+            return False, "no document_submission item on the review queue page"
+        it = page.locator(item).filter(has_text="Gate v1.7 queue page").first
+        for tid in ("accept-section", "accept-document", "return-reason", "return-document"):
+            if it.locator(f"[data-testid='{tid}']").count() == 0:
+                problems.append(f"no {tid}")
+        if it.locator("[data-testid='return-document']").count() and it.locator("[data-testid='return-document']").first.is_enabled():
+            problems.append("Return is enabled before a reason is typed")
+        if it.get_attribute("data-overdue") not in ("true", "false"):
+            problems.append("the item does not state data-overdue")
+    finally:
+        for i in _pending(operator, gid, "document_submission"):
+            if str(i["context"].get("title", "")).startswith("Gate v1.7"):
+                operator.call("POST", f"/admin/review/{i['id']}/return-document", {"reason": "Gate clean-up."})
+        _remove_gate_docs(operator, gid)
+        _pin_demo_org(page, cfg)
+        _safe_disable(cfg, operator)
+    ok = not problems
+    return ok, "submission offers section, Accept, and Return that waits for a reason" if ok else "; ".join(problems[:6])
+
+
+def drv_new_org_modules_available(page, cfg, line, res, errors):
+    """Line 70: a new organisation's eight module statuses default to
+    Available, never Live; Settings shows one Module status control per
+    module and no twelve-line list. Read on the gate organisation (created
+    by the gate) and in the browser on the demo's Settings."""
+    settle_ms = line.get("settle_ms", 500)
+    problems = []
+    if _api_only_once(line, res):
+        operator = _ApiSeat(cfg, "admin")
+        org, created = _gate_org(operator)
+        s, body = operator.call("GET", f"/admin/settings?org={org['id']}")
+        ms = ((body or {}).get("settings") or {}).get("moduleStatus") or {}
+        if sorted(ms.keys()) != [str(i) for i in range(1, 9)] or (created and set(ms.values()) != {"Available"}):
+            problems.append(f"gate organisation module status: {ms}")
+        if "Live" in ms.values() and created:
+            problems.append("a new organisation starts with a module Live")
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator"
+    page.goto(cfg["_target"].rstrip("/") + "/admin/settings")
+    _wait_for(page, "[data-testid='module-status-8']", 10000)
+    page.wait_for_timeout(settle_ms)
+    n = sum(page.locator(f"[data-testid='module-status-{i}']").count() for i in range(1, 9))
+    if n != 8:
+        problems.append(f"{n} module status controls, expected 8")
+    text = page.locator("body").inner_text()
+    if re.search(r"service line", text, re.I):
+        problems.append("Settings still says 'service line'")
+    ok = not problems
+    return ok, "eight Module status controls; a new organisation's modules are Available" if ok else "; ".join(problems[:6])
 
 
 DRIVERS = {
@@ -4625,6 +5436,20 @@ DRIVERS = {
     "figures_operator_only": drv_figures_operator_only,
     "statement_three_parts": drv_statement_three_parts,
     "register_aliases_resolve": drv_register_aliases_resolve,
+    # v1.7 (FRAGO 07)
+    "documents_download": drv_documents_download,
+    "client_upload_queue": drv_client_upload_queue,
+    "documents_pages": drv_documents_pages,
+    "operator_board_drag": drv_operator_board_drag,
+    "no_drag_client_side": drv_no_drag_client_side,
+    "ask_in_client_view": drv_ask_in_client_view,
+    "test_seat_excluded": drv_test_seat_excluded,
+    "no_service_lines_wording": drv_no_service_lines_wording,
+    "migration_counts_equal": drv_migration_counts_equal,
+    "corpus_every_file": drv_corpus_every_file,
+    "guide_cites_documents": drv_guide_cites_documents,
+    "review_queue_page": drv_review_queue_page,
+    "new_org_modules_available": drv_new_org_modules_available,
 }
 
 

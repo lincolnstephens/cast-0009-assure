@@ -38,7 +38,10 @@ export const recordEntrySchema = z.object({
   id: z.string(),
   orgId: z.string(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  line: z.number().int().min(1).max(12),
+  /** v1.7. The module the work belongs to, 1 to 8. */
+  area: z.number().int().min(1).max(8),
+  /** Before v1.7, one of the twelve archive lines. Kept for history; never shown to the client. */
+  line: z.number().int().min(1).max(12).nullable().optional(),
   what: z.string(),
   outcome: z.string(),
   hours: z.number().min(0),
@@ -55,7 +58,7 @@ export type RecordEntry = z.infer<typeof recordEntrySchema>;
 /** What an admin may send when adding or editing an entry. */
 export const entryInputSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  line: z.coerce.number().int().min(1).max(12),
+  area: z.coerce.number().int().min(1).max(8),
   what: z.string().min(1).max(500),
   outcome: z.string().max(500).default(""),
   hours: z.coerce.number().min(0).max(1000),
@@ -75,7 +78,10 @@ export const orgSettingsSchema = z.object({
   retainer: z.union([z.coerce.number().min(0).max(1000000), z.literal("")]),
   lead: z.string().max(200),
   showIllustrative: z.boolean(),
-  lineStatus: z.record(z.string(), lineStatusSchema),
+  /** Before v1.7. Kept so an older client can still save; no surface reads it. */
+  lineStatus: z.record(z.string(), lineStatusSchema).optional(),
+  /** v1.7. Module status by module id, "1" to "8". */
+  moduleStatus: z.record(z.string(), lineStatusSchema).default({}),
 
   // --- Compliance Tracker -------------------------------------------------
   jurisdiction: z.enum(["UK", "CH-MC", "DIFC", "SG", "US"]).default("UK"),
@@ -125,27 +131,23 @@ export const orgSettingsSchema = z.object({
 });
 export type OrgSettings = z.infer<typeof orgSettingsSchema>;
 
-/** One of the twelve service lines, with the tenant's status and count. */
-export const serviceLineViewSchema = z.object({
+/** v1.7. One of the eight modules, with the tenant's status and count on the Record. */
+export const moduleViewSchema = z.object({
   id: z.number().int(),
   name: z.string(),
-  short: z.string(),
-  hoursPer: z.number(),
-  deadline: z.boolean(),
-  why: z.string(),
+  introduction: z.string(),
   status: lineStatusSchema,
   onRecord: z.number().int(),
 });
-export type ServiceLineView = z.infer<typeof serviceLineViewSchema>;
+export type ModuleView = z.infer<typeof moduleViewSchema>;
 
-export const lineTotalSchema = z.object({
-  line: z.number().int(),
+export const moduleTotalSchema = z.object({
+  area: z.number().int(),
   name: z.string(),
-  short: z.string(),
   items: z.number().int(),
   hours: z.number(),
 });
-export type LineTotal = z.infer<typeof lineTotalSchema>;
+export type ModuleTotal = z.infer<typeof moduleTotalSchema>;
 
 export const recordTotalsSchema = z.object({
   items: z.number().int(),
@@ -153,7 +155,7 @@ export const recordTotalsSchema = z.object({
   io: z.number(),
   con: z.number(),
   deadlinesMet: z.number().int(),
-  byLine: z.array(lineTotalSchema),
+  byModule: z.array(moduleTotalSchema),
   anyIllustrative: z.boolean(),
 });
 export type RecordTotals = z.infer<typeof recordTotalsSchema>;
@@ -164,7 +166,7 @@ export const recordResponseSchema = z.object({
   periods: z.array(z.string()),
   period: z.string(),
   settings: orgSettingsSchema,
-  lines: z.array(serviceLineViewSchema),
+  modules: z.array(moduleViewSchema),
   /** True when illustrative entries are being shown to the client for a demo. */
   showingIllustrative: z.boolean(),
 });
@@ -190,10 +192,12 @@ export const statementResponseSchema = z.object({
   /**
    * v1.6 (FRAGO 06 3.5). The Statement reads in three parts: the service,
    * what MITMARK has done, and what comes next. There is no planned-against-
-   * achieved comparison. `service` is the twelve lines with their status from
-   * Settings, live first.
+   * achieved comparison. v1.7: `service` is the eight modules with their
+   * status from Settings and their one-line introduction, in module order.
    */
-  service: z.array(z.object({ id: z.number().int(), name: z.string(), status: lineStatusSchema })),
+  service: z.array(
+    z.object({ id: z.number().int(), name: z.string(), status: lineStatusSchema, introduction: z.string() }),
+  ),
   /** What MITMARK has done: each reviewed Record entry in the period, oldest first. */
   items: z.array(recordEntrySchema),
   /** What comes next: the open dated tasks in the workplan, soonest first. */

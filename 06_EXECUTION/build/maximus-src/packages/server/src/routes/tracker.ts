@@ -9,15 +9,25 @@ import {
   RAG_LABEL,
   TASK_STATUS_LABEL,
   areaName,
+  clientDocumentSubmitSchema,
   jobGroupOf,
   taskConfirmSchema,
   type AreaId,
   type JobGroup,
 } from "@maximus/shared";
-import type { EntryRecord, TaskRecord } from "../db/model.ts";
-import { mutateOrg, newId, readDocumentBlob, readOrg } from "../db/store.ts";
+import type { DocumentRecord, EntryRecord, TaskRecord } from "../db/model.ts";
+import { mutateOrg, newId, readDocumentBlob, readOrg, writeDocumentBlob } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
-import { buildDocumentsResponse } from "../lib/documents.ts";
+import {
+  EFFECTIVE_UPLOAD_MAX_BYTES,
+  EFFECTIVE_UPLOAD_MAX_MB,
+  buildDocumentsResponse,
+  isLiveDocument,
+  replaceableFor,
+  submissionsFor,
+} from "../lib/documents.ts";
+import { buildCorpusFor } from "../lib/documentCorpus.ts";
+import { fileResponse } from "./adminDocuments.ts";
 import { requireAuth, requireClientSeat, type AppEnv } from "../lib/middleware.ts";
 import {
   areaSummaries,
@@ -234,8 +244,32 @@ trackerRoutes.post("/tasks/:id/confirm", async (c) => {
     // MITMARK's own work is never closable from the client side.
     if (task.ownerType !== "client") return { code: "forbidden" as const };
 
-    const already = task.clientConfirmedAt !== null;
     const now = new Date().toISOString();
+
+    // v1.7: a test seat's confirmation raises a test item for the operator
+    // and leaves the real task exactly as it is.
+    if (user.testSeat) {
+      const pending = doc.review.some(
+        (r) => r.type === "task_confirmation" && r.refId === task.id && r.state === "pending" && r.test,
+      );
+      if (!pending) {
+        doc.review.push({
+          id: newId(),
+          orgId,
+          type: "task_confirmation",
+          refId: task.id,
+          summary: `TEST SEAT. Confirmed "${task.title}".${parsed.data.note ? ` ${parsed.data.note}` : ""}`,
+          state: "pending",
+          decidedBy: null,
+          decidedAt: null,
+          createdAt: now,
+          test: true,
+        });
+      }
+      return { code: "ok" as const, title: task.title, already: pending };
+    }
+
+    const already = task.clientConfirmedAt !== null;
 
     // Confirming is a fact about what the client did, not a status change:
     // status, progress and closedAt are untouched here. Confirming twice is
@@ -362,10 +396,13 @@ trackerRoutes.get("/jobs", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// Compliance Documents: read and download only. The client never creates,
-// edits or deletes a document here - that is the operator's side entirely
-// (routes/adminDocuments.ts). See lib/documents.ts for how the three
-// sections are built from the org document.
+// Compliance Documents. The client reads and downloads what is published.
+// v1.7 (FRAGO 07 3.1): she may also offer a document, which lands in the
+// operator's review queue and is published only when the operator accepts
+// it. She never edits, replaces or deletes anything already submitted or
+// published; a new version is a new submission. See lib/documents.ts for how
+// the three sections are built and for the one rule (isLiveDocument) every
+// client-facing reader goes through.
 // ---------------------------------------------------------------------------
 
 trackerRoutes.get("/documents", async (c) => {
@@ -374,7 +411,129 @@ trackerRoutes.get("/documents", async (c) => {
   const doc = await readOrg(user.clientAccountId);
   if (!doc) return c.json({ error: "No organisation" }, 404);
 
-  return c.json(buildDocumentsResponse(doc));
+  return c.json({
+    ...buildDocumentsResponse(doc),
+    submissions: submissionsFor(doc, user.testSeat === true),
+    replaceable: replaceableFor(doc),
+    uploadMaxMb: EFFECTIVE_UPLOAD_MAX_MB,
+    testSeat: user.testSeat === true,
+  });
+});
+
+trackerRoutes.post("/documents", async (c) => {
+  const user = c.get("user");
+  if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
+  const orgId = user.clientAccountId;
+  const parsed = clientDocumentSubmitSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ error: "Give the document a title, its module and one line of what it is." }, 400);
+  }
+  const input = parsed.data;
+  const doc = await readOrg(orgId);
+  if (!doc) return c.json({ error: "No organisation" }, 404);
+
+  if (input.supersedes) {
+    const earlier = doc.documents.find((d) => d.id === input.supersedes);
+    if (!earlier || !isLiveDocument(earlier)) {
+      return c.json({ error: "That document is not one you can send a new version of." }, 400);
+    }
+  }
+
+  const id = newId();
+  const now = new Date().toISOString();
+  const test = user.testSeat === true;
+  const record: DocumentRecord = {
+    id,
+    orgId,
+    // The operator chooses the section on acceptance. Until then it is held
+    // under procedures, unpublished, and appears in no section at all.
+    section: "procedures",
+    area: input.area,
+    title: input.title,
+    version: "",
+    asAt: now.slice(0, 10),
+    owner: "Client",
+    kind: input.kind,
+    blobKey: null,
+    fileName: "",
+    contentType: "",
+    sizeBytes: 0,
+    url: "",
+    published: false,
+    updatedAt: now,
+    updatedBy: user.displayName,
+    description: input.note,
+    status: "",
+    submission: {
+      state: "submitted",
+      submittedById: user.id,
+      submittedByName: user.displayName,
+      submittedAt: now,
+      note: input.note,
+      decidedById: null,
+      decidedByName: null,
+      decidedAt: null,
+      returnReason: "",
+    },
+    supersedes: input.supersedes,
+    ...(test ? { test: true } : {}),
+  };
+
+  if (input.kind === "file") {
+    if (!input.fileBase64) return c.json({ error: "Choose a file, or switch to a link." }, 400);
+    let bytes: Uint8Array;
+    try {
+      bytes = new Uint8Array(Buffer.from(input.fileBase64, "base64"));
+    } catch {
+      return c.json({ error: "That file could not be read." }, 400);
+    }
+    if (bytes.byteLength === 0) return c.json({ error: "That file is empty." }, 400);
+    if (bytes.byteLength > EFFECTIVE_UPLOAD_MAX_BYTES) {
+      return c.json(
+        { error: `Files up to ${EFFECTIVE_UPLOAD_MAX_MB} MB can be uploaded here; this one is larger. Send it as a link instead.` },
+        413,
+      );
+    }
+    await writeDocumentBlob(orgId, id, bytes);
+    record.blobKey = id;
+    record.fileName = input.fileName || input.title;
+    record.contentType = input.contentType || "application/octet-stream";
+    record.sizeBytes = bytes.byteLength;
+    const corpus = await buildCorpusFor(orgId, record, bytes);
+    if (corpus) {
+      record.searchable = corpus.searchable;
+      record.searchNote = corpus.searchNote;
+    }
+  } else {
+    if (!/^https?:\/\//i.test(input.url)) return c.json({ error: "Give a link starting with https://." }, 400);
+    record.url = input.url;
+  }
+
+  await mutateOrg(orgId, (d) => {
+    d.documents.push(record);
+    d.review.push({
+      id: newId(),
+      orgId,
+      type: "document_submission",
+      refId: id,
+      summary: `${test ? "TEST SEAT. " : ""}Client submitted "${input.title}" for module ${input.area} (${areaName(input.area)})${input.supersedes ? " as a new version" : ""}.`,
+      state: "pending",
+      decidedBy: null,
+      decidedAt: null,
+      createdAt: now,
+      ...(test ? { test: true } : {}),
+    });
+  });
+
+  await writeAudit({
+    orgId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "document.submit",
+    detail: `Document ${id} ("${input.title}") submitted by the ${test ? "test seat (test)" : "client"} for review; not published.`,
+  });
+
+  return c.json({ id, state: "submitted", stateLabel: "Submitted, awaiting MITMARK review" }, 201);
 });
 
 trackerRoutes.get("/documents/:id/download", async (c) => {
@@ -385,9 +544,19 @@ trackerRoutes.get("/documents/:id/download", async (c) => {
 
   const id = c.req.param("id");
   // Unpublished stays invisible even to a client who has guessed an id -
-  // the same rule a draft policy already follows (routes/policies.ts).
-  const record = doc.documents.find((d) => d.id === id && d.published);
+  // the same rule a draft policy already follows (routes/policies.ts). v1.7:
+  // so does a submission not yet accepted, and a superseded version.
+  const record = doc.documents.find((d) => d.id === id && isLiveDocument(d));
   if (!record) return c.json({ error: "Not found" }, 404);
+  if (!c.get("preview")) {
+    await writeAudit({
+      orgId: doc.id,
+      actorId: user.id,
+      actorName: user.displayName,
+      action: "document.download",
+      detail: `Document ${record.id} ("${record.title}") downloaded by the client.`,
+    });
+  }
 
   if (record.kind === "link") {
     if (!record.url) return c.json({ error: "Not found" }, 404);
@@ -397,16 +566,7 @@ trackerRoutes.get("/documents/:id/download", async (c) => {
   if (record.kind === "file") {
     const bytes = await readDocumentBlob(doc.id, record.id);
     if (!bytes) return c.json({ error: "This file is not available." }, 404);
-    const filename = record.fileName || "document";
-    // Cast: @types/node's Uint8Array<ArrayBufferLike> is not structurally
-    // assignable to lib.dom's BodyInit even though this is exactly the byte
-    // buffer a Response body accepts at runtime (see routes/exports.ts).
-    return new Response(bytes as unknown as BodyInit, {
-      headers: {
-        "Content-Type": record.contentType || "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-      },
-    });
+    return fileResponse(bytes, record.fileName || "document", record.contentType);
   }
 
   return c.json({ error: "Not found" }, 404);

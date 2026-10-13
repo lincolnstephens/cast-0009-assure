@@ -155,3 +155,84 @@ export function priority(status: Record<string, LineStatus>): ServiceLine[] {
 export function defaultHoursFor(lineId: number): number {
   return lineOf(lineId)?.hoursPer ?? 1;
 }
+
+// ---------------------------------------------------------------------------
+// v1.7 (FRAGO 07 3.4). The Record speaks in the eight modules.
+// ---------------------------------------------------------------------------
+
+/**
+ * Where each of the twelve archive lines lands among the eight modules. One
+ * line, one module. `home` is true where the module is the line's own work;
+ * false where the line has no module of its own and goes to the nearest one.
+ * The twelve lines stay here only so entries written before v1.7 can be
+ * migrated and audited; no client-facing surface reads them.
+ */
+export const LINE_MODULE: Record<number, { area: number; home: boolean; why: string }> = {
+  1: { area: 5, home: true, why: "DPIAs are module 5." },
+  2: { area: 2, home: true, why: "The record of processing is one of the registers module 2 reviews." },
+  3: { area: 4, home: true, why: "The policy suite is module 4, policy review." },
+  4: { area: 6, home: true, why: "Data requests are module 6." },
+  5: { area: 8, home: true, why: "Breach advisory is module 8." },
+  6: { area: 7, home: true, why: "Vendor due diligence and DPAs are module 7." },
+  7: { area: 4, home: false, why: "Staff training is training on the policies; nearest is policy review." },
+  8: { area: 8, home: false, why: "The threat report feeds incident readiness; nearest is breach and incident response." },
+  9: { area: 1, home: false, why: "Board reporting is the DPO's duty to report to the highest level; nearest is DPO registration." },
+  10: { area: 8, home: false, why: "Log review is how incidents are found; nearest is breach and incident response." },
+  11: { area: 4, home: false, why: "The annual cycle centres on the policy refresh; nearest is policy review." },
+  12: { area: 1, home: false, why: "Ad hoc advice is the DPO's advisory role; nearest is DPO registration." },
+};
+
+/** The module a pre-v1.7 entry's line migrates to. An unknown line goes to module 1. */
+export function moduleOfLine(line: number | null | undefined): number {
+  return LINE_MODULE[Number(line)]?.area ?? 1;
+}
+
+/**
+ * Default hours a Record entry gets when the product raises it for a module
+ * (a clock closing, a policy approved). The officer's own hours the work
+ * replaced; the operator edits it before review.
+ */
+export const MODULE_DEFAULT_HOURS: Record<number, number> = {
+  1: 1,
+  2: 8,
+  3: 6,
+  4: 10,
+  5: 16,
+  6: 6,
+  7: 5,
+  8: 8,
+};
+
+export function defaultHoursForModule(area: number): number {
+  return MODULE_DEFAULT_HOURS[area] ?? 1;
+}
+
+/** A new organisation's module status: every module Available, never Live (FRAGO 07 3.6). */
+export const DEFAULT_MODULE_STATUS: Record<string, LineStatus> = {
+  "1": "Available",
+  "2": "Available",
+  "3": "Available",
+  "4": "Available",
+  "5": "Available",
+  "6": "Available",
+  "7": "Available",
+  "8": "Available",
+};
+
+const STATUS_RANK: Record<string, number> = { Live: 0, Recommended: 1, Available: 2, "Not in scope": 3 };
+
+/**
+ * An organisation that set line statuses before v1.7 keeps its values: each
+ * module takes the strongest status among the lines that map to it. A module
+ * no line maps to stays Available.
+ */
+export function moduleStatusFromLines(lineStatus: Record<string, LineStatus> | undefined): Record<string, LineStatus> {
+  const out: Record<string, LineStatus> = { ...DEFAULT_MODULE_STATUS };
+  if (!lineStatus) return out;
+  const best: Record<string, LineStatus> = {};
+  for (const [line, status] of Object.entries(lineStatus)) {
+    const area = String(moduleOfLine(Number(line)));
+    if (!best[area] || (STATUS_RANK[status] ?? 9) < (STATUS_RANK[best[area]] ?? 9)) best[area] = status;
+  }
+  return { ...out, ...best };
+}

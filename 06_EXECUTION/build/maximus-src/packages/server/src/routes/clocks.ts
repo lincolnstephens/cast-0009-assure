@@ -37,8 +37,9 @@ clockRoutes.get("/", async (c) => {
   if (!doc) return c.json({ active: [], closed: [] });
 
   const now = new Date();
+  // v1.7: the client never sees a test seat's requests; a test seat sees only its own.
   const items = doc.clocks
-    .slice()
+    .filter((clock) => Boolean(clock.test) === Boolean(user.testSeat))
     .sort(byStartedDesc)
     .map((clock) => {
       const intake = doc.intakes.find((i) => i.id === clock.intakeId);
@@ -120,6 +121,7 @@ requestRoutes.post("/", async (c) => {
       source: "manual",
       summary: parsed.data.details,
       raisedBy: user.id,
+      test: user.testSeat === true,
     }),
   );
 
@@ -128,7 +130,7 @@ requestRoutes.post("/", async (c) => {
     actorId: user.id,
     actorName: user.displayName,
     action: "intake.create",
-    detail: `${parsed.data.type === "data_request" ? "SAR" : "Breach"} intake raised by the client (${result.intake.id}).`,
+    detail: `${parsed.data.type === "data_request" ? "SAR" : "Breach"} intake raised by the ${user.testSeat ? "test seat (test)" : "client"} (${result.intake.id}).`,
   });
 
   return c.json(

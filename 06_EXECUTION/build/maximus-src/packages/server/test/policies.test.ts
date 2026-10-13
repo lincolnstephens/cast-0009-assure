@@ -142,7 +142,7 @@ describe("policy lifecycle", () => {
     expect(org!.audit.filter((a) => a.action === "policy.approve")).toHaveLength(1);
   });
 
-  it("approving a policy version creates exactly one Record entry, line 3, reviewed by the approver", async () => {
+  it("approving a policy version creates exactly one Record entry, module 4, reviewed by the approver", async () => {
     const id = await createDraftPolicy();
     await approve(id);
 
@@ -150,7 +150,7 @@ describe("policy lifecycle", () => {
     const entries = org!.entries.filter((e) => e.source === "policy" && e.sourceRef === id);
     expect(entries).toHaveLength(1);
     const [entry] = entries;
-    expect(entry.line).toBe(3);
+    expect(entry.area).toBe(4);
     expect(entry.what).toContain("version 1");
     expect(entry.outcome).toBe("Approved version issued and recorded");
     expect(entry.hours).toBe(10);

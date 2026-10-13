@@ -1,10 +1,11 @@
 import type { GuideRawResult } from "@maximus/shared";
 import type { CorpusSection } from "./corpus.ts";
+import { retrieve, type Passage } from "./retrieve.ts";
 
 /**
- * Deterministic keyword-matching stub used when ANTHROPIC_API_KEY is absent.
- * Pure function of (question, corpus): the three seeded demo questions
- * produce green / amber / red respectively, every time.
+ * The deterministic path, used when ANTHROPIC_API_KEY is absent. Pure
+ * function of (question, corpus): the three seeded demo questions produce
+ * green / amber / red respectively, every time.
  */
 export function askStub(corpus: CorpusSection[], question: string): GuideRawResult {
   const q = question.toLowerCase();
@@ -54,64 +55,43 @@ export function askStub(corpus: CorpusSection[], question: string): GuideRawResu
     };
   }
 
-  // Otherwise: keyword overlap against the corpus. A strong single-section
-  // match reads as "clearly answered" (green); anything weaker is amber.
-  const tokens = tokenise(q);
-  let best: { section: CorpusSection; score: number } | null = null;
-  for (const section of corpus) {
-    const haystack = `${section.heading} ${section.body}`.toLowerCase();
-    let score = 0;
-    for (const token of tokens) {
-      if (haystack.includes(token)) score += 1;
-    }
-    if (!best || score > best.score) best = { section, score };
-  }
-
-  if (best && best.score >= 4) {
-    const { section } = best;
+  // Otherwise: the passages that match (lib/guide/retrieve.ts). v1.7: with no
+  // model key the Guide does not compose an answer; it shows the matching
+  // passages with where each comes from. A strong match reads as answered
+  // from the sources (green); nothing strong enough goes to MITMARK (amber).
+  const passages = retrieve(corpus, question, PASSAGE_LIMIT, PASSAGE_MIN_SCORE);
+  if (passages.length > 0) {
     return {
       status: "green",
-      answer: `${firstSentences(section.body, 2)} (Your ${section.policyTitle}, section ${section.sectionRef}.)`,
-      citations: [
-        {
-          policy_code: section.policyCode,
-          section_ref: section.sectionRef,
-          heading: section.heading,
-        },
-      ],
+      answer: passages.map(passageLine).join("\n\n"),
+      citations: passages.map((p) => ({
+        policy_code: p.section.policyCode,
+        section_ref: p.section.sectionRef,
+        heading: p.section.heading,
+      })),
       intake: null,
     };
   }
 
   return {
     status: "amber",
-    answer: "This is not clearly answered by your approved policies and needs your compliance officer.",
+    answer: "This is not clearly answered by your approved policies and published documents and needs your compliance officer.",
     citations: [],
     intake: null,
   };
 }
 
-const STOPWORDS = new Set([
-  "the", "a", "an", "and", "or", "but", "with", "our", "your", "their", "his",
-  "her", "can", "could", "should", "would", "may", "might", "is", "are", "was",
-  "were", "be", "been", "do", "does", "did", "have", "has", "had", "what",
-  "when", "where", "who", "how", "why", "that", "this", "these", "those", "it",
-  "its", "in", "on", "at", "to", "of", "for", "from", "by", "about", "into",
-  "want", "wants", "wanted", "put", "own", "allowed", "okay", "fine", "please",
-]);
+/** At most three passages, and only those that match well. */
+export const PASSAGE_LIMIT = 3;
+export const PASSAGE_MIN_SCORE = 4;
 
-function tokenise(q: string): string[] {
-  const words = q
-    .replace(/[^a-z0-9\s-]/g, " ")
-    .split(/\s+/)
-    .map((w) => (w.endsWith("s") && w.length > 4 ? w.slice(0, -1) : w))
-    .filter((w) => w.length > 3 && !STOPWORDS.has(w));
-  return [...new Set(words)];
-}
-
-function firstSentences(text: string, count: number): string {
-  const sentences = text.match(/[^.!?]+[.!?]+/g) ?? [text];
-  return sentences.slice(0, count).join(" ").trim();
+/** One passage as the Information Officer reads it: the words, then where they come from. */
+export function passageLine(p: Passage): string {
+  const where =
+    p.section.sourceKind === "document"
+      ? `${p.section.policyTitle}, section ${p.section.sectionRef}: ${p.section.heading}`
+      : `Your ${p.section.policyTitle}, section ${p.section.sectionRef}: ${p.section.heading}`;
+  return `"${p.excerpt}" (${where})`;
 }
 
 function trim200(text: string): string {

@@ -27,7 +27,8 @@ export type ReviewItemType =
   | 'export_request'
   | 'alert'
   | 'intake'
-  | 'task_confirmation';
+  | 'task_confirmation'
+  | 'document_submission';
 export type ReviewItemState = 'pending' | 'approved' | 'rejected';
 export type ExportState = 'requested' | 'approved' | 'generated';
 
@@ -53,6 +54,13 @@ export interface UserRecord {
    * blob each and are not indexed by user.
    */
   sessionEpoch?: number;
+  /**
+   * v1.7 (FRAGO 07 3.3). A client user the operator uses to try the client's
+   * flows. One per organisation. Its writes are tagged test and kept out of
+   * the Record, the counters and the Statement. The flag is never removed; a
+   * test seat is disabled, not converted.
+   */
+  testSeat?: boolean;
 }
 
 export interface SessionRecord {
@@ -105,6 +113,8 @@ export interface ChatThreadRecord {
   userId: string;
   title: string;
   createdAt: Iso;
+  /** v1.7. The thread belongs to a test seat. */
+  test?: boolean;
 }
 
 export interface ChatMessageRecord {
@@ -117,6 +127,12 @@ export interface ChatMessageRecord {
   /** True when the Guide declined to answer and raised an escalation. */
   escalated: boolean;
   createdAt: Iso;
+  /**
+   * v1.7. How a Guide reply was made: "answer" when the model composed it
+   * from the retrieved passages, "passages" when no model key is set and the
+   * passages are shown as they are. Absent on replies before v1.7.
+   */
+  mode?: 'answer' | 'passages';
 }
 
 export interface EscalationRecord {
@@ -129,6 +145,8 @@ export interface EscalationRecord {
   answeredBy: string | null;
   answeredAt: Iso | null;
   createdAt: Iso;
+  /** v1.7. Raised by a test seat: answering it books nothing on the Record. */
+  test?: boolean;
 }
 
 export interface IntakeRecord {
@@ -140,6 +158,8 @@ export interface IntakeRecord {
   summary: string;
   raisedBy: string;
   createdAt: Iso;
+  /** v1.7. Raised by a test seat. */
+  test?: boolean;
 }
 
 export interface ClockRecord {
@@ -158,6 +178,8 @@ export interface ClockRecord {
   insideStatute: boolean | null;
   /** Set when a reported concern closed: was the ICO notified. Feeds the breach tile. */
   icoNotified: boolean | null;
+  /** v1.7. Started by a test seat: never counted, never booked on the Record. */
+  test?: boolean;
 }
 
 export interface ClockEventRecord {
@@ -214,6 +236,8 @@ export interface ReviewItemRecord {
   decidedBy: string | null;
   decidedAt: Iso | null;
   createdAt: Iso;
+  /** v1.7. Raised by a test seat; deciding it changes nothing real. */
+  test?: boolean;
 }
 
 export interface AuditRecord {
@@ -331,6 +355,42 @@ export interface DocumentRecord {
    * state from the title and description (see lib/modulePage.ts).
    */
   status?: 'approved' | 'draft' | 'published' | 'template' | '';
+  /**
+   * v1.7 (FRAGO 07 3.1). Present only on a document the client submitted.
+   * Until the operator accepts it, it is not published and not counted
+   * anywhere; `published` stays false. Returned items keep their reason.
+   */
+  submission?: DocumentSubmission;
+  /** v1.7. The earlier document this one supersedes, when it is a new version. */
+  supersedes?: string | null;
+  /** v1.7. Set on the earlier document once a newer version is accepted. History is kept. */
+  supersededBy?: string | null;
+  /**
+   * v1.7 (FRAGO 07 3.5). Whether Quick questions can read the file: "yes"
+   * once its text is extracted, "no" when extraction failed (shown on the
+   * admin side only), absent for a link, which is never read.
+   */
+  searchable?: 'yes' | 'no';
+  /** Why extraction failed, for the operator. Never shown to the client. */
+  searchNote?: string;
+  /** v1.7. Uploaded by a test seat. */
+  test?: boolean;
+}
+
+export type SubmissionState = 'submitted' | 'returned' | 'accepted';
+
+export interface DocumentSubmission {
+  state: SubmissionState;
+  submittedById: string;
+  submittedByName: string;
+  submittedAt: Iso;
+  /** The client's one line of what it is. */
+  note: string;
+  decidedById: string | null;
+  decidedByName: string | null;
+  decidedAt: Iso | null;
+  /** The operator's one-line reason, shown to the client, when returned. */
+  returnReason: string;
 }
 
 /**
@@ -382,8 +442,10 @@ export interface EntryRecord {
   orgId: string;
   /** YYYY-MM-DD, the date the work completed. */
   date: string;
-  /** One of the twelve service lines, 1 to 12. */
-  line: number;
+  /** v1.7. The module the work belongs to, 1 to 8. */
+  area: number;
+  /** Before v1.7, one of the twelve archive lines. Kept for history only. */
+  line?: number | null;
   what: string;
   outcome: string;
   /** Estimate of the officer's own hours the work replaced. */
@@ -418,8 +480,10 @@ export interface OrgSettings {
   lead: string;
   /** Demo switch. Off means illustrative entries never reach the client portal. */
   showIllustrative: boolean;
-  /** Service line status by line id, 1 to 12. */
-  lineStatus: Record<string, LineStatus>;
+  /** Before v1.7, service line status by line id, 1 to 12. Kept for history; no surface reads it. */
+  lineStatus?: Record<string, LineStatus>;
+  /** v1.7. Module status by module id, "1" to "8". Available for a new organisation, never Live. */
+  moduleStatus: Record<string, LineStatus>;
 
   // --- Compliance Tracker -------------------------------------------------
   /** Which regime the workplan is written against. Only UK has content. */
@@ -502,6 +566,18 @@ export const DEFAULT_LINE_STATUS: Record<string, LineStatus> = {
   '12': 'Live',
 };
 
+/** v1.7 (FRAGO 07 3.6). Every module Available for a new organisation. */
+export const DEFAULT_MODULE_STATUS: Record<string, LineStatus> = {
+  '1': 'Available',
+  '2': 'Available',
+  '3': 'Available',
+  '4': 'Available',
+  '5': 'Available',
+  '6': 'Available',
+  '7': 'Available',
+  '8': 'Available',
+};
+
 export const DEFAULT_SETTINGS: OrgSettings = {
   clientName: 'Demo Organisation',
   ioName: 'Information Officer',
@@ -510,7 +586,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   retainer: '',
   lead: '',
   showIllustrative: true,
-  lineStatus: { ...DEFAULT_LINE_STATUS },
+  moduleStatus: { ...DEFAULT_MODULE_STATUS },
   jurisdiction: 'UK',
   staffInScope: null,
   staffTrained: null,
@@ -536,7 +612,7 @@ export function emptyOrgDoc(id: string, name: string): OrgDoc {
     id,
     name,
     branding: { accent: '', displayName: name },
-    settings: { ...DEFAULT_SETTINGS, clientName: name, lineStatus: { ...DEFAULT_LINE_STATUS } },
+    settings: { ...DEFAULT_SETTINGS, clientName: name, moduleStatus: { ...DEFAULT_MODULE_STATUS } },
     createdAt: new Date().toISOString(),
     policies: [],
     threads: [],

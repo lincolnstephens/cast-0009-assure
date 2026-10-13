@@ -7,6 +7,7 @@ import { askStub } from "../src/lib/guide/stub.ts";
 /** The real seeded corpus, flattened (ids/versions faked - not under test). */
 const corpus: CorpusSection[] = policyPack.flatMap((p, pi) =>
   p.sections.map((s) => ({
+    sourceKind: "policy" as const,
     policyId: `policy-${pi}`,
     policyCode: p.code,
     policyTitle: p.title,

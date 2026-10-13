@@ -10,6 +10,9 @@
 const KEY = "assure.clientView";
 export const PREVIEW_HEADER = "X-Assure-Preview";
 export const PREVIEW_READ_ONLY = "Read only in client view";
+/** v1.7 (FRAGO 07 3.3). A refused control in client view says why, in the same words as the server. */
+export const PREVIEW_SUBMIT_MESSAGE = "Read only in client view. The client submits requests from her own sign-in.";
+export const PREVIEW_CONFIRM_MESSAGE = "Read only in client view. The client confirms from her own sign-in.";
 
 let current: string | null = read();
 

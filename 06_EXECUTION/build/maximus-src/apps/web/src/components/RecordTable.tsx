@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { RecordEntry } from "@maximus/shared";
-import { lineOf } from "@maximus/shared";
+import { areaName } from "@maximus/shared";
 import { formatDateGB, formatGBP } from "../lib/format";
 
 /**
@@ -33,7 +33,7 @@ export function RecordTable({
         <thead>
           <tr>
             <Th style={{ width: 110 }}>Date</Th>
-            <Th style={{ width: 90 }}>Line</Th>
+            <Th style={{ width: 150 }}>Module</Th>
             <Th style={{ width: "30%" }}>What MITMARK did</Th>
             <Th style={{ width: "26%" }}>Outcome</Th>
             <Th align="right">Hours</Th>
@@ -53,13 +53,12 @@ export function RecordTable({
             </tr>
           ) : (
             entries.map((e) => {
-              const line = lineOf(e.line);
               const io = e.hours * (Number(ioRate) || 0);
               const con = (e.hours / 8) * (Number(dayRate) || 0);
               return (
                 <tr key={e.id} data-testid="record-row">
                   <Td className="whitespace-nowrap font-mono">{formatDateGB(e.date)}</Td>
-                  <Td>{line?.short ?? e.line}</Td>
+                  <Td>{areaName(e.area)}</Td>
                   <Td>
                     {e.what}
                     {e.ill && <Tag tone="amber">illustrative</Tag>}

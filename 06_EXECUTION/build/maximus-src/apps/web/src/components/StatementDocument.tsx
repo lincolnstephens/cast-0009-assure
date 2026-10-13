@@ -1,4 +1,5 @@
 import type { StatementResponse } from "@maximus/shared";
+import { areaName } from "@maximus/shared";
 import { formatDateGB, formatGBP } from "../lib/format";
 
 /**
@@ -7,8 +8,9 @@ import { formatDateGB, formatGBP } from "../lib/format";
  * and the sentence shown when the retainer fee has not been entered. Do not
  * rewrite, shorten or improve any of it.
  *
- * v1.6 (FRAGO 06 3.5, DC-61): three parts. The service (the twelve lines,
- * live first); what MITMARK has done (the Record, item by item with hours and
+ * v1.6 (FRAGO 06 3.5, DC-61): three parts. The service (v1.7, FRAGO 07
+ * 3.4: the eight modules in order, each with its status and its one line);
+ * what MITMARK has done (v1.7: totals by module) (the Record, item by item with hours and
  * cost, then the totals and comparators as before); what comes next (the open
  * dated tasks in the workplan). There is no comparison of what was planned
  * against what was achieved.
@@ -43,21 +45,25 @@ export function StatementDocument({ data }: { data: StatementResponse }) {
         <h3 className="text-[15px] font-semibold">The service</h3>
         <p className="max-w-[58ch]">
           MITMARK provides the data protection officer function to {clientName} under a retainer,
-          across twelve service lines. Their status for this client is set out below, live lines
-          first.
+          as eight modules. Each is set out below with its status for this client and what it
+          covers.
         </p>
         <table className="my-3 w-full border-collapse text-[13px]">
           <thead>
             <tr>
-              <StH>Service line</StH>
+              <StH>Module</StH>
               <StH>Status</StH>
+              <StH>What it covers</StH>
             </tr>
           </thead>
           <tbody>
-            {data.service.map((l) => (
-              <tr key={l.id} data-testid="statement-service-line">
-                <StTd>{l.name}</StTd>
-                <StTd>{l.status}</StTd>
+            {data.service.map((m) => (
+              <tr key={m.id} data-testid="statement-module">
+                <StTd className="whitespace-nowrap">
+                  {m.id}. {m.name}
+                </StTd>
+                <StTd className="whitespace-nowrap">{m.status}</StTd>
+                <StTd>{m.introduction}</StTd>
               </tr>
             ))}
           </tbody>
@@ -68,7 +74,7 @@ export function StatementDocument({ data }: { data: StatementResponse }) {
       <h3 className="text-[15px] font-semibold">What MITMARK has done</h3>
       <p className="max-w-[58ch]">
         In {data.period} MITMARK completed {totals.items} items of work under the retainer across{" "}
-        {totals.byLine.length} of the twelve service lines. {totals.deadlinesMet} of them carried a
+        {totals.byModule.length} of the eight modules. {totals.deadlinesMet} of them carried a
         statutory or governance deadline; all were met. Each item was reviewed by a named MITMARK
         person before it was recorded.
       </p>
@@ -78,6 +84,7 @@ export function StatementDocument({ data }: { data: StatementResponse }) {
             <tr>
               <StH>Date</StH>
               <StH>Work</StH>
+              <StH>Module</StH>
               <StH align="right">Hours</StH>
               <StH align="right">Officer's time at £{data.ioRate}/hour</StH>
             </tr>
@@ -87,6 +94,7 @@ export function StatementDocument({ data }: { data: StatementResponse }) {
               <tr key={e.id}>
                 <StTd className="whitespace-nowrap font-mono">{formatDateGB(e.date)}</StTd>
                 <StTd>{e.what}</StTd>
+                <StTd>{areaName(e.area)}</StTd>
                 <StTd align="right">{e.hours}</StTd>
                 <StTd align="right">{formatGBP(e.hours * data.ioRate)}</StTd>
               </tr>
@@ -97,17 +105,17 @@ export function StatementDocument({ data }: { data: StatementResponse }) {
       <table className="my-3 w-full border-collapse text-[13px]">
         <thead>
           <tr>
-            <StH>Service line</StH>
+            <StH>Module</StH>
             <StH align="right">Items</StH>
             <StH align="right">Hours of the officer's time replaced</StH>
           </tr>
         </thead>
         <tbody>
-          {totals.byLine.map((l) => (
-            <tr key={l.line}>
-              <StTd>{l.name}</StTd>
-              <StTd align="right">{l.items}</StTd>
-              <StTd align="right">{l.hours}</StTd>
+          {totals.byModule.map((m) => (
+            <tr key={m.area} data-testid="statement-module-total">
+              <StTd>{m.name}</StTd>
+              <StTd align="right">{m.items}</StTd>
+              <StTd align="right">{m.hours}</StTd>
             </tr>
           ))}
           <tr>

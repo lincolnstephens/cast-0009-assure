@@ -1,29 +1,29 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { RecordResponse } from "@maximus/shared";
-import { LINES } from "@maximus/shared";
+import { AREAS } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { formatDateGB, formatGBP } from "../../lib/format";
 import { RecordTable } from "../../components/RecordTable";
-import { ServiceLines } from "../../components/ServiceLines";
+import { ModuleStatus } from "../../components/ModuleStatus";
 import { SpendList } from "../../components/SpendList";
 
 /**
  * The Record: what MITMARK did on the Information Officer's behalf, read
- * only. Her only inputs here are the period and service line filters; there
+ * only. Her only inputs here are the period and module filters; there
  * is no form and nothing for her to enter.
  */
 export function ValuePage() {
   const [data, setData] = useState<RecordResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>("");
-  const [line, setLine] = useState<string>("");
+  const [moduleId, setModuleId] = useState<string>("");
 
-  const load = useCallback(async (nextPeriod?: string, nextLine?: string) => {
+  const load = useCallback(async (nextPeriod?: string, nextModule?: string) => {
     try {
       const params = new URLSearchParams();
       if (nextPeriod) params.set("period", nextPeriod);
-      if (nextLine) params.set("line", nextLine);
+      if (nextModule) params.set("module", nextModule);
       const qs = params.toString();
       const res = await api<RecordResponse>(`/value/record${qs ? `?${qs}` : ""}`);
       setData(res);
@@ -41,18 +41,18 @@ export function ValuePage() {
 
   function changePeriod(value: string) {
     setPeriod(value);
-    void load(value, line);
+    void load(value, moduleId);
   }
 
-  function changeLine(value: string) {
-    setLine(value);
+  function changeModule(value: string) {
+    setModuleId(value);
     void load(period, value);
   }
 
   const rows = data?.entries ?? [];
   const deadlineRows = rows.filter((e) => e.deadline !== "");
   const bars = data
-    ? [...data.totals.byLine].filter((l) => l.hours > 0).sort((a, b) => b.hours - a.hours)
+    ? [...data.totals.byModule].filter((l) => l.hours > 0).sort((a, b) => b.hours - a.hours)
     : [];
   const maxHours = Math.max(1, ...bars.map((b) => b.hours));
 
@@ -77,9 +77,10 @@ export function ValuePage() {
       </p>
       <h1 className="text-lg font-semibold">What MITMARK did on your behalf, and what it saved you</h1>
       <p className="mt-2 max-w-[58ch] text-[13px] text-client-muted">
-        Each line is one piece of work MITMARK completed under the retainer. The hours are an
+        Each row is one piece of work MITMARK completed under the retainer, filed under the module it
+        belongs to. The hours are an
         estimate of your time it replaced. The cost equivalent is those hours at the rate set in
-        Operator, and what a contractor would have charged for the same work. Every line is
+        Operator, and what a contractor would have charged for the same work. Every entry is
         reviewed by a named MITMARK person before it appears here.
       </p>
 
@@ -124,19 +125,19 @@ export function ValuePage() {
               </select>
             </div>
             <div>
-              <label htmlFor="fLine" className="mb-1 block font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
-                Service line
+              <label htmlFor="fModule" className="mb-1 block font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
+                Module
               </label>
               <select
-                id="fLine"
-                value={line}
-                onChange={(e) => changeLine(e.target.value)}
+                id="fModule"
+                value={moduleId}
+                onChange={(e) => changeModule(e.target.value)}
                 className="min-w-[160px] rounded border border-client-line bg-client-bg px-2 py-1.5 text-[13px]"
               >
-                <option value="">All twelve</option>
-                {LINES.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.id}. {l.name}
+                <option value="">All modules</option>
+                {AREAS.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.id}. {a.name}
                   </option>
                 ))}
               </select>
@@ -178,15 +179,19 @@ export function ValuePage() {
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div className="rounded border border-client-line bg-client-surface p-4">
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">
-                Hours saved by service line
+                Hours saved by module
               </p>
               {bars.length === 0 ? (
                 <p className="mt-2 text-[13px] text-client-muted">Nothing yet.</p>
               ) : (
                 <div className="mt-2 space-y-1.5">
                   {bars.map((b) => (
-                    <div key={b.line} className="grid grid-cols-[150px_1fr_40px] items-center gap-2 text-[13px]">
-                      <span>{b.short}</span>
+                    <div
+                      key={b.area}
+                      data-testid="value-module-group"
+                      className="grid grid-cols-[150px_1fr_40px] items-center gap-2 text-[13px]"
+                    >
+                      <span>{b.name}</span>
                       <div className="h-2 bg-client-line">
                         <div
                           className="h-2 bg-client-accent"
@@ -240,15 +245,13 @@ export function ValuePage() {
 
           <section className="mt-10">
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-client-muted">Assessment</p>
-            <h2 className="text-lg font-semibold">The twelve service lines, prioritised for this contract</h2>
+            <h2 className="text-lg font-semibold">The eight modules of the service</h2>
             <p className="mt-2 max-w-[88ch] text-[13px] text-client-muted">
-              Priority is set by three tests, in this order: the line is already being delivered
-              under the retainer; a missed obligation on that line carries a regulatory or
-              financial consequence; the line replaces the most of the Information Officer's own
-              hours per instance. Status is the operator's entry, not an assumption.
+              Each module with its status for this contract and the work on record against it.
+              Status is the operator's entry, not an assumption.
             </p>
             <div className="mt-3">
-              <ServiceLines lines={data.lines} />
+              <ModuleStatus modules={data.modules} />
             </div>
           </section>
 

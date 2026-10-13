@@ -1,4 +1,10 @@
-import { reviewAnswerSchema, reviewDecisionSchema, reviewItemTypeSchema } from "@maximus/shared";
+import {
+  acceptSubmissionSchema,
+  returnSubmissionSchema,
+  reviewAnswerSchema,
+  reviewDecisionSchema,
+  reviewItemTypeSchema,
+} from "@maximus/shared";
 import { Hono } from "hono";
 import { readOrg } from "../db/store.ts";
 import { requireAuth, requireRole, type AppEnv, ADMIN_ORG_HEADER } from "../lib/middleware.ts";
@@ -10,6 +16,8 @@ import {
   pendingReviewItems,
   rejectReviewItem,
   decideTaskConfirmation,
+  acceptDocumentSubmission,
+  returnDocumentSubmission,
   ReviewError,
 } from "../lib/reviewQueue.ts";
 import { closeTaskAndRaiseEntry } from "./adminWorkplan.ts";
@@ -87,6 +95,9 @@ adminReviewRoutes.post("/review/:id/approve", async (c) => {
       });
       return c.json({ ok: true });
     }
+    if (item.type === "document_submission") {
+      return c.json({ error: "Choose a section, then accept the document." }, 409);
+    }
     return c.json({ error: "This item must be answered, not approved." }, 409);
   } catch (err) {
     if (err instanceof ReviewError) return c.json({ error: err.message }, err.status as 400);
@@ -106,12 +117,52 @@ adminReviewRoutes.post("/review/:id/reject", async (c) => {
   try {
     const doc = await readOrg(orgId);
     const item = doc?.review.find((r) => r.id === id);
+    if (item?.type === "document_submission") {
+      const reason = parsed.data.note?.trim();
+      if (!reason) return c.json({ error: "Give the client a one-line reason." }, 400);
+      await returnDocumentSubmission(orgId, id, user.id, user.displayName, reason.slice(0, 300));
+      return c.json({ ok: true });
+    }
     if (item?.type === "task_confirmation") {
       // Reopening clears the client's claim and leaves the task where it was.
       await decideTaskConfirmation(orgId, id, user.id, user.displayName, false, () => {});
       return c.json({ ok: true });
     }
     await rejectReviewItem(orgId, id, user.id, user.displayName, parsed.data.note);
+    return c.json({ ok: true });
+  } catch (err) {
+    if (err instanceof ReviewError) return c.json({ error: err.message }, err.status as 400);
+    throw err;
+  }
+});
+
+/** v1.7 (FRAGO 07 3.1). Accept a client's document: choose its section; only now is it published. */
+adminReviewRoutes.post("/review/:id/accept-document", async (c) => {
+  const parsed = acceptSubmissionSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Choose the section it belongs in." }, 400);
+  const id = c.req.param("id");
+  const user = c.get("user");
+  const orgId = await findReviewItemOrgId(id);
+  if (!orgId) return c.json({ error: "Review item not found or already decided." }, 404);
+  try {
+    const out = await acceptDocumentSubmission(orgId, id, user.id, user.displayName, parsed.data);
+    return c.json({ ok: true, ...out });
+  } catch (err) {
+    if (err instanceof ReviewError) return c.json({ error: err.message }, err.status as 400);
+    throw err;
+  }
+});
+
+/** v1.7. Return a client's document with a one-line reason she sees. */
+adminReviewRoutes.post("/review/:id/return-document", async (c) => {
+  const parsed = returnSubmissionSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Give the client a one-line reason." }, 400);
+  const id = c.req.param("id");
+  const user = c.get("user");
+  const orgId = await findReviewItemOrgId(id);
+  if (!orgId) return c.json({ error: "Review item not found or already decided." }, 404);
+  try {
+    await returnDocumentSubmission(orgId, id, user.id, user.displayName, parsed.data.reason);
     return c.json({ ok: true });
   } catch (err) {
     if (err instanceof ReviewError) return c.json({ error: err.message }, err.status as 400);

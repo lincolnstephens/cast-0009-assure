@@ -350,7 +350,7 @@ describe("admin clock management", () => {
     expect(entries).toHaveLength(1);
     const entry = entries[0];
     expect(entry.id).toBe(clock.entryId);
-    expect(entry.line).toBe(4); // SAR -> DSAR support
+    expect(entry.area).toBe(6); // SAR -> module 6, data subject requests
     expect(entry.hours).toBe(6);
     expect(entry.deadline).toBe("DSAR one month");
     expect(entry.reviewer).toBe(adminUser.displayName);
@@ -362,7 +362,7 @@ describe("admin clock management", () => {
     expect(entry.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it("closing a breach clock creates a line-5 entry with an 8-hour default", async () => {
+  it("closing a breach clock creates a module 8 entry with an 8-hour default", async () => {
     const raise = await app.request(
       "/api/requests",
       asUser(clientUser, "POST", { type: "concern", details: "Possible incident." }),
@@ -375,7 +375,7 @@ describe("admin clock management", () => {
 
     const doc = await readOrg(orgId);
     const entry = doc!.entries.find((e) => e.sourceRef === clockId)!;
-    expect(entry.line).toBe(5);
+    expect(entry.area).toBe(8);
     expect(entry.hours).toBe(8);
     expect(entry.deadline).toBe("Breach 72 hours");
     expect(entry.what).toContain("ICO notification threshold");

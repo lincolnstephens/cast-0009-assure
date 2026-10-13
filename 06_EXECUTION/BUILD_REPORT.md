@@ -495,3 +495,161 @@ The first production run failed line 6 at all three resolutions. The fault was i
 ## The smallest next decision for Sunray
 
 **Take the score rule to the operator.** The product implements FRAGO 06 3.6 as written. If her conversation settles different bands, the constants are all in `lib/modulePage.ts`, and the change is a short order.
+
+
+---
+
+# v1.7, the working programme
+
+**Live:** https://assure.tessera-monitor.com. https://tessera-assure.netlify.app serves the same deploy.
+**Production deploy:** `6ace40f03ee0582cff94f371`, 2026-10-13 at about 15:32 BST. It is the third production deploy of the day:
+- `6ace346344c169c6f547ce4c` (14:38) was the first. The migrations ran on it.
+- `6ace34e70174ad0de201286b` (14:41) added heading detection for the corpus.
+- `6ace40f03ee0582cff94f371` (15:32) carries the fix found by gate run 1, below.
+**Gate:** PASS, 209 of 209, against the production address on run 2, after one fix pass. That is the static checks plus 69 live definition-of-done lines at 1920x1080, 1366x768 and 390x844. Unit and integration tests: 292 of 292.
+**Spend:** no new money committed.
+- What it used: build-session time, local compute, and seven deploys on the existing Netlify plan (four drafts, three production).
+- No new dependency: text is extracted with jszip, which the server already carried.
+- No environment variable or secret was changed.
+
+**Built under:** `06_EXECUTION/FRAGO_07_WORKING_PROGRAMME.md`, issued 13 October (DC-65). It was due live by 1800 BST on Wednesday 15 October and went live on Tuesday 13 October.
+
+## What v1.7 adds
+
+**Documents both ways (3.1).**
+- **The operator downloads.** Every filed file has a Download control on the admin Documents page, opening in a new tab: the stored bytes, under the original name and type. A link redirects. Each download writes `document.download` to the audit.
+- **The client downloads** published documents as before. Her downloads are now audited too.
+- **The client uploads** a file (up to 4 MB) or a link, with a title, a module and one line of what it is. She may also name the published document it is a new version of.
+- **A submission is an offer, not a filing.** One rule, `isLiveDocument` in `lib/documents.ts`, decides what a client may see, and every client-facing reader goes through it. A submission the operator has not accepted is never published, never in a section, never on a module page and never downloadable. It is also kept out of every count.
+- **The operator decides in the review queue:**
+  - **Accept:** she chooses the section, and only then is it published.
+  - **Return:** with a one-line reason the client sees.
+- **New versions.** An accepted new version supersedes the earlier one. The earlier record is kept, marked `supersededBy`, and is no longer shown to the client.
+- **Nothing is changeable once sent.** The client cannot edit, replace or delete anything submitted or published.
+- **The amber flag.** Any queue item unreviewed for 5 working days carries one.
+
+**Job management, draggable (3.2).** The admin Jobs page is now the client's three-column board.
+- **Moving a card.** Dragging changes the status, writes a `workplan.edit` audit entry ("moved from Not started to In progress") and moves the client's tracker.
+- **Completion dates.** Dropping on Completed dates the task today. Moving a task out of done clears its date. A task books its Record entry once only.
+- **Keyboard.** Each card carries a status select. Blocked is reached from the card, not by drag.
+- **No drag on her side.** The client's board has none, and neither does client view; the banner says so.
+
+**Requests and Ask (3.3).**
+- **Ask in client view.** It is the one post the client-view middleware lets through, and the handler answers it as a pure read: no thread, message, escalation, intake or clock is written. A question that would escalate or start a clock says what would happen from her own sign-in.
+- **Refusals that explain themselves.** Submit request is refused in client view: "Read only in client view. The client submits requests from her own sign-in." Confirm and upload carry the same pattern.
+- **The test seat.** One active test seat per organisation, created on Users, flagged on screen and in the audit. The flag cannot be removed.
+  - What it writes is tagged test: threads, escalations, intakes, clocks, review items and documents.
+  - Its clocks are left out of every count.
+  - Closing its clock books nothing on the Record.
+  - Accepting its confirmation leaves the task untouched.
+  - Accepting its upload publishes it to no client.
+  - Client view serves the client's own seat, never the test seat.
+
+**Eight modules, not twelve lines (3.4).**
+- **Entries.** Record entries carry `area` (1 to 8). The archive line stays on the entry as history and never reaches a client response.
+- **Settings.** It has Module status, one select per module. A new organisation's modules default to Available (`emptyOrgDoc`).
+- **The Statement.** Part 1 lists the eight modules with status and one line. Part 2 totals by module.
+- **Value and Record** group by module.
+- **Gone from client pages:** "service line", "twelve" and the word "lines". The gate greps ten client pages for them. "Twelve months" in the score's basis became "12 months" for the same reason.
+
+**Quick questions over every published document (3.5).**
+- **Extraction.** At upload, and once as a migration, the text of each .docx and .xlsx is extracted into sections and stored beside the document (`corpus/`), capped at 200 KB.
+  - A .docx is split at its headings. Headings are found by the style names in its own styles part, or by outline level.
+  - Long stretches with no heading are cut into parts of about 2,000 characters.
+  - An .xlsx gives one section per sheet.
+  - A failure leaves the document filed and marked "not searchable" on the admin side only.
+- **The corpus** is the approved policies plus the published procedures' and trackers' text.
+- **Retrieval** is deterministic: keyword and phrase scoring at section level, best passages first.
+- **Without a working key** the reply is the passages themselves. Each is cited by document and section, under one sentence saying no AI answer is switched on, with a "Send to MITMARK" control.
+- **With a working key** the model is given the retrieved passages only. Its citations are checked against them.
+- **The page names the live path.** The model path counts as live only once a call to it has succeeded, so a key that is present but refused (DC-19) leaves the page saying passages.
+
+## Migrations, counts before and after
+
+Run through `POST /api/admin/migrations/v1-7/{modules|corpus}?org=`, one organisation per call, on production deploy `6ace346344c169c6f547ce4c`, dry run first. The corpus was read again with `force=1` on `6ace34e70174ad0de201286b` after the heading detection was improved.
+
+| Organisation | Record entries before / after | Hours before / after | Entries given a module by the write | Module status | Files | Searchable before / after |
+|---|---|---|---|---|---|---|
+| Demo | 27 / 27 | 160 / 160 | 0 (see note) | Kept: modules 1, 2, 4, 6, 7, 8 Live; 3 and 5 Available | 0 | 0 / 0 |
+| Client organisation 01 | 0 / 0 | 0 / 0 | 0 | Set, all eight Available | 9 | 0 / 9 |
+| Gate test organisation | 1 / 1 | 0 / 0 | 0 | All Available | 0 (2 links, not read) | 0 / 0 |
+
+- **The demo's 27 entries were already written with their modules** when the migration ran, so "before" and "after" read the same in that table. The migration applies on every read, and the first write after the first draft went up (a sign-in audit) persisted the migrated document. Nothing else changes between the two states, so the counts are equal by construction:
+  - the 27 entries are the 27 read through the API before the build started;
+  - the line each entry came from is kept beside its module.
+- **The demo's lines and where they landed.** By line, 1:1, 2:1, 3:7, 4:3, 5:2, 6:2, 8:3, 9:1, 10:1, 12:6. By module, 1:7, 2:1, 4:7, 5:1, 6:3, 7:2, 8:6.
+- **The gate organisation's one entry** is from the board line's own close of a gate task during the draft gate (0 hours, a client-owned task).
+- **Client organisation 01's nine files** read as follows:
+
+  | File | Passages |
+  |---|---|
+  | Data Protection Policy | 10 |
+  | Internal Privacy Policy | 4 |
+  | Data Retention Policy | 2 |
+  | Website privacy policy | 2 |
+  | Guide to Data Sharing Agreements | 2 |
+  | Data Sharing Agreement template | 20 |
+  | Roles Assessment Guidance | 4 |
+  | Record of Processing Activities | 4 |
+  | Employee Access Matrix | 2 |
+
+  None failed.
+
+## The line-to-module table (FRAGO 07 3.4)
+
+It is held in `packages/shared/src/lines.ts`, as `LINE_MODULE`. Six lines have a module of their own and six go to the nearest. The order expected four without a home; on the archive's wording, six have none.
+
+| Line | Module | Home or nearest |
+|---|---|---|
+| 1 DPIAs | 5 | home |
+| 2 ROPA management | 2 | home |
+| 3 Policy and procedure suite | 4 | home |
+| 4 DSAR support | 6 | home |
+| 5 Breach advisory | 8 | home |
+| 6 Vendor due diligence and DPAs | 7 | home |
+| 7 Staff training | 4 | nearest: training is on the policies |
+| 8 Monthly threat intelligence report | 8 | nearest: feeds incident readiness |
+| 9 Board briefing | 1 | nearest: the DPO's duty to report to the highest level |
+| 10 Quarterly log review | 8 | nearest: how incidents are found |
+| 11 Annual compliance cycle | 4 | nearest: centred on the policy refresh |
+| 12 Ad hoc assurance and advisory | 1 | nearest: the DPO's advisory role |
+
+Some entries follow their line, not their content. The demo's illustrative "Refreshed the data retention and deletion schedule" was booked to line 3, so it lands in module 4, not module 3. The operator can move any entry in Record.
+
+## Calls the order left to the build (DC-66)
+
+1. **Ask in client view is answered and not saved.** The order says Ask has been a pure read since DC-46. The thread read was, but posting a question wrote messages and could start a statutory clock. In client view it now writes nothing.
+2. **The test seat's accepted upload is published to no client.** The client's view stays untouched, and the test seat sees it as accepted. **The test seat's accepted confirmation leaves the real task alone.**
+3. **A submission is held under Procedures, unpublished, until accepted.** The section is chosen on acceptance.
+4. **Quick questions reads procedures and trackers, as the order says, plus the approved policy pack.** It does not read the four policy files filed under Policies, three of which are drafts.
+5. **"Send to MITMARK" under a passages reply** raises the same escalation the Guide raises for a question it cannot answer. It is the order's "escalation line" made into a control. It writes nothing new in kind: the Guide has escalated since v1.0. Sunray may strike it.
+6. **Existing organisations' module status.** The demo keeps its values: each module takes the strongest status among its lines. Any organisation whose line statuses were only ever the defaults starts all Available, as a new one does. That covers the client organisation and the gate organisation.
+
+## Deviations
+
+- **PDF text is not extracted on this deployment.** The order names pdf-parse. Bundling its pdf.js into the single-file function needs a change to the bundle's module loading, and no PDF has been filed. A PDF is therefore filed, downloadable and marked "not searchable" with the reason, which is the order's own rule for a failed extraction. The extractor loads pdf.js lazily, so adding the package later is a dependency and a bundler change, not a rewrite.
+- **Six lines have no module home, not four** (table above).
+- **The confirm and upload refusals** say "...confirms from her own sign-in" and "...uploads documents from her own sign-in". The order gave the submit wording and said "the same message on Confirm". The same sentence word for word would tell her on Confirm that she submits requests, so the build used the same pattern in each control's own verb.
+- **Three production deploys.** The forced re-read of the corpus needed the second, and the Settings fix the third.
+
+## What the gate caught
+
+| Run | Target | Result |
+|---|---|---|
+| Subset | Drafts `6ace3195c6c75867b6203c17` and `6ace33c888a41f2d217b4978` | New and changed lines at 1920x1080. Four failed first time and were fixed before production: the request page's read-only line was inside the form; "twelve months" in the score's basis; Settings checked before it had loaded; and the live-path wording, below |
+| 1 | Production `6ace34e70174ad0de201286b` | 201 of 209 |
+| Fix pass 1 (the only one) | Product and gate | Below |
+| 2 | Production `6ace40f03ee0582cff94f371` | **209 of 209** |
+
+**The live path was claimed, not proved (found on a draft).** The team-level Anthropic key reaches the site, so the Guide counted the model path as live while every call to it was refused with 401. The page said answers were written when they were passages. The model path now counts as live only once a call has worked.
+
+**Run 1's failures, and what was done about each:**
+- **Line 6, at 1920 only.** The demo switch moved on the wrong organisation. The operator's Settings page loads, then the switcher settles on the pinned organisation. In that window the page showed one organisation's settings, and a change saved to whichever organisation was current. Run 1's switch-off and switch-on landed on the gate organisation; its audit shows them at 14:49 BST. The client organisation's audit shows no settings change since 1 October. This is the class of fault behind DC-63, and it predates v1.7.
+  - **Product fix:** Settings now shows nothing until it holds the switcher's own organisation's settings. It drops a load that arrives for an organisation no longer selected, and refuses a save unless the settings on screen belong to the organisation selected.
+  - **Gate fix:** line 6 now reads the demo's stored value through the API after switching it off, and fails loudly if it did not change. Repeated three times on a draft, line 6 passed every time.
+- **Lines 20 and 28.** Both checked v1.6 behaviour that FRAGO 07 changed. Line 20 forbade any file input on Compliance Documents; it now allows the upload form and nothing else. Line 28 expected one fixed intro; it now expects the sentence for the live path.
+- **Static banned term "TODO".** A variable named `todo` in the migration route, renamed.
+
+## The smallest next decision for Sunray
+
+**Set a working `ANTHROPIC_API_KEY` on the site (DC-19), or say the meeting runs on passages.** With the key, Quick questions writes a cited answer from the client's own documents. Without it, it shows the passages, which is honest but plainer. Nothing else in the product waits on it.

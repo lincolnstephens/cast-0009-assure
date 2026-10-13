@@ -39,6 +39,10 @@ export interface StoredCitation {
   policyVersion: number;
   sectionRef: string;
   heading: string;
+  /** v1.7. A policy section, or a section of a published document's text. Absent means policy. */
+  sourceKind?: "policy" | "document";
+  /** v1.7. The title of the policy or document, for the citation chip. */
+  title?: string;
 }
 
 export const answerEscalationSchema = z.object({

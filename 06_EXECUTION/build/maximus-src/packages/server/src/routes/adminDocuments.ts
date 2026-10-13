@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { TRACKER_DOCUMENTS, areaName, documentInputSchema } from "@maximus/shared";
 import type { DocumentRecord } from "../db/model.ts";
-import { deleteDocumentBlob, mutateOrg, newId, readOrg, writeDocumentBlob } from "../db/store.ts";
+import { deleteDocumentBlob, mutateOrg, newId, readDocumentBlob, readOrg, writeDocumentBlob } from "../db/store.ts";
+import { buildCorpusFor } from "../lib/documentCorpus.ts";
 import { EFFECTIVE_UPLOAD_MAX_BYTES, EFFECTIVE_UPLOAD_MAX_MB } from "../lib/documents.ts";
 import { writeAudit } from "../lib/audit.ts";
 import { requireAuth, requireRole, type AppEnv, adminOrgOf } from "../lib/middleware.ts";
@@ -106,6 +107,12 @@ adminDocumentRoutes.post("/documents", async (c) => {
     record.fileName = input.fileName || record.title;
     record.contentType = input.contentType || "application/octet-stream";
     record.sizeBytes = bytes.byteLength;
+    // v1.7 (FRAGO 07 3.5). The text is extracted at upload for Quick questions.
+    const corpus = await buildCorpusFor(orgId, record, bytes);
+    if (corpus) {
+      record.searchable = corpus.searchable;
+      record.searchNote = corpus.searchNote;
+    }
   } else {
     if (!input.url) return c.json({ error: "Add a link, or switch to a file." }, 400);
     record.url = input.url;
@@ -196,8 +203,32 @@ adminDocumentRoutes.patch("/documents/:id", async (c) => {
 
   if (!result) return c.json({ error: "Document not found" }, 404);
 
-  if (newBytes) await writeDocumentBlob(orgId, id, newBytes);
-  if (result.blobRemoved) await deleteDocumentBlob(orgId, id);
+  if (newBytes) {
+    await writeDocumentBlob(orgId, id, newBytes);
+    // A replaced file is read again; a file turned into a link is not read at all.
+    const corpus = await buildCorpusFor(orgId, result.record, newBytes);
+    await mutateOrg(orgId, (doc) => {
+      const r = doc.documents.find((d) => d.id === id);
+      if (r && corpus) {
+        r.searchable = corpus.searchable;
+        r.searchNote = corpus.searchNote;
+      }
+    });
+    if (corpus) {
+      result.record.searchable = corpus.searchable;
+      result.record.searchNote = corpus.searchNote;
+    }
+  }
+  if (result.blobRemoved) {
+    await deleteDocumentBlob(orgId, id);
+    await mutateOrg(orgId, (doc) => {
+      const r = doc.documents.find((d) => d.id === id);
+      if (r) {
+        delete r.searchable;
+        delete r.searchNote;
+      }
+    });
+  }
 
   await writeAudit({
     orgId,
@@ -235,3 +266,52 @@ adminDocumentRoutes.delete("/documents/:id", async (c) => {
 
   return c.json({ ok: true });
 });
+
+/**
+ * v1.7 (FRAGO 07 3.1). The operator downloads any filed file: the stored
+ * file, its original name and type. A link redirects. Every download leaves
+ * an audit row. Opened in a new tab from the Documents page, so the org is
+ * named in the query, not the switcher's header.
+ */
+adminDocumentRoutes.get("/documents/:id/download", async (c) => {
+  const orgId = orgIdOf(c);
+  const user = c.get("user");
+  const id = c.req.param("id");
+  const doc = await readOrg(orgId);
+  if (!doc) return c.json({ error: "Organisation not found" }, 404);
+  const record = doc.documents.find((d) => d.id === id);
+  if (!record) return c.json({ error: "Document not found" }, 404);
+
+  await writeAudit({
+    orgId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "document.download",
+    detail: `Document ${record.id} ("${record.title}") downloaded by the operator.`,
+  });
+
+  if (record.kind === "link") {
+    if (!record.url) return c.json({ error: "This link has no address." }, 404);
+    return c.redirect(record.url, 302);
+  }
+  if (record.kind !== "file") return c.json({ error: "Document not found" }, 404);
+  const bytes = await readDocumentBlob(orgId, record.id);
+  if (!bytes) return c.json({ error: "This file is not available." }, 404);
+  return fileResponse(bytes, record.fileName || "document", record.contentType);
+});
+
+/**
+ * The stored bytes as a download. The original name travels in both
+ * Content-Disposition forms so a name with spaces or non-ASCII letters
+ * arrives intact.
+ */
+export function fileResponse(bytes: Uint8Array, fileName: string, contentType: string): Response {
+  const ascii = fileName.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  // Cast: see routes/exports.ts on Uint8Array and BodyInit.
+  return new Response(bytes as unknown as BodyInit, {
+    headers: {
+      "Content-Type": contentType || "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    },
+  });
+}

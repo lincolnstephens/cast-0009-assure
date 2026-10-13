@@ -18,8 +18,34 @@ interface TrackerDocumentEntry {
   area: number;
 }
 
+/**
+ * v1.7. What the admin list carries beyond the client's shape: a client
+ * submission's state, supersession, whether Quick questions can read the file
+ * (admin side only) and the test-seat flag.
+ */
+interface AdminDocument extends ComplianceDocument {
+  submission?: {
+    state: "submitted" | "returned" | "accepted";
+    submittedByName: string;
+    submittedAt: string;
+    note: string;
+    returnReason: string;
+  };
+  supersedes?: string | null;
+  supersededBy?: string | null;
+  searchable?: "yes" | "no";
+  searchNote?: string;
+  test?: boolean;
+}
+
+const SUBMISSION_LABEL: Record<string, string> = {
+  submitted: "Submitted, awaiting your review",
+  returned: "Returned to the client",
+  accepted: "Accepted",
+};
+
 interface DocumentsListResponse {
-  documents: ComplianceDocument[];
+  documents: AdminDocument[];
   uploadMaxBytes: number;
   uploadMaxMb: number;
   trackerDocuments: TrackerDocumentEntry[];
@@ -52,6 +78,10 @@ export function AdminDocumentsPage() {
   const [sectionFilter, setSectionFilter] = useState<DocumentSection | "">("");
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<ComplianceDocument | "new" | null>(null);
+  // v1.7: a client submission not yet accepted is not filed; it waits in its own group.
+  const pendingSubmission = (d: AdminDocument) => !!d.submission && d.submission.state !== "accepted";
+  const filed = list ? list.documents.filter((d) => !pendingSubmission(d)) : [];
+  const submitted = list ? list.documents.filter(pendingSubmission) : [];
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return;
@@ -136,11 +166,46 @@ export function AdminDocumentsPage() {
       </div>
 
       {!list && !error && <p className="mt-4 text-[13px] text-hud-muted">Loading…</p>}
-      {list && list.documents.length === 0 && (
+      {submitted.length > 0 && (
+        <section data-testid="admin-client-submissions" className="mt-4 rounded border border-hud-line p-4">
+          <h2 className="text-[13px] font-semibold">Submitted by the client</h2>
+          <p className="mt-0.5 text-[12px] text-hud-muted">
+            Nothing here is published or counted until you accept it in the review queue, where you
+            choose its section or return it with a reason.
+          </p>
+          <ul className="mt-2 space-y-2 text-[13px]">
+            {submitted.map((d) => (
+              <li key={d.id} data-testid="admin-client-submission" className="border-t border-hud-line/50 pt-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{d.title}</span>
+                  <span className="text-hud-muted">{d.area ? areaName(d.area) : "All modules"}</span>
+                  <span className="text-hud-muted">{SUBMISSION_LABEL[d.submission!.state] ?? d.submission!.state}</span>
+                  {d.test && <TestLabel />}
+                  <a
+                    data-testid="admin-doc-download"
+                    href={`/api/admin/documents/${d.id}/download?org=${encodeURIComponent(selectedAccountId)}`}
+                    target="_blank"
+                    rel="noopener"
+                    className="text-[12px] text-hud-accent hover:underline"
+                  >
+                    {d.kind === "link" ? "Open" : "Download"}
+                  </a>
+                </div>
+                {d.submission!.note && <p className="mt-0.5 text-hud-muted">{d.submission!.note}</p>}
+                {d.submission!.state === "returned" && d.submission!.returnReason && (
+                  <p className="mt-0.5 text-hud-muted">Reason given: {d.submission!.returnReason}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {list && filed.length === 0 && (
         <p className="mt-4 text-[13px] text-hud-muted">Nothing filed under this section yet.</p>
       )}
 
-      {list && list.documents.length > 0 && (
+      {list && filed.length > 0 && (
         <div className="mt-4 overflow-x-auto rounded border border-hud-line">
           <table data-testid="document-table" className="w-full min-w-[960px] text-left text-[13px]">
             <thead className="border-b border-hud-line bg-hud-panel/60 text-[11px] uppercase tracking-wider text-hud-muted">
@@ -157,7 +222,7 @@ export function AdminDocumentsPage() {
               </tr>
             </thead>
             <tbody>
-              {list.documents.map((d) => (
+              {filed.map((d) => (
                 <tr key={d.id} data-testid="document-row" className="border-b border-hud-line/50 align-top">
                   <td className="whitespace-nowrap px-3 py-2 text-hud-muted">
                     {DOCUMENT_SECTIONS.find((s) => s.id === d.section)?.name ?? d.section}
@@ -165,13 +230,37 @@ export function AdminDocumentsPage() {
                   <td className="whitespace-nowrap px-3 py-2 text-hud-muted">
                     {d.area ? areaName(d.area) : "All modules"}
                   </td>
-                  <td className="px-3 py-2">{d.title}</td>
+                  <td className="px-3 py-2">
+                    {d.title}
+                    {d.test && (
+                      <span className="ml-2">
+                        <TestLabel />
+                      </span>
+                    )}
+                    {d.supersededBy && (
+                      <span className="mt-0.5 block text-[11px] text-hud-muted">Superseded by a newer version</span>
+                    )}
+                    {d.submission && (
+                      <span className="mt-0.5 block text-[11px] text-hud-muted">
+                        Submitted by the client, accepted
+                      </span>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     {d.version || (d.asAt ? formatDateGB(d.asAt) : " - ")}
                   </td>
                   <td className="px-3 py-2">{d.owner || " - "}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-hud-muted">
                     {d.kind === "file" ? `File (${(d.sizeBytes / 1024).toFixed(0)} KB)` : "Link"}
+                    {d.kind === "file" && d.searchable === "no" && (
+                      <span
+                        data-testid="admin-doc-searchable"
+                        title={d.searchNote || "Quick questions cannot read this file."}
+                        className="mt-0.5 block text-[11px] text-status-amber"
+                      >
+                        Not searchable
+                      </span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">{d.published ? "Published" : "Held back"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-hud-muted">
@@ -179,6 +268,15 @@ export function AdminDocumentsPage() {
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-col items-start gap-1 text-[12px]">
+                      <a
+                        data-testid="admin-doc-download"
+                        href={`/api/admin/documents/${d.id}/download?org=${encodeURIComponent(selectedAccountId)}`}
+                        target="_blank"
+                        rel="noopener"
+                        className="text-hud-accent hover:underline"
+                      >
+                        {d.kind === "link" ? "Open" : "Download"}
+                      </a>
                       <button className="text-hud-accent hover:underline" onClick={() => setEditing(d)}>
                         Edit
                       </button>
@@ -509,6 +607,17 @@ function DocumentModal({
         </div>
       </form>
     </div>
+  );
+}
+
+function TestLabel() {
+  return (
+    <span
+      data-testid="test-label"
+      className="rounded border border-status-amber/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-status-amber"
+    >
+      Test seat
+    </span>
   );
 }
 

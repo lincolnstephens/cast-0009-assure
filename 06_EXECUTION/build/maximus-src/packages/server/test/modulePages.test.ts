@@ -346,7 +346,7 @@ describe("counters", () => {
 });
 
 describe("statement outlook (FRAGO 06 3.5)", () => {
-  it("lists the service live first, and what comes next as the open dated tasks, soonest first", () => {
+  it("lists the eight modules in order, and what comes next as the open dated tasks, soonest first", () => {
     const doc = docWith([
       task({ id: "later", title: "Later", dueAt: "2026-11-30" }),
       task({ id: "sooner", title: "Sooner", dueAt: "2026-10-22" }),
@@ -354,8 +354,10 @@ describe("statement outlook (FRAGO 06 3.5)", () => {
       task({ id: "undated", dueAt: null }),
     ]);
     const o = statementOutlook(doc);
-    expect(o.service).toHaveLength(12);
-    expect(o.service[0].status).toBe("Live");
+    // v1.7 (FRAGO 07 3.4): the service is the eight modules, in module order, each with its one line.
+    expect(o.service).toHaveLength(8);
+    expect(o.service.map((m) => m.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(o.service.every((m) => m.introduction.length > 0)).toBe(true);
     expect(o.next.map((t) => t.id)).toEqual(["sooner", "later"]);
   });
 });
@@ -478,7 +480,7 @@ describe("seed additions (manifest v2.1)", () => {
 describe("the client's pages", () => {
   it("the Statement has the service and what comes next, and no obligations comparison", async () => {
     const body = (await (await call("/api/value/statement", client)).json()) as any;
-    expect(body.service).toHaveLength(12);
+    expect(body.service).toHaveLength(8);
     expect(Array.isArray(body.next)).toBe(true);
     expect(Array.isArray(body.items)).toBe(true);
     expect(body).not.toHaveProperty("obligations");

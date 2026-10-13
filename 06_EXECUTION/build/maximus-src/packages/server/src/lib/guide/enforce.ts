@@ -55,6 +55,8 @@ export function enforce(raw: GuideRawResult | null, corpus: CorpusSection[]): En
         policyVersion: match.policyVersion,
         sectionRef: match.sectionRef,
         heading: match.heading,
+        sourceKind: match.sourceKind,
+        title: match.policyTitle,
       });
     }
   }

@@ -20,8 +20,8 @@ import { newId } from "../db/store.ts";
 export interface RaiseEntryInput {
   /** YYYY-MM-DD in Europe/London. Defaults to today. */
   date?: string;
-  /** One of the twelve service lines, 1 to 12. */
-  line: number;
+  /** v1.7. The module the work belongs to, 1 to 8. */
+  area: number;
   what: string;
   outcome: string;
   hours: number;
@@ -46,7 +46,7 @@ export function raiseEntry(doc: OrgDoc, input: RaiseEntryInput): EntryRecord {
     id: newId(),
     orgId: doc.id,
     date: input.date ?? todayLondon(),
-    line: input.line,
+    area: input.area,
     what: input.what,
     outcome: input.outcome,
     hours: input.hours,
@@ -62,13 +62,13 @@ export function raiseEntry(doc: OrgDoc, input: RaiseEntryInput): EntryRecord {
   return entry;
 }
 
-/** Line 3: an approved policy version issued and recorded. */
+/** Module 4, policy review: an approved policy version issued and recorded. */
 export function raisePolicyEntry(
   doc: OrgDoc,
   input: { policyId: string; title: string; version: number; reviewer: string },
 ): EntryRecord {
   return raiseEntry(doc, {
-    line: 3,
+    area: 4,
     what: `Reviewed and issued ${input.title}, version ${input.version}`,
     outcome: "Approved version issued and recorded",
     hours: 10,
@@ -79,13 +79,13 @@ export function raisePolicyEntry(
   });
 }
 
-/** Line 12: an answered Guide question leaving the review queue. */
+/** Module 1, the DPO's advisory role: an answered Guide question leaving the review queue. */
 export function raiseGuideEntry(
   doc: OrgDoc,
   input: { refId: string; reviewer: string; decisionNote?: string | null },
 ): EntryRecord {
   return raiseEntry(doc, {
-    line: 12,
+    area: 1,
     what: "Answered a question from the Information Officer on the approved policies",
     outcome: input.decisionNote?.trim() ? input.decisionNote.trim() : "Answer released to the client portal",
     hours: 1,
@@ -96,13 +96,13 @@ export function raiseGuideEntry(
   });
 }
 
-/** Line 11: a completed defence-file export. */
+/** Module 4, policy review: a completed defence-file export of the approved policy pack. */
 export function raiseExportEntry(
   doc: OrgDoc,
   input: { exportId: string; reviewer: string },
 ): EntryRecord {
   return raiseEntry(doc, {
-    line: 11,
+    area: 4,
     what: "Produced the defence file: approved policy pack with summary",
     outcome: "Defence file generated and released",
     hours: 12,

@@ -16,6 +16,8 @@ interface AdminClock {
   closedAt: string | null;
   outcome: string | null;
   status: RagStatus | null;
+  /** v1.7. Started by a test seat: never counted, nothing booked on the Record. */
+  test?: boolean;
 }
 
 interface TimelineEvent {
@@ -109,6 +111,14 @@ export function AdminClocksPage() {
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-[13px]">
                 <span className="w-28 font-medium">{kindLabel(clock.kind)}</span>
                 <span className="w-32 text-hud-muted">{clock.reference}</span>
+                {clock.test && (
+                  <span
+                    data-testid="test-label"
+                    className="rounded border border-status-amber px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-status-amber"
+                  >
+                    Test seat
+                  </span>
+                )}
                 <span className="text-hud-muted">due {formatLondon(clock.dueAt)}</span>
                 {clock.closedAt ? (
                   <span className="text-hud-muted">closed - {clock.outcome}</span>

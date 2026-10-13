@@ -27,7 +27,10 @@ export function ClientViewBanner() {
       role="status"
       className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 bg-client-text px-4 py-2 text-[13px] text-white print:hidden sm:px-8"
     >
-      <span>Viewing as the client's Information Officer. Read only.</span>
+      <span>
+        Viewing as the client's Information Officer. Read only. Cards cannot be dragged here. Run
+        the monthly review from Job management on the MITMARK side.
+      </span>
       <button
         type="button"
         data-testid="client-view-return"

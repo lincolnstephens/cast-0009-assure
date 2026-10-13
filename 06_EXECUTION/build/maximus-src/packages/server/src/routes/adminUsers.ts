@@ -23,6 +23,8 @@ const createUserSchema = z.object({
   role: z.enum(["client", "mitmark_admin"]),
   orgId: z.string().trim().min(1).max(128).nullable().optional(),
   displayName: z.string().trim().max(200).optional(),
+  /** v1.7 (FRAGO 07 3.3). A client test seat; one active per organisation; never removed. */
+  testSeat: z.boolean().optional(),
 });
 
 type UserStatus = "active" | "disabled" | "must_change_password";
@@ -43,6 +45,7 @@ function view(u: UserRecord, orgNames: Map<string, string>) {
     orgName: u.orgId ? (orgNames.get(u.orgId) ?? null) : null,
     status: statusOf(u),
     lastSignInAt: u.lastSignInAt ?? null,
+    testSeat: u.testSeat === true,
   };
 }
 
@@ -85,11 +88,16 @@ adminUserRoutes.post("/users", async (c) => {
     return c.json({ error: "A manager sees every organisation and belongs to none." }, 400);
   }
   if (orgId && !(await readOrg(orgId))) return c.json({ error: "No such organisation." }, 404);
+  const testSeat = parsed.data.testSeat === true;
+  if (testSeat && role !== "client") {
+    return c.json({ error: "A test seat is a client user. Choose the client role and its organisation." }, 400);
+  }
 
   const password = oneTimePassword();
   const passwordHash = await bcrypt.hash(password, 10);
   const created = await mutateUsers((doc) => {
     if (doc.users.some((u) => u.email === email)) return null;
+    if (testSeat && doc.users.some((u) => u.testSeat && u.orgId === orgId && !u.disabled)) return "seat_taken" as const;
     const user: UserRecord = {
       id: newId(),
       orgId,
@@ -97,16 +105,21 @@ adminUserRoutes.post("/users", async (c) => {
       passwordHash,
       role,
       displayName:
-        parsed.data.displayName || (role === "client" ? "Information Officer" : "MITMARK officer"),
+        parsed.data.displayName ||
+        (testSeat ? "Test seat" : role === "client" ? "Information Officer" : "MITMARK officer"),
       createdAt: new Date().toISOString(),
       disabled: false,
       mustChangePassword: true,
       lastSignInAt: null,
       sessionEpoch: 0,
+      ...(testSeat ? { testSeat: true } : {}),
     };
     doc.users.push(user);
     return user;
   });
+  if (created === "seat_taken") {
+    return c.json({ error: "This organisation already has an active test seat. Disable it before adding another." }, 409);
+  }
   if (!created) return c.json({ error: "A user with that email address already exists." }, 409);
 
   await writeSystemAudit({
@@ -114,7 +127,7 @@ adminUserRoutes.post("/users", async (c) => {
     actorId: actor.id,
     actorName: actor.displayName,
     action: "user.create",
-    detail: `Created user ${created.id} as ${role === "client" ? `a client user of ${orgId}` : "a manager"}; one-time password issued.`,
+    detail: `Created user ${created.id} as ${testSeat ? `the test seat of ${orgId} (test)` : role === "client" ? `a client user of ${orgId}` : "a manager"}; one-time password issued.`,
   });
 
   return c.json({ user: view(created, await orgNamesFor([created])), oneTimePassword: password }, 201);

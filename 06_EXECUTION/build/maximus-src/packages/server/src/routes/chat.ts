@@ -1,9 +1,11 @@
 import { sendChatMessageSchema, type StoredCitation } from "@maximus/shared";
 import { Hono } from "hono";
 import type { ChatMessageRecord, ChatThreadRecord, EscalationRecord, OrgDoc } from "../db/model.ts";
-import { mutateOrg, newId, readOrg, readUsers } from "../db/store.ts";
+import { mutateOrg, newId, readGuideHealth, readOrg, readUsers, writeGuideHealth } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
-import { buildCorpus } from "../lib/guide/corpus.ts";
+import { buildCorpus, documentSections } from "../lib/guide/corpus.ts";
+import { retrieve } from "../lib/guide/retrieve.ts";
+import { loadDocumentCorpora } from "../lib/documentCorpus.ts";
 import { enforce, parseRawResult, type EnforcedReply } from "../lib/guide/enforce.ts";
 import { askLlm, GuideBusyError, GuideUnavailableError, isLlmConfigured } from "../lib/guide/llm.ts";
 import { askStub } from "../lib/guide/stub.ts";
@@ -44,20 +46,69 @@ chatRoutes.get("/thread", async (c) => {
   } else if (c.get("preview")) {
     result = { threadId: "", messages: [] };
   } else {
-    result = await mutateOrg(orgId, (doc) => threadOf(doc, getOrCreateThread(doc, user.id)));
+    result = await mutateOrg(orgId, (doc) => threadOf(doc, getOrCreateThread(doc, user.id, user.testSeat === true)));
   }
 
   return c.json({
     threadId: result.threadId,
     officerName,
     messages: result.messages.map(serialiseMessage),
+    // v1.7. Which path answers, so the page's wording stays true to it.
+    guidePath: await livePath(),
   });
 });
 
 type PostResult =
   | { kind: "rate_limited" }
-  | { kind: "busy" }
   | { kind: "ok"; userMessage: ChatMessageRecord; guideMessage: ChatMessageRecord; reply: EnforcedReply };
+
+type Answered =
+  | { kind: "busy" }
+  | { kind: "ok"; reply: EnforcedReply; mode: "answer" | "passages" | null; corpusSize: number };
+
+/** How many retrieved passages the model is given to compose from. */
+const LLM_PASSAGES = 8;
+
+/**
+ * Answer one question over the organisation's corpus, without writing
+ * anything. v1.7 (FRAGO 07 3.5): the corpus is the approved policies plus the
+ * published procedures' and trackers' extracted text. Retrieval is
+ * deterministic. With a model key, the model composes the answer from the
+ * retrieved passages only and must cite them; without one, the passages are
+ * the answer, each with where it comes from.
+ */
+async function answer(doc: OrgDoc, question: string): Promise<Answered> {
+  const corpus = [...buildCorpus(doc), ...documentSections(await loadDocumentCorpora(doc))];
+  if (corpus.length === 0) {
+    return {
+      kind: "ok",
+      reply: { status: "amber", answer: EMPTY_CORPUS_COPY, citations: [], intake: null },
+      mode: null,
+      corpusSize: 0,
+    };
+  }
+  const passagesPath = (): Answered => {
+    const reply = enforce(askStub(corpus, question), corpus);
+    return { kind: "ok", reply, mode: reply.status === "green" ? "passages" : null, corpusSize: corpus.length };
+  };
+  if (!isLlmConfigured()) return passagesPath();
+  try {
+    const passages = retrieve(corpus, question, LLM_PASSAGES, 1).map((p) => p.section);
+    const { text } = await askLlm(doc.branding.displayName || doc.name, passages, question);
+    await recordHealth(true, 200);
+    const reply = enforce(parseRawResult(text), passages);
+    return { kind: "ok", reply, mode: reply.status === "green" ? "answer" : null, corpusSize: corpus.length };
+  } catch (err) {
+    // The key or the request is wrong, not the moment: show the passages
+    // rather than tell her to come back for an answer that will never arrive.
+    if (err instanceof GuideUnavailableError) {
+      await recordHealth(false, err.httpStatus);
+      return passagesPath();
+    }
+    if (err instanceof GuideBusyError) return { kind: "busy" };
+    throw err;
+  }
+}
 
 /** One guide round-trip: user message in, enforced guide reply out. */
 chatRoutes.post("/messages", async (c) => {
@@ -72,44 +123,37 @@ chatRoutes.post("/messages", async (c) => {
   const question = parsed.data.body;
   const officerName = await officerDisplayName();
 
-  const result: PostResult = await mutateOrg(orgId, async (doc): Promise<PostResult> => {
-    const thread = getOrCreateThread(doc, user.id);
+  const current = await readOrg(orgId);
+  if (!current) return c.json({ error: "No organisation" }, 404);
 
-    // Spec §8: 10 messages/min/user.
-    const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
-    const recent = doc.messages.filter(
-      (m) => m.threadId === thread.id && m.sender === "user" && m.createdAt >= oneMinuteAgo,
-    ).length;
-    if (recent >= RATE_LIMIT_PER_MINUTE) return { kind: "rate_limited" };
+  // v1.7 (FRAGO 07 3.3). In client view, Ask is a pure read: the answer is
+  // worked out and shown, and nothing is saved, raised or started. A question
+  // that would start a statutory clock or go to MITMARK says so instead.
+  if (c.get("preview")) {
+    const result = await answer(current, question);
+    if (result.kind === "busy") return c.json({ error: BUSY_COPY, retryable: true }, 503);
+    const now = new Date().toISOString();
+    const userMessage = previewMessage("user", question, now);
+    const guideMessage = previewMessage("guide", previewReplyCopy(result.reply, result.mode, officerName), now);
+    guideMessage.citations = encodeStatusCitations(result.reply);
+    if (result.mode) guideMessage.mode = result.mode;
+    return c.json({ messages: [serialiseMessage(userMessage), serialiseMessage(guideMessage)], preview: true });
+  }
 
-    const corpus = buildCorpus(doc);
-    let reply: EnforcedReply;
-    if (corpus.length === 0) {
-      reply = { status: "amber", answer: EMPTY_CORPUS_COPY, citations: [], intake: null };
-    } else {
-      // Ask the model (or the deterministic stub when no key is configured),
-      // BEFORE writing the user message, so a busy model leaves no half-state.
-      try {
-        if (isLlmConfigured()) {
-          const { text } = await askLlm(doc.branding.displayName || doc.name, corpus, question);
-          reply = enforce(parseRawResult(text), corpus);
-        } else {
-          reply = enforce(askStub(corpus, question), corpus);
-        }
-      } catch (err) {
-        if (err instanceof GuideUnavailableError) {
-          // The key or the request is wrong, not the moment. Answering from the
-          // approved policies with the deterministic matcher is better than
-          // telling her to come back in a few seconds for an answer that will
-          // never arrive.
-          reply = enforce(askStub(corpus, question), corpus);
-        } else if (err instanceof GuideBusyError) {
-          return { kind: "busy" };
-        } else {
-          throw err;
-        }
-      }
-    }
+  // Spec section 8: 10 messages a minute a user, checked before the model is asked.
+  if (recentCount(current, user.id) >= RATE_LIMIT_PER_MINUTE) {
+    return c.json({ error: "That's a lot of questions at once - give me a minute, then ask again." }, 429);
+  }
+
+  // Ask BEFORE writing the user message, so a busy model leaves no half-state.
+  const answered = await answer(current, question);
+  if (answered.kind === "busy") return c.json({ error: BUSY_COPY, retryable: true }, 503);
+  const { reply, mode, corpusSize } = answered;
+  const test = user.testSeat === true;
+
+  const result: PostResult = await mutateOrg(orgId, (doc): PostResult => {
+    if (recentCount(doc, user.id) >= RATE_LIMIT_PER_MINUTE) return { kind: "rate_limited" };
+    const thread = getOrCreateThread(doc, user.id, test);
 
     const now = new Date().toISOString();
     const userMessage: ChatMessageRecord = {
@@ -123,27 +167,27 @@ chatRoutes.post("/messages", async (c) => {
     };
     doc.messages.push(userMessage);
 
-    const guideBody = applyReplyCopy(reply, officerName);
     // A real escalation is raised only for amber with a real corpus (the
     // empty-corpus amber has nothing to escalate to). ChatMessageRecord has
     // no persisted "status" column, so the citations array also carries a
     // status marker for amber/red replies (see encodeStatusCitations) - the
     // only reliable way to recover green/amber/red on a later read.
-    const escalated = reply.status === "amber" && corpus.length > 0;
+    const escalated = reply.status === "amber" && corpusSize > 0;
     const guideMessage: ChatMessageRecord = {
       id: newId(),
       threadId: thread.id,
       sender: "guide",
-      body: guideBody,
+      body: applyReplyCopy(reply, mode, officerName),
       citations: encodeStatusCitations(reply),
       escalated,
       createdAt: now,
+      ...(mode ? { mode } : {}),
     };
     doc.messages.push(guideMessage);
 
     // Amber (with a real corpus): raise an escalation + review item.
     if (escalated) {
-      createEscalation(doc, { threadId: thread.id, question });
+      createEscalation(doc, { threadId: thread.id, question, test });
     }
 
     // Red: same plumbing as "raise a request" - not a parallel path.
@@ -153,6 +197,7 @@ chatRoutes.post("/messages", async (c) => {
         source: "chat",
         summary: reply.intake.summary,
         raisedBy: user.id,
+        test,
       });
     }
 
@@ -165,16 +210,13 @@ chatRoutes.post("/messages", async (c) => {
       429,
     );
   }
-  if (result.kind === "busy") {
-    return c.json({ error: BUSY_COPY, retryable: true }, 503);
-  }
 
   await writeAudit({
     orgId,
     actorId: user.id,
     actorName: user.displayName,
     action: "chat.message",
-    detail: `status=${result.reply.status} citations=${result.reply.citations.length}`,
+    detail: `status=${result.reply.status} citations=${result.reply.citations.length}${mode ? ` mode=${mode}` : ""}${test ? " test" : ""}`,
   });
 
   return c.json({
@@ -182,8 +224,109 @@ chatRoutes.post("/messages", async (c) => {
   });
 });
 
-/** The fixed copy stored as the guide reply body for amber/red states. */
-function applyReplyCopy(reply: EnforcedReply, officerName: string): string {
+/**
+ * v1.7. "Send to MITMARK" under a passages reply: the passages did not answer
+ * it, so the question goes to the operator's review queue as an amber
+ * escalation would. Once per reply. Refused in client view by the middleware.
+ */
+chatRoutes.post("/messages/:id/escalate", async (c) => {
+  const user = c.get("user");
+  if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
+  const orgId = user.clientAccountId;
+  const id = c.req.param("id");
+  const officerName = await officerDisplayName();
+  const test = user.testSeat === true;
+
+  const result = await mutateOrg(orgId, (doc) => {
+    const thread = doc.threads.find((t) => t.userId === user.id);
+    const reply = doc.messages.find((m) => m.id === id && m.sender === "guide" && m.threadId === thread?.id);
+    if (!thread || !reply) return { code: "not_found" as const };
+    if (reply.mode !== "passages") return { code: "not_passages" as const };
+    if (reply.escalated) return { code: "already" as const };
+    const asked = doc.messages
+      .filter((m) => m.threadId === thread.id && m.sender === "user" && m.createdAt <= reply.createdAt)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
+    reply.escalated = true;
+    createEscalation(doc, {
+      threadId: thread.id,
+      question: asked?.body ?? "A question the passages did not answer.",
+      test,
+    });
+    const note: ChatMessageRecord = {
+      id: newId(),
+      threadId: thread.id,
+      sender: "guide",
+      body: `Sent to ${officerName}. The answer will appear here.`,
+      citations: [`${STATUS_MARKER}amber`],
+      escalated: true,
+      createdAt: new Date().toISOString(),
+    };
+    doc.messages.push(note);
+    return { code: "ok" as const, note };
+  });
+
+  if (result.code === "not_found") return c.json({ error: "Not found" }, 404);
+  if (result.code === "not_passages") return c.json({ error: "Only a passages reply is sent on this way." }, 409);
+  if (result.code === "already") return c.json({ error: "This has already gone to MITMARK." }, 409);
+
+  await writeAudit({
+    orgId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "chat.escalate",
+    detail: `Passages reply ${id} sent to MITMARK${test ? " (test)" : ""}.`,
+  });
+  return c.json({ messages: [serialiseMessage(result.note)] });
+});
+
+/**
+ * The path that is actually answering. The model path is live only when a
+ * key is set and the last call to the model succeeded; a key that is set
+ * but refused, or never yet tried, leaves the passages path live, and the
+ * page says so.
+ */
+async function livePath(): Promise<"model" | "passages"> {
+  if (!isLlmConfigured()) return "passages";
+  const health = await readGuideHealth();
+  return health?.ok === true ? "model" : "passages";
+}
+
+async function recordHealth(ok: boolean, httpStatus: number): Promise<void> {
+  const prev = await readGuideHealth();
+  // Write only on a change of state, so a working Guide is not a store write per question.
+  if (!prev || prev.ok !== ok) await writeGuideHealth({ ok, httpStatus, at: new Date().toISOString() });
+}
+
+function recentCount(doc: OrgDoc, userId: string): number {
+  const thread = doc.threads.find((t) => t.userId === userId);
+  if (!thread) return 0;
+  const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+  return doc.messages.filter((m) => m.threadId === thread.id && m.sender === "user" && m.createdAt >= oneMinuteAgo)
+    .length;
+}
+
+function previewMessage(sender: "user" | "guide", body: string, createdAt: string): ChatMessageRecord {
+  return { id: `preview-${sender}-${newId()}`, threadId: "", sender, body, citations: [], escalated: false, createdAt };
+}
+
+/** The reply copy in client view, where nothing is saved, raised or started. */
+function previewReplyCopy(reply: EnforcedReply, mode: "answer" | "passages" | null, officerName: string): string {
+  if (reply.status === "red" && reply.intake) {
+    const noun = reply.intake.type === "sar" ? "data request" : "potential incident";
+    return `Client view: nothing was started. From the client's own sign-in, this would be treated as a formal ${noun}, the statutory process would start and ${officerName} would be alerted.`;
+  }
+  if (reply.status === "amber") {
+    if (reply.answer === EMPTY_CORPUS_COPY) return reply.answer;
+    return `Client view: nothing was sent. From the client's own sign-in, this question would go to ${officerName} for a judgement call.`;
+  }
+  return applyReplyCopy(reply, mode, officerName);
+}
+
+export const PASSAGES_LEAD =
+  "No AI answer is switched on, so these are the passages from your policies and documents that best match the question.";
+
+/** The fixed copy stored as the guide reply body, by state and by path. */
+function applyReplyCopy(reply: EnforcedReply, mode: "answer" | "passages" | null, officerName: string): string {
   if (reply.status === "red" && reply.intake) {
     const noun = reply.intake.type === "sar" ? "data request" : "potential incident";
     return `What you've described is a formal ${noun}. I've started the statutory process and alerted ${officerName}.`;
@@ -192,10 +335,13 @@ function applyReplyCopy(reply: EnforcedReply, officerName: string): string {
     if (reply.answer === EMPTY_CORPUS_COPY) return reply.answer;
     return `This needs a judgement call from your compliance officer. I've flagged it to ${officerName} - meanwhile, here's what's useful to gather: dates, names, and any documents or messages involved.`;
   }
+  if (mode === "passages") {
+    return `${PASSAGES_LEAD}\n\n${reply.answer}\n\nIf these do not answer it, use Send to MITMARK and the question goes to ${officerName}.`;
+  }
   return reply.answer;
 }
 
-function createEscalation(doc: OrgDoc, input: { threadId: string; question: string }): EscalationRecord {
+function createEscalation(doc: OrgDoc, input: { threadId: string; question: string; test?: boolean }): EscalationRecord {
   const now = new Date().toISOString();
   const escalation: EscalationRecord = {
     id: newId(),
@@ -207,6 +353,7 @@ function createEscalation(doc: OrgDoc, input: { threadId: string; question: stri
     answeredBy: null,
     answeredAt: null,
     createdAt: now,
+    ...(input.test ? { test: true } : {}),
   };
   doc.escalations.push(escalation);
 
@@ -215,17 +362,18 @@ function createEscalation(doc: OrgDoc, input: { threadId: string; question: stri
     orgId: doc.id,
     type: "chat_amber",
     refId: escalation.id,
-    summary: `Amber policy question: "${trim(input.question, 140)}"`,
+    summary: `${input.test ? "TEST SEAT. " : ""}Amber policy question: "${trim(input.question, 140)}"`,
     state: "pending",
     decidedBy: null,
     decidedAt: null,
     createdAt: now,
+    ...(input.test ? { test: true } : {}),
   });
 
   return escalation;
 }
 
-function getOrCreateThread(doc: OrgDoc, userId: string): ChatThreadRecord {
+function getOrCreateThread(doc: OrgDoc, userId: string, test = false): ChatThreadRecord {
   const existing = doc.threads.find((t) => t.userId === userId);
   if (existing) return existing;
   const created: ChatThreadRecord = {
@@ -234,6 +382,7 @@ function getOrCreateThread(doc: OrgDoc, userId: string): ChatThreadRecord {
     userId,
     title: "Policy questions",
     createdAt: new Date().toISOString(),
+    ...(test ? { test: true } : {}),
   };
   doc.threads.push(created);
   return created;
@@ -291,5 +440,7 @@ function serialiseMessage(m: ChatMessageRecord) {
     status: statusOf(m),
     citations: decodeCitations(m.citations),
     createdAt: m.createdAt,
+    mode: m.mode ?? null,
+    escalated: m.escalated,
   };
 }

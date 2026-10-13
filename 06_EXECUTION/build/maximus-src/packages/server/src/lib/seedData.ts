@@ -28,6 +28,7 @@ import {
   setSeedMarker,
 } from "../db/store.ts";
 import { sarDueAt } from "./deadlines.ts";
+import { moduleOfLine } from "@maximus/shared";
 import { applyLibraryToDoc } from "./workplan.ts";
 
 const ORG_ID = "demo";
@@ -318,6 +319,7 @@ async function seedEntries(): Promise<void> {
         id: newId(),
         orgId: ORG_ID,
         date,
+        area: moduleOfLine(line),
         line,
         what,
         outcome,

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ForYouTask } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { formatDateGB } from "../../lib/format";
-import { PREVIEW_READ_ONLY } from "../../lib/preview";
+import { PREVIEW_CONFIRM_MESSAGE } from "../../lib/preview";
 import { usePreviewing } from "../../lib/usePreviewing";
 import { RagMark } from "./RagMark";
 
@@ -114,14 +114,14 @@ function ForYouRow({ task }: { task: ForYouTask }) {
                 data-testid="confirm-task"
                 onClick={() => void confirm()}
                 disabled={sending || previewing}
-                title={previewing ? PREVIEW_READ_ONLY : undefined}
+                title={previewing ? PREVIEW_CONFIRM_MESSAGE : undefined}
                 className="rounded bg-client-accent px-3 py-1.5 text-[13px] font-medium text-white hover:bg-client-accent/90 disabled:opacity-50"
               >
                 {sending ? "Sending…" : "Confirm"}
               </button>
               {previewing && (
                 <span data-testid="preview-read-only" className="text-[11px] text-client-muted">
-                  {PREVIEW_READ_ONLY}
+                  {PREVIEW_CONFIRM_MESSAGE}
                 </span>
               )}
             </>

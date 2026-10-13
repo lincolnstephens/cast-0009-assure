@@ -1,8 +1,8 @@
 ---
 document: OPERATOR_BRIEF
 job: CAST-0009 ASSURE
-product: Tessera Assure v1.6
-version: v1.6
+product: Tessera Assure v1.7
+version: v1.7
 status: FOR THE MITMARK OPERATOR
 authority: Seagull, written by the build session under T02 A6
 register_id: T18
@@ -12,8 +12,8 @@ register_id: T18
 
 For the MITMARK data compliance officer who runs the client's DPO contract, and for the MITMARK contract lead.
 
-**Address:** https://tessera-assure.netlify.app
-**Who it is for:** you keep it. The client's Information Officer reads it. She enters nothing.
+**Address:** https://assure.tessera-monitor.com
+**Who it is for:** you keep it. The client's Information Officer reads it. From v1.7 she may offer you a document, which nobody sees until you accept it; she still enters nothing else.
 
 ## 1. What this is
 
@@ -54,9 +54,19 @@ The retainer fee is the one that matters most. Without it the Statement cannot s
 
 Her rate is an assumption until she confirms it. Ask her for a band rather than a figure if she would rather; a band is enough. The Statement says plainly that rates are assumptions until the client confirms them, and it should keep saying so until she has.
 
-## 4. Service line status
+## 4. Module status
 
-Also in **Settings**. Set each of the twelve lines to Live, Available, Recommended or Not in scope. This drives the order the lines appear in and tells the Information Officer what she is and is not getting. Set it honestly: "Live" means MITMARK is actually delivering it under the retainer.
+Also in **Settings**, under "Module status". Set each of the eight modules to one of four statuses:
+- **Live**
+- **Available**
+- **Recommended**
+- **Not in scope**
+
+The Statement's first part lists the eight modules with these statuses and each module's one line, so the Information Officer can see what she is and is not getting. Set it honestly: "Live" means MITMARK is actually delivering that module under the retainer.
+
+A new organisation starts with every module **Available**, never Live. The client organisation starts that way too, so set its eight statuses before the meeting.
+
+Until v1.7 this was "Service line status", with twelve lines from the archive. The twelve lines are gone from every page the client sees. The Record now speaks in modules (see 5l).
 
 ## 5. Keeping the Record
 
@@ -423,6 +433,132 @@ This line is made from the module's dated tasks and nothing else. There are at m
 
 If you would rather these counts came from registers than from your monthly entry, that is the next step (T23).
 
+## 5l. The working programme (v1.7)
+
+v1.7 answers your fourth round of feedback. Two of your points were View as client working as designed: every write is refused there, so "Submit request" and "Ask" looked switched off. Those two now behave differently, as set out below. The other three were real changes, and are here too.
+
+### Documents both ways
+
+- **You download.** Every filed file on **Documents** has a Download control. It gives you the stored file with its original name and type, in a new tab. A link opens its address. Each download is written to the audit log.
+- **The client uploads.** On her Compliance Documents page she has "Upload a document". She gives:
+  - a file (up to 4 MB) or a link;
+  - a title;
+  - which module it belongs to;
+  - one line of what it is.
+
+  She can also say it is a new version of something already published.
+- **Nothing she sends is published or counted until you accept it.** Until then it sits in two places:
+  - on her page, as "Submitted, awaiting MITMARK review";
+  - on yours, in the review queue, under "Submitted by the client" on **Documents**.
+- **Deciding it.** In the review queue, download it and read it, then do one of two things:
+  - **Accept and publish:** choose the section (Policies, Procedures or Trackers) and it is published there.
+  - **Return:** give her a one-line reason, which she sees beside it.
+- **New versions.** When you accept a new version, it replaces the earlier one on her side. The earlier one stays on yours, marked "Superseded by a newer version", with its history.
+- **What she cannot do.** She cannot change, replace or delete anything she has sent or that you have published. A correction is a new upload, and it goes through the queue again.
+
+### The review queue flags what has waited
+
+Any item that has waited 5 working days or more shows an amber flag: "Waiting n working days". The rule from v1.0 stands: the system that asks the client for things must answer her. See the weekly routine below.
+
+### Job management is a board you can drag
+
+**Jobs**, in your menu, is now the same three-column board the client sees:
+- **Not started**
+- **In progress**
+- **Completed**
+
+**Moving a task.** Drag a card to another column and its status changes, the move is written to the audit log, and her tracker follows.
+- Dropping on Completed dates the task today.
+- Moving a task out of Completed clears its date until you close it again.
+- A task books its work on the Record once only, however often it is moved.
+
+**From the keyboard.** Each card has a status select that does the same as dragging.
+
+**Blocked** is reached from the card ("Mark blocked") or the select, never by dragging.
+
+**Workplan** keeps the table editor as before.
+
+**The client's own board** is unchanged: she reads it and cannot drag. In View as client nothing can be dragged either, and the banner says so. Run the monthly review from your own board with her watching, or show her the board in View as client.
+
+### Ask and Submit request in View as client
+
+- **Ask works in View as client.** It answers exactly as it would answer her, and nothing is saved, sent or started.
+  - A question that would go to you says "Client view: nothing was sent".
+  - A question that would start a statutory clock says "Client view: nothing was started".
+- **Submit request is still refused in View as client.** The page now says why: "Read only in client view. The client submits requests from her own sign-in." Confirm says the same of confirming.
+
+### The test seat
+
+To try her side end to end without touching her account, create a **test seat** for the organisation:
+1. In **Users**, create a client user for the organisation.
+2. Tick "Test seat".
+
+The Users list shows it as "Test seat", and the audit log says so. Rules:
+- There is **one active test seat per organisation**.
+- The flag cannot be taken off. When you are finished with it, disable it.
+
+Sign in as the test seat and do what she would: raise a request, confirm a task, ask a question, upload a document. Everything it does is tagged test:
+- its requests show "Test seat" on **Intakes and clocks**, and closing one books nothing on the Record;
+- its confirmations and uploads show "Test seat" in the review queue. Accepting a test confirmation changes nothing in the workplan. Accepting a test upload publishes it to no client;
+- nothing it does reaches the Record, the counters, the tracker figures or the Statement;
+- the client never sees anything it does.
+
+Walk the product with it before the meeting.
+
+### The Record in eight modules
+
+Every Record entry now belongs to a module, 1 to 8. Entries made before v1.7 were moved from their archive line by a fixed table, one line to one module:
+
+| Archive line | Module |
+|---|---|
+| DPIAs | 5 |
+| ROPA management | 2 |
+| Policy and procedure suite | 4 |
+| DSAR support | 6 |
+| Breach advisory | 8 |
+| Vendor due diligence and DPAs | 7 |
+| Staff training | 4 (nearest) |
+| Monthly threat intelligence report | 8 (nearest) |
+| Board briefing | 1 (nearest) |
+| Quarterly log review | 8 (nearest) |
+| Annual compliance cycle | 4 (nearest) |
+| Ad hoc assurance and advisory | 1 (nearest) |
+
+Counts and hours were checked either side and are the same. If an entry sits in the wrong module (for example, a retention schedule refresh booked under the old policy line now shows under module 4), change its module in **Record**.
+
+The work the product books for you lands in modules as follows:
+- a closed data request lands in module 6;
+- a closed concern lands in module 8;
+- an approved policy and the defence file land in module 4;
+- an answered Guide question lands in module 1.
+
+**Value** and **Record** group by module.
+
+### What Quick questions reads
+
+Quick questions now reads three things:
+- the approved policies, as before;
+- the published **procedures**;
+- the published **trackers** (registers).
+
+The text of every .docx and .xlsx you file is extracted when you file it. Your nine files were read on 13 October. Links are never read.
+
+**Not searchable.** If a file cannot be read, it is still filed, and **Documents** marks it "Not searchable" with the reason, on your side only. A PDF is marked not searchable on this deployment (see 11).
+
+**Policy files are not used.** The four policy files under Policies are read but not used for answers. Three are drafts, and the order limits answers to approved policies. The approved policy pack is what answers.
+
+**How it answers.** Answers come from the matching passages, each cited by document and section. Today there is no working model key (11), so Quick questions shows the passages themselves under the line "No AI answer is switched on…", with where each comes from. Beneath them is "Send to MITMARK", which puts the question in your queue as any unanswered question would.
+
+When a working key is set, the model writes the answer from those passages only and cites them. The page's own wording changes to match whichever is live.
+
+### Weekly routine
+
+Once a week, in this order:
+1. **Review queue.** Clear anything with an amber flag first. Then decide the rest: submissions, confirmations, unanswered questions, requests.
+2. **Documents.** Check for anything marked "Not searchable" and re-file it if it should be read.
+3. **Jobs.** Move the board to where the work actually is. Close work on the day it is done.
+4. **Figures.** Update the counts if they changed.
+
 ## 6. Importing the v0.1 export
 
 If you have a record file from the earlier single-page version, **Record** has an import.
@@ -431,11 +567,19 @@ If you have a record file from the earlier single-page version, **Record** has a
 2. In **Record**, choose "Import record", and pick that file.
 3. Read what it tells you. It reports how many entries it took, how many it skipped, and why it skipped them. Entries with no named reviewer are imported **unreviewed**: they will not reach the client until you review them.
 
-The import also brings across the rates and the service line statuses from the old file. Check Settings afterwards.
+The import also brings across the rates. Each imported entry is put in its module by the table in 5l. The old file's line statuses are kept as history only; set the module statuses yourself in **Settings**. Check Settings afterwards.
 
 ## 7. Reviewing
 
-**Review queue**, in the admin workspace. Amber Policy Guide answers, export requests, alerts and intakes wait here. Nothing reaches the client until you decide. Every decision is recorded under your name in the audit log.
+**Review queue**, in the admin workspace. These wait here:
+- amber Policy Guide answers;
+- export requests;
+- alerts;
+- intakes;
+- the client's confirmations;
+- from v1.7, her document submissions.
+
+Nothing reaches the client until you decide. Every decision is recorded under your name in the audit log. Anything that has waited 5 working days or more carries an amber flag.
 
 This is the mandatory MITMARK review. It has not been relaxed and should not be.
 
@@ -444,8 +588,8 @@ This is the mandatory MITMARK review. It has not been relaxed and should not be.
 **Value** in the client portal, or **Record** then the statement view in admin.
 
 The Statement is the thing she forwards to her CFO unedited. Since v1.6 it has three parts, as you asked:
-- **The service**: the twelve service lines and their status for this client, from **Settings**, live ones first.
-- **What MITMARK has done**: each reviewed Record entry in the period with its hours and the cost of her time, then the totals by service line, what that would have cost two ways (her own time at her rate, and a contractor at the day rate), the retainer and the two comparators against it **only if you have entered the fee**, and the statutory and governance deadlines met.
+- **The service**: the eight modules, in order, each with its status from **Settings** and its one line.
+- **What MITMARK has done**: each reviewed Record entry in the period with its module, its hours and the cost of her time, then the totals by module, what that would have cost two ways (her own time at her rate, and a contractor at the day rate), the retainer and the two comparators against it **only if you have entered the fee**, and the statutory and governance deadlines met.
 - **What comes next**: the open dated tasks in the workplan, soonest first, as at the day it is printed.
 
 Then its own limitations. It no longer opens with "n of m obligations met", and nothing in it compares what was done with the March handover plan. Until you supply the deliverables agreed in May, "what comes next" is the dated list you gave on 29 September.
@@ -467,7 +611,8 @@ The product is multi-tenant. A second retained client is a second organisation, 
 ## 11. What this version does not do
 
 - Entries are held on the site, not in a shared spreadsheet, and there is no email digest yet. Both are on the "Where spend would help" list in the client portal, with what they would cost.
-- The Policy Guide answers from the approved policies only. If the Anthropic API key is not set on the site it falls back to keyword matching, which is noticeably worse. Check with Sunray that the key is set before showing it to anyone.
+- **Quick questions has no working model key.** A key reaches the site from the Netlify team, and the Anthropic API refuses it (DC-19). So Quick questions shows the matching passages rather than a written answer, and says so in one sentence. It works, and it is honest. A written answer needs Sunray to set a working key on the site.
+- **Uploaded PDFs are not read** on this deployment. They are filed and downloadable, and marked "Not searchable". Every file filed so far is a .docx or .xlsx.
 - The posture and the exposure alerts carry demo data and say so on screen. Do not present them as live monitoring.
 
 ## 12. If something looks wrong

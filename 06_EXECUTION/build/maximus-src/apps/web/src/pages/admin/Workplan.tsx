@@ -11,6 +11,8 @@ import {
   taskStatusSchema,
 } from "@maximus/shared";
 import type { OwnerType, Recurrence, Task, TaskInput, TaskStatus } from "@maximus/shared";
+import { useLocation } from "react-router-dom";
+import { AdminJobBoard } from "../../components/AdminJobBoard";
 import { api, ApiError } from "../../lib/api";
 import { formatDateGB } from "../../lib/format";
 import { useAdmin } from "../../store/admin";
@@ -48,6 +50,8 @@ function ownerLabel(t: Task): string {
  */
 export function AdminWorkplanPage() {
   const { selectedAccountId } = useAdmin();
+  // /admin/jobs is Job management: the same tasks as a draggable board (FRAGO 07 3.2).
+  const isBoard = useLocation().pathname.replace(/\/$/, "").endsWith("/jobs");
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [clientRoles, setClientRoles] = useState<string[]>([]);
   const [areaFilter, setAreaFilter] = useState("");
@@ -126,7 +130,7 @@ export function AdminWorkplanPage() {
 
   return (
     <div className="max-w-6xl">
-      <h1 className="text-lg font-semibold">Workplan</h1>
+      <h1 className="text-lg font-semibold">{isBoard ? "Job management" : "Workplan"}</h1>
       <p className="mt-0.5 text-[13px] text-hud-muted">
         This is MITMARK's workplan for the client. The client can only confirm a task assigned to
         them, from their own portal; every other change happens here.
@@ -228,7 +232,21 @@ export function AdminWorkplanPage() {
         <p className="mt-4 text-[13px] text-hud-muted">No tasks match these filters.</p>
       )}
 
-      {tasks && tasks.length > 0 && (
+      {isBoard && tasks && tasks.length > 0 && (
+        <AdminJobBoard
+          tasks={tasks}
+          onStatus={(task, status) =>
+            void act(() =>
+              api(`/admin/workplan/${task.id}?org=${selectedAccountId}`, {
+                method: "PATCH",
+                body: JSON.stringify({ status }),
+              }),
+            )
+          }
+        />
+      )}
+
+      {!isBoard && tasks && tasks.length > 0 && (
         <div className="mt-4 overflow-x-auto rounded border border-hud-line">
           <table data-testid="task-table" className="w-full min-w-[960px] text-left text-[13px]">
             <thead className="border-b border-hud-line bg-hud-panel/60 text-[11px] uppercase tracking-wider text-hud-muted">

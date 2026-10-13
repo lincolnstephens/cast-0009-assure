@@ -112,7 +112,7 @@ describe("the operator in client view", () => {
       body: JSON.stringify({ note: "", evidence: "" }),
     });
     expect(res.status).toBe(403);
-    expect((await res.json()).error).toBe("Read only in client view");
+    expect((await res.json()).error).toMatch(/^Read only in client view/);
     const doc = await readOrg(fixtures.accountId);
     const task = doc!.tasks.find((t) => t.id === TASK_ID)!;
     expect(task.clientConfirmedAt).toBeNull();
@@ -123,7 +123,15 @@ describe("the operator in client view", () => {
       headers: { cookie: adminCookie, "x-assure-preview": preview(), "content-type": "application/json" },
       body: JSON.stringify({ body: "hello" }),
     });
-    expect(chat.status).toBe(403);
+    // v1.7 (FRAGO 07 3.3): Ask is let through client view as a pure read. It
+    // answers, and nothing is saved, raised or started.
+    expect(chat.status).toBe(200);
+    expect((await chat.json()).preview).toBe(true);
+    const after = await readOrg(fixtures.accountId);
+    expect(after!.threads).toHaveLength(0);
+    expect(after!.messages).toHaveLength(0);
+    expect(after!.review).toHaveLength(0);
+    expect(after!.clocks).toHaveLength(0);
   });
 
   it("uses the client figure even when the operator's toggle is on the stricter count", async () => {

@@ -8,10 +8,13 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { DEFAULT_LINE_STATUS, moduleOfLine, moduleStatusFromLines } from '@maximus/shared';
 import { mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  DEFAULT_MODULE_STATUS,
   DEFAULT_SETTINGS,
+  type LineStatus,
   EMPTY_USERS_DOC,
   emptyOrgDoc,
   type OrgDoc,
@@ -196,7 +199,7 @@ export function migrateOrg(doc: OrgDoc): OrgDoc {
   s.workplanTargetDate = s.workplanTargetDate === undefined ? null : s.workplanTargetDate;
   s.denominatorMode ??= 'overdue';
   s.documentsTargetDate = s.documentsTargetDate === undefined ? null : s.documentsTargetDate;
-  s.lineStatus ??= { ...DEFAULT_SETTINGS.lineStatus };
+  s.moduleStatus ??= moduleStatusOnMigration(doc);
   s.journeyPhase = s.journeyPhase === undefined ? null : s.journeyPhase;
   s.journeyNote ??= '';
   s.moduleIntroductions ??= {};
@@ -220,7 +223,38 @@ export function migrateOrg(doc: OrgDoc): OrgDoc {
     if (c.icoNotified === undefined) c.icoNotified = null;
   }
 
+  // v1.7 (FRAGO 07 3.4). Every entry carries its module. An entry written
+  // before v1.7 has only a line; it takes the module the line maps to, and
+  // keeps the line beside it for history. Idempotent: an entry with an area
+  // is never touched.
+  for (const e of doc.entries) {
+    if (e.area === undefined || e.area === null) e.area = moduleOfLine(e.line);
+  }
+
   return doc;
+}
+
+/**
+ * v1.7. The module status an organisation starts with when it has none.
+ *
+ * The demo organisation, and any organisation whose operator changed the
+ * line statuses, keeps its values: each module takes the strongest status
+ * among the lines mapped to it. Any other organisation only ever carried the
+ * line defaults, which it never chose, so it starts with every module
+ * Available, as a new organisation does.
+ */
+export function moduleStatusOnMigration(doc: OrgDoc): Record<string, LineStatus> {
+  const lines = doc.settings?.lineStatus;
+  const operatorSet =
+    !!lines && Object.keys(DEFAULT_LINE_STATUS).some((k) => (lines[k] ?? DEFAULT_LINE_STATUS[k]) !== DEFAULT_LINE_STATUS[k]);
+  if (doc.id === 'demo' || operatorSet) return moduleStatusFromLines(lines);
+  return { ...DEFAULT_MODULE_STATUS };
+}
+
+/** The stored document exactly as written, before any migration on read. For migration counts only. */
+export async function readOrgRaw(orgId: string): Promise<OrgDoc | null> {
+  const raw = await getDriver().get(orgKey(orgId));
+  return raw ? (JSON.parse(raw) as OrgDoc) : null;
 }
 
 export async function readOrg(orgId: string): Promise<OrgDoc | null> {
@@ -357,4 +391,44 @@ export async function writeDocumentBlob(orgId: string, documentId: string, bytes
 
 export async function deleteDocumentBlob(orgId: string, documentId: string): Promise<void> {
   await getDriver().del(documentKey(orgId, documentId));
+}
+
+// ---------------------------------------------------------------------------
+// v1.7. The per-document corpus Quick questions reads (FRAGO 07 3.5)
+// ---------------------------------------------------------------------------
+
+/**
+ * v1.7. What the last call to the model did, so Quick questions can say
+ * which path is live rather than which variable is set: a key that reaches
+ * the site and is refused (DC-19) leaves the passages path live.
+ */
+export interface GuideHealth {
+  ok: boolean;
+  httpStatus: number;
+  at: string;
+}
+
+const GUIDE_HEALTH_KEY = 'guide-health.json';
+
+export async function readGuideHealth(): Promise<GuideHealth | null> {
+  const raw = await getDriver().get(GUIDE_HEALTH_KEY);
+  try {
+    return raw ? (JSON.parse(raw) as GuideHealth) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeGuideHealth(h: GuideHealth): Promise<void> {
+  await getDriver().set(GUIDE_HEALTH_KEY, JSON.stringify(h));
+}
+
+export const corpusKey = (orgId: string, documentId: string) => `corpus/${orgId}/${documentId}.json`;
+
+export async function readCorpusBlob(orgId: string, documentId: string): Promise<string | null> {
+  return getDriver().get(corpusKey(orgId, documentId));
+}
+
+export async function writeCorpusBlob(orgId: string, documentId: string, json: string): Promise<void> {
+  await getDriver().set(corpusKey(orgId, documentId), json);
 }

@@ -58,6 +58,8 @@ export interface AuthedUser {
   clientAccountId: string | null;
   /** v1.5. Until false, only the /auth routes answer (requireAuth). */
   mustChangePassword: boolean;
+  /** v1.7. A client test seat: its writes are tagged test (FRAGO 07 3.3). */
+  testSeat?: boolean;
 }
 
 /**
@@ -99,5 +101,6 @@ export async function getUserForSession(sessionId: string): Promise<AuthedUser |
     role: user.role,
     clientAccountId: user.orgId,
     mustChangePassword: user.mustChangePassword === true,
+    testSeat: user.role === "client" && user.testSeat === true,
   };
 }

@@ -60,6 +60,7 @@ adminRoutes.get("/clocks", async (c) => {
         status: clock.closedAt
           ? null
           : clockStatus(new Date(clock.startedAt), new Date(clock.dueAt), now),
+        test: Boolean(clock.test),
       };
     });
 
@@ -169,7 +170,8 @@ adminRoutes.post("/clocks/:id/close", async (c) => {
     });
     // Closing a statutory clock creates a Record entry automatically (see
     // PORTING_BRIEF.md, "the value layer being added") and links it back via
-    // clock.entryId.
+    // clock.entryId. v1.7: a test seat's clock books nothing on the Record.
+    if (clock.test) return { id: null, area: null };
     return recordEntryForClosedClock(doc, clock, {
       outcome: parsed.data.outcome,
       closedAt,
@@ -191,7 +193,7 @@ adminRoutes.post("/clocks/:id/close", async (c) => {
     actorId: user.id,
     actorName: user.displayName,
     action: "clock.close",
-    detail: `Clock ${found.clock.id} closed: ${parsed.data.outcome}${insideStatuteDetail}${icoNotifiedDetail} Record entry ${entry.id} created (service line ${entry.line}).`,
+    detail: `Clock ${found.clock.id} closed: ${parsed.data.outcome}${insideStatuteDetail}${icoNotifiedDetail} ${entry.id ? `Record entry ${entry.id} created (module ${entry.area}).` : "Test seat clock: nothing booked on the Record."}`,
   });
 
   return c.json({ ok: true });

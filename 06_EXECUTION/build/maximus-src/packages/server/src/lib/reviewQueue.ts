@@ -42,6 +42,30 @@ export interface PendingReviewItem {
    * take the whole admin workspace down the moment a first item arrived.
    */
   context: Record<string, unknown>;
+  /** v1.7. Working days (Monday to Friday) the item has waited. */
+  workingDaysWaiting: number;
+  /** v1.7 (FRAGO 07 3.1). Unreviewed for 5 working days or more: the amber flag. */
+  overdue: boolean;
+  /** v1.7. Raised by a test seat. */
+  test: boolean;
+}
+
+/** v1.7. The system that asks the client for things must answer her: 5 working days, then amber. */
+export const REVIEW_AMBER_WORKING_DAYS = 5;
+
+/** Whole working days (Monday to Friday, UTC) from `fromIso` to `now`. Bank holidays are not excluded. */
+export function workingDaysBetween(fromIso: string, now: Date = new Date()): number {
+  const start = new Date(fromIso);
+  if (Number.isNaN(start.getTime()) || start >= now) return 0;
+  let days = 0;
+  const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  while (cursor < end) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    const dow = cursor.getUTCDay();
+    if (dow !== 0 && dow !== 6) days += 1;
+  }
+  return days;
 }
 
 /**
@@ -84,6 +108,9 @@ export async function pendingReviewItems(
       summary: item.summary,
       createdAt: item.createdAt,
       context: reviewContext(doc, item),
+      workingDaysWaiting: workingDaysBetween(item.createdAt),
+      overdue: workingDaysBetween(item.createdAt) >= REVIEW_AMBER_WORKING_DAYS,
+      test: Boolean(item.test),
     }));
 }
 
@@ -136,7 +163,117 @@ function reviewContext(doc: OrgDoc, item: ReviewItemRecord): Record<string, unkn
       summary: intake?.summary ?? item.summary,
     };
   }
+  if (item.type === "document_submission") {
+    const d = doc.documents.find((x) => x.id === item.refId);
+    const earlier = d?.supersedes ? doc.documents.find((x) => x.id === d.supersedes) : undefined;
+    return {
+      title: d?.title ?? item.summary,
+      area: d?.area ?? null,
+      note: d?.submission?.note ?? "",
+      kind: d?.kind ?? "file",
+      fileName: d?.fileName ?? "",
+      sizeBytes: d?.sizeBytes ?? 0,
+      url: d?.kind === "link" ? (d?.url ?? "") : "",
+      documentId: d?.id ?? null,
+      supersedesTitle: earlier?.title ?? null,
+      supersedesSection: earlier?.section ?? null,
+      searchable: d?.searchable ?? null,
+      submittedBy: d?.submission?.submittedByName ?? "",
+    };
+  }
   return { summary: item.summary };
+}
+
+/**
+ * v1.7 (FRAGO 07 3.1). Accepting a client submission: the operator chooses
+ * the section, and only now is the document published. A new version
+ * supersedes the earlier one, which is kept with its history and marked.
+ */
+export async function acceptDocumentSubmission(
+  orgId: string,
+  reviewItemId: string,
+  officerId: string,
+  officerName: string,
+  input: { section: "policies" | "procedures" | "trackers"; area?: number },
+): Promise<{ documentId: string; superseded: string | null }> {
+  const result = await mutateOrg(orgId, (doc) => {
+    const item = doc.review.find(
+      (r) => r.id === reviewItemId && r.state === "pending" && r.type === "document_submission",
+    );
+    if (!item) throw new ReviewError("Review item not found or already decided.", 404);
+    const d = doc.documents.find((x) => x.id === item.refId);
+    if (!d || !d.submission) throw new ReviewError("The document this submission belongs to is gone.", 404);
+    const now = new Date().toISOString();
+    d.section = input.section;
+    if (input.area) d.area = input.area;
+    d.published = true;
+    d.submission.state = "accepted";
+    d.submission.decidedById = officerId;
+    d.submission.decidedByName = officerName;
+    d.submission.decidedAt = now;
+    d.updatedAt = now;
+    d.updatedBy = officerName;
+    let superseded: string | null = null;
+    if (d.supersedes) {
+      const earlier = doc.documents.find((x) => x.id === d.supersedes);
+      if (earlier && !earlier.supersededBy && !d.test) {
+        earlier.supersededBy = d.id;
+        earlier.updatedAt = now;
+        earlier.updatedBy = officerName;
+        superseded = earlier.id;
+      }
+    }
+    item.state = "approved";
+    item.decidedBy = officerId;
+    item.decidedAt = now;
+    return { documentId: d.id, superseded, title: d.title, test: Boolean(d.test) };
+  });
+
+  await writeAudit({
+    orgId,
+    actorId: officerId,
+    actorName: officerName,
+    action: "document.accept",
+    detail: `Document ${result.documentId} ("${result.title}") accepted under ${input.section} and published${result.test ? " (test seat: shown to no client)" : ""}${result.superseded ? `; supersedes ${result.superseded}, which is kept` : ""}.`,
+  });
+  return { documentId: result.documentId, superseded: result.superseded };
+}
+
+/** v1.7. Returning a client submission with a one-line reason the client sees. Nothing is published. */
+export async function returnDocumentSubmission(
+  orgId: string,
+  reviewItemId: string,
+  officerId: string,
+  officerName: string,
+  reason: string,
+): Promise<void> {
+  const title = await mutateOrg(orgId, (doc) => {
+    const item = doc.review.find(
+      (r) => r.id === reviewItemId && r.state === "pending" && r.type === "document_submission",
+    );
+    if (!item) throw new ReviewError("Review item not found or already decided.", 404);
+    const d = doc.documents.find((x) => x.id === item.refId);
+    if (!d || !d.submission) throw new ReviewError("The document this submission belongs to is gone.", 404);
+    const now = new Date().toISOString();
+    d.published = false;
+    d.submission.state = "returned";
+    d.submission.returnReason = reason;
+    d.submission.decidedById = officerId;
+    d.submission.decidedByName = officerName;
+    d.submission.decidedAt = now;
+    item.state = "rejected";
+    item.decidedBy = officerId;
+    item.decidedAt = now;
+    return d.title;
+  });
+
+  await writeAudit({
+    orgId,
+    actorId: officerId,
+    actorName: officerName,
+    action: "document.return",
+    detail: `Document submission "${title}" returned to the client with a reason.`,
+  });
 }
 
 /** Spec §5.1: answering posts the officer's reply into the client's thread. */
@@ -176,7 +313,8 @@ export async function answerChatAmber(
     item.decidedBy = officerId;
     item.decidedAt = now;
 
-    raiseGuideEntry(doc, { refId: escalation.id, reviewer: officerName, decisionNote: reply });
+    // v1.7: a test seat's question books nothing on the Record.
+    if (!escalation.test) raiseGuideEntry(doc, { refId: escalation.id, reviewer: officerName, decisionNote: reply });
 
     return created;
   });
@@ -343,7 +481,11 @@ export async function decideTaskConfirmation(
     const task = doc.tasks.find((t) => t.id === item.refId);
     if (!task) throw new ReviewError("The task this confirmation belongs to is gone.", 404);
 
-    if (accept) {
+    // v1.7: a test seat's confirmation is decided, and the real task is left
+    // exactly as it was. Nothing moves, nothing is booked.
+    if (item.test) {
+      // no change to the task
+    } else if (accept) {
       closeTask(doc, task, officerName);
     } else {
       task.clientConfirmedAt = null;

@@ -4,7 +4,8 @@ import {
   applyFilter,
   clientVisible,
   periodsOf,
-  serviceLineViews,
+  forClient,
+  moduleViews,
   statementOf,
   statementOutlook,
   totalsOf,
@@ -35,18 +36,21 @@ valueRoutes.get("/record", async (c) => {
   const visible = clientVisible(doc);
   const available = periodsOf(visible);
   const period = periodParam(c.req.query("period"), available);
-  const lineRaw = Number(c.req.query("line"));
-  const line = Number.isInteger(lineRaw) && lineRaw >= 1 && lineRaw <= 12 ? lineRaw : undefined;
+  const areaRaw = Number(c.req.query("module"));
+  const area = Number.isInteger(areaRaw) && areaRaw >= 1 && areaRaw <= 8 ? areaRaw : undefined;
 
-  const entries = applyFilter(visible, { period, line });
+  const entries = applyFilter(visible, { period, area });
+  // The archive's line statuses are history on the operator's side only.
+  const { lineStatus: _archive, ...settings } = doc.settings;
+  void _archive;
 
   return c.json({
-    entries,
+    entries: entries.map(forClient),
     totals: totalsOf(entries, doc.settings),
     periods: available,
     period: period || "all periods",
-    settings: doc.settings,
-    lines: serviceLineViews(doc),
+    settings,
+    modules: moduleViews(doc),
     showingIllustrative: doc.settings.showIllustrative && visible.some((e) => e.ill),
   });
 });
@@ -62,7 +66,10 @@ valueRoutes.get("/statement", async (c) => {
   const period = periodParam(c.req.query("period"), available);
   const entries = applyFilter(visible, { period });
 
-  return c.json(
-    statementOf(entries, doc.settings, period || "all periods", new Date(), statementOutlook(doc)),
-  );
+  const statement = statementOf(entries, doc.settings, period || "all periods", new Date(), statementOutlook(doc));
+  return c.json({
+    ...statement,
+    deadlines: statement.deadlines.map(forClient),
+    items: statement.items.map(forClient),
+  });
 });

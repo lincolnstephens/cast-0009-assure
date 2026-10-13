@@ -94,7 +94,7 @@ async function buildSummaryPdf(
   y -= 6;
 
   draw("Statutory clocks", { bold: true, size: 12 });
-  const clockRows = [...doc.clocks].sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1));
+  const clockRows = doc.clocks.filter((c) => !c.test).sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1));
   if (clockRows.length === 0) draw("No statutory clocks recorded.");
   for (const clock of clockRows) {
     const status = clock.closedAt ? `Closed ${formatLondon(clock.closedAt)}` : "Active";

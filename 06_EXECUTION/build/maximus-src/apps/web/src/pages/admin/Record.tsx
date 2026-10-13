@@ -1,7 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { deadlineLabelSchema } from "@maximus/shared";
 import type { RecordEntry, RecordResponse } from "@maximus/shared";
-import { LINES } from "@maximus/shared";
+import { AREAS } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { RecordTable } from "../../components/RecordTable";
 import { useAdmin } from "../../store/admin";
@@ -26,7 +26,7 @@ export function AdminRecordPage() {
   const [data, setData] = useState<RecordResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>("all");
-  const [lineFilter, setLineFilter] = useState<string>("");
+  const [moduleFilter, setModuleFilter] = useState<string>("");
   const [editing, setEditing] = useState<RecordEntry | "new" | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -87,7 +87,7 @@ export function AdminRecordPage() {
     }
   }
 
-  const entries = (data?.entries ?? []).filter((e) => !lineFilter || e.line === Number(lineFilter));
+  const entries = (data?.entries ?? []).filter((e) => !moduleFilter || e.area === Number(moduleFilter));
 
   return (
     <div className="max-w-6xl">
@@ -128,19 +128,19 @@ export function AdminRecordPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="aLine" className="mb-1 block text-[11px] uppercase tracking-wider text-hud-muted">
-                Service line
+              <label htmlFor="aModule" className="mb-1 block text-[11px] uppercase tracking-wider text-hud-muted">
+                Module
               </label>
               <select
-                id="aLine"
-                value={lineFilter}
-                onChange={(e) => setLineFilter(e.target.value)}
+                id="aModule"
+                value={moduleFilter}
+                onChange={(e) => setModuleFilter(e.target.value)}
                 className="min-w-[160px] rounded border border-hud-line bg-hud-bg px-2 py-1.5 text-[13px]"
               >
-                <option value="">All twelve</option>
-                {LINES.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.id}. {l.name}
+                <option value="">All modules</option>
+                {AREAS.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.id}. {a.name}
                   </option>
                 ))}
               </select>
@@ -207,11 +207,34 @@ export function AdminRecordPage() {
             />
           </div>
 
+          <div data-testid="record-module-totals" className="mt-6 rounded border border-hud-line bg-hud-panel/60 p-4">
+            <h2 className="text-sm font-semibold">Totals by module, {data.period}</h2>
+            {data.totals.byModule.length === 0 ? (
+              <p className="mt-1 text-[13px] text-hud-muted">Nothing on the Record for this period.</p>
+            ) : (
+              <table className="mt-2 w-full max-w-xl border-collapse text-[13px]">
+                <tbody>
+                  {data.totals.byModule.map((m) => (
+                    <tr key={m.area} data-testid="record-module-total">
+                      <td className="border-b border-hud-line py-1 pr-3">
+                        {m.area}. {m.name}
+                      </td>
+                      <td className="border-b border-hud-line py-1 pr-3 text-right font-mono tabular-nums">
+                        {m.items} items
+                      </td>
+                      <td className="border-b border-hud-line py-1 text-right font-mono tabular-nums">{m.hours}h</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
           <div className="mt-6 rounded border border-hud-line bg-hud-panel/60 p-4">
             <h2 className="text-sm font-semibold">Import a v0.1 record export</h2>
             <p className="mt-1 text-[13px] text-hud-muted">
-              Reads a Tessera Assure v0.1 export file (JSON) and imports its entries, settings and
-              line statuses into this organisation.
+              Reads a Tessera Assure v0.1 export file (JSON) and imports its entries and settings
+              into this organisation. Each entry is filed under its module.
             </p>
             <input
               ref={fileInput}
@@ -275,7 +298,7 @@ function EntryModal({
   onSaved: () => void;
 }) {
   const [date, setDate] = useState(entry?.date ?? "");
-  const [line, setLine] = useState(String(entry?.line ?? 1));
+  const [area, setArea] = useState(String(entry?.area ?? 1));
   const [hours, setHours] = useState(String(entry?.hours ?? ""));
   const [reviewer, setReviewer] = useState(entry?.reviewer ?? "");
   const [what, setWhat] = useState(entry?.what ?? "");
@@ -292,7 +315,7 @@ function EntryModal({
     setError(null);
     const body = {
       date,
-      line: Number(line),
+      area: Number(area),
       what,
       outcome,
       hours: Number(hours),
@@ -332,16 +355,17 @@ function EntryModal({
             className="w-full rounded border border-hud-line bg-hud-bg px-2 py-1.5 text-[13px]"
           />
         </Field>
-        <Field label="Service line">
+        <Field label="Module">
           <select
             required
-            value={line}
-            onChange={(e) => setLine(e.target.value)}
+            name="area"
+            value={area}
+            onChange={(e) => setArea(e.target.value)}
             className="w-full rounded border border-hud-line bg-hud-bg px-2 py-1.5 text-[13px]"
           >
-            {LINES.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.id}. {l.name}
+            {AREAS.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.id}. {a.name}
               </option>
             ))}
           </select>

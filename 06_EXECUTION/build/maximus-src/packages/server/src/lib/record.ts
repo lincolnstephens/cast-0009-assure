@@ -6,13 +6,8 @@
  * reviewer: no claim without a record.
  */
 
-import { LINES, areaName, lineOf, priority } from "@maximus/shared";
-import type {
-  LineTotal,
-  RecordTotals,
-  ServiceLineView,
-  StatementResponse,
-} from "@maximus/shared";
+import { AREA_IDS, DEFAULT_MODULE_INTRODUCTIONS, areaName } from "@maximus/shared";
+import type { ModuleTotal, ModuleView, RecordTotals, StatementResponse } from "@maximus/shared";
 import type { EntryRecord, OrgDoc, OrgSettings } from "../db/model.ts";
 import { isOpen, ownerLabel } from "./tracker.ts";
 
@@ -47,24 +42,31 @@ export function clientVisible(doc: OrgDoc): EntryRecord[] {
 
 export interface EntryFilter {
   period?: string;
-  line?: number;
+  /** v1.7. A module, 1 to 8. */
+  area?: number;
+}
+
+/** An entry as the client reads it: the archive line it migrated from stays on the operator's side. */
+export function forClient(e: EntryRecord): Omit<EntryRecord, "line"> {
+  const { line: _line, ...rest } = e;
+  void _line;
+  return rest;
 }
 
 /** Newest first. */
 export function applyFilter(entries: EntryRecord[], f: EntryFilter): EntryRecord[] {
   return entries
     .filter((e) => (f.period ? quarterOf(e.date) === f.period : true))
-    .filter((e) => (f.line ? e.line === f.line : true))
+    .filter((e) => (f.area ? e.area === f.area : true))
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
 export function totalsOf(rows: EntryRecord[], s: OrgSettings): RecordTotals {
-  const byLine: LineTotal[] = LINES.map((line) => {
-    const of = rows.filter((e) => e.line === line.id);
+  const byModule: ModuleTotal[] = AREA_IDS.map((area) => {
+    const of = rows.filter((e) => e.area === area);
     return {
-      line: line.id,
-      name: line.name,
-      short: line.short,
+      area,
+      name: areaName(area),
       items: of.length,
       hours: of.reduce((a, e) => a + Number(e.hours), 0),
     };
@@ -76,23 +78,25 @@ export function totalsOf(rows: EntryRecord[], s: OrgSettings): RecordTotals {
     io: rows.reduce((a, e) => a + costs(e, s).io, 0),
     con: rows.reduce((a, e) => a + costs(e, s).con, 0),
     deadlinesMet: rows.filter((e) => e.deadline !== "").length,
-    byLine,
+    byModule,
     anyIllustrative: rows.some((e) => e.ill),
   };
 }
 
-/** The twelve lines in priority order, with this tenant's status and counts. */
-export function serviceLineViews(doc: OrgDoc): ServiceLineView[] {
-  const status = doc.settings.lineStatus;
-  return priority(status).map((l) => ({
-    id: l.id,
-    name: l.name,
-    short: l.short,
-    hoursPer: l.hoursPer,
-    deadline: l.deadline,
-    why: l.why,
-    status: status[String(l.id)] ?? "Available",
-    onRecord: doc.entries.filter((e) => e.line === l.id).length,
+/** The module's one line: the operator's introduction, else the default. */
+export function moduleIntroduction(doc: OrgDoc, area: number): string {
+  return doc.settings.moduleIntroductions?.[String(area)]?.trim() || DEFAULT_MODULE_INTRODUCTIONS[area] || "";
+}
+
+/** v1.7. The eight modules in module order, with this tenant's status and counts on the Record. */
+export function moduleViews(doc: OrgDoc): ModuleView[] {
+  const status = doc.settings.moduleStatus ?? {};
+  return AREA_IDS.map((area) => ({
+    id: area,
+    name: areaName(area),
+    introduction: moduleIntroduction(doc, area),
+    status: status[String(area)] ?? "Available",
+    onRecord: doc.entries.filter((e) => e.area === area).length,
   }));
 }
 
@@ -151,20 +155,20 @@ export function statementOf(
   };
 }
 
-const LINE_STATUS_ORDER: Record<string, number> = { Live: 0, Available: 1, Recommended: 2, "Not in scope": 3 };
-
 /**
- * The Statement's first and third parts (FRAGO 06 3.5). The service is the
- * twelve lines with their status from Settings, live ones first. What comes
- * next is the workplan's open dated tasks, soonest first, as the operator
- * loaded them; it is stated as at today, not scoped to the period.
+ * The Statement's first and third parts (FRAGO 06 3.5, FRAGO 07 3.4). The
+ * service is the eight modules in module order, each with its status from
+ * Settings and its one line. What comes next is the workplan's open dated
+ * tasks, soonest first, as the operator loaded them; it is stated as at
+ * today, not scoped to the period.
  */
 export function statementOutlook(doc: OrgDoc): StatementOutlook {
-  const service = LINES.map((l) => ({
-    id: l.id,
-    name: l.name,
-    status: doc.settings.lineStatus[String(l.id)] ?? "Available",
-  })).sort((a, b) => (LINE_STATUS_ORDER[a.status] ?? 9) - (LINE_STATUS_ORDER[b.status] ?? 9) || a.id - b.id);
+  const service = moduleViews(doc).map((m) => ({
+    id: m.id,
+    name: m.name,
+    status: m.status,
+    introduction: m.introduction,
+  }));
   const next = doc.tasks
     .filter((t): t is typeof t & { dueAt: string } => isOpen(t) && t.dueAt !== null)
     .sort((a, b) => (a.dueAt < b.dueAt ? -1 : a.dueAt > b.dueAt ? 1 : 0))
@@ -172,4 +176,3 @@ export function statementOutlook(doc: OrgDoc): StatementOutlook {
   return { service, next };
 }
 
-export { lineOf };

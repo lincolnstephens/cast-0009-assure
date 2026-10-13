@@ -5,13 +5,14 @@ import {
   v01ImportSchema,
   type LineStatus,
 } from "@maximus/shared";
+import { moduleOfLine } from "@maximus/shared";
 import { mutateOrg, newId, readOrg } from "../db/store.ts";
 import type { EntryRecord, DeadlineLabel } from "../db/model.ts";
 import {
   applyFilter,
   statementOutlook,
   periodsOf,
-  serviceLineViews,
+  moduleViews,
   statementOf,
   totalsOf,
 } from "../lib/record.ts";
@@ -45,7 +46,7 @@ adminRecordRoutes.get("/record", async (c) => {
     periods: periodsOf(doc.entries),
     period: period || "all periods",
     settings: doc.settings,
-    lines: serviceLineViews(doc),
+    modules: moduleViews(doc),
     showingIllustrative: doc.settings.showIllustrative,
   });
 });
@@ -76,7 +77,7 @@ adminRecordRoutes.post("/record", async (c) => {
   const user = c.get("user");
   const parsed = entryInputSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
-    return c.json({ error: "Check the entry: a date, a service line, hours and a reviewer are needed." }, 400);
+    return c.json({ error: "Check the entry: a date, a module, hours and a reviewer are needed." }, 400);
   }
   const input = parsed.data;
 
@@ -85,7 +86,7 @@ adminRecordRoutes.post("/record", async (c) => {
       id: newId(),
       orgId,
       date: input.date,
-      line: input.line,
+      area: input.area,
       what: input.what,
       outcome: input.outcome,
       hours: input.hours,
@@ -101,7 +102,7 @@ adminRecordRoutes.post("/record", async (c) => {
     return created;
   });
 
-  await writeAudit({ orgId, actorId: user.id, actorName: user.displayName, action: "record.add", detail: `Entry added for service line ${entry.line}.` });
+  await writeAudit({ orgId, actorId: user.id, actorName: user.displayName, action: "record.add", detail: `Entry added for module ${entry.area}.` });
   return c.json(entry, 201);
 });
 
@@ -118,7 +119,7 @@ adminRecordRoutes.patch("/record/:id", async (c) => {
     if (!e) return null;
     const p = parsed.data;
     if (p.date !== undefined) e.date = p.date;
-    if (p.line !== undefined) e.line = p.line;
+    if (p.area !== undefined) e.area = p.area;
     if (p.what !== undefined) e.what = p.what;
     if (p.outcome !== undefined) e.outcome = p.outcome;
     if (p.hours !== undefined) e.hours = p.hours;
@@ -173,10 +174,12 @@ adminRecordRoutes.post("/record/import", async (c) => {
 
     for (const [k, v] of Object.entries(raw.status ?? {})) {
       const id = Number(k);
+      // A v0.1 file states twelve line statuses. v1.7 keeps them as history
+      // only; the module statuses are the operator's, set in Settings.
       if (id >= 1 && id <= 12 && STATUSES.includes(v as LineStatus)) {
-        doc.settings.lineStatus[String(id)] = v as LineStatus;
+        doc.settings.lineStatus = { ...(doc.settings.lineStatus ?? {}), [String(id)]: v as LineStatus };
       } else {
-        problems.push(`Service line status not recognised for line ${k}.`);
+        problems.push(`Status not recognised for archive line ${k}.`);
       }
     }
 
@@ -206,7 +209,7 @@ adminRecordRoutes.post("/record/import", async (c) => {
         return;
       }
       if (!(line >= 1 && line <= 12)) {
-        problems.push(`Entry ${i + 1} skipped: service line ${String(e.line)} is not one of the twelve.`);
+        problems.push(`Entry ${i + 1} skipped: archive line ${String(e.line)} is not recognised.`);
         skipped += 1;
         return;
       }
@@ -227,6 +230,8 @@ adminRecordRoutes.post("/record/import", async (c) => {
         id: newId(),
         orgId,
         date,
+        // v1.7: a v0.1 file speaks in archive lines; each lands in its module.
+        area: moduleOfLine(line),
         line,
         what: typeof e.what === "string" ? e.what : "",
         outcome: typeof e.outcome === "string" ? e.outcome : "",
@@ -266,7 +271,10 @@ adminRecordRoutes.put("/settings", async (c) => {
   if (!parsed.success) return c.json({ error: "Check the settings." }, 400);
 
   const settings = await mutateOrg(orgId, (doc) => {
-    Object.assign(doc.settings, parsed.data);
+    const { moduleStatus, ...rest } = parsed.data;
+    Object.assign(doc.settings, rest);
+    // Module status merges by module, so saving one module never resets another.
+    if (moduleStatus) doc.settings.moduleStatus = { ...doc.settings.moduleStatus, ...moduleStatus };
     if (parsed.data.clientName) doc.branding.displayName = parsed.data.clientName;
     return doc.settings;
   });

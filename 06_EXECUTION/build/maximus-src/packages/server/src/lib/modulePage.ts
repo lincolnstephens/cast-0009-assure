@@ -24,7 +24,7 @@ import {
   type Rag,
 } from "@maximus/shared";
 import type { ModuleFiguresRecord, OrgDoc, TaskRecord } from "../db/model.ts";
-import { buildDocumentsResponse } from "./documents.ts";
+import { buildDocumentsResponse, isLiveDocument } from "./documents.ts";
 import { formatDate, isOpen, today } from "./tracker.ts";
 
 // ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ const LATE_NEAR = 0.7;
 const LATE_FAR = 0.5;
 
 export const MODULE_SCORE_BASIS =
-  "Dated obligations in this module that fell due in the last twelve months, plus any completed early. " +
+  "Dated obligations in this module that fell due in the last 12 months, plus any completed early. " +
   "One met on or before its date counts in full; one met late counts 70 per cent if within 30 days of its date " +
   "and 50 per cent beyond; one still open after its date counts nothing. Undated tasks are not counted. " +
   "Green at 90 and above, amber from 60 to 89, red below 60.";
@@ -255,7 +255,7 @@ export function moduleTiles(doc: OrgDoc, area: number): ModuleTile[] {
   // Other filed items against this module: further registers, procedures and
   // templates, then links last.
   const rest = [...trackers, ...items("procedures")].filter(
-    (d) => d.area === area && d.published && !used.has(d.id) && !d.id.startsWith("tracker-unfiled:") && doc.documents.some((r) => r.id === d.id),
+    (d) => d.area === area && d.published && !used.has(d.id) && !d.id.startsWith("tracker-unfiled:") && doc.documents.some((r) => r.id === d.id && isLiveDocument(r)),
   );
   for (const d of rest.filter((d) => d.kind !== "link")) {
     tiles.push(tileOfDocument(d, "file", statusWord(documentStatusOf(d))));
@@ -344,9 +344,9 @@ function operatorGroups(doc: OrgDoc, area: number): CounterGroup[] {
 function recordGroup(doc: OrgDoc, area: 6 | 8, now: Date): CounterGroup {
   const asAt = today(now);
   const kind = area === 6 ? "sar_1_month" : "breach_72h";
-  const clocks = doc.clocks.filter((c) => c.kind === kind);
+  const clocks = doc.clocks.filter((c) => c.kind === kind && !c.test);
   const pendingIntakes = new Set(
-    doc.review.filter((r) => r.type === "intake" && r.state === "pending").map((r) => r.refId),
+    doc.review.filter((r) => r.type === "intake" && r.state === "pending" && !r.test).map((r) => r.refId),
   );
   const open = clocks.filter((c) => !c.closedAt);
   const waiting = open.filter((c) => c.intakeId !== null && pendingIntakes.has(c.intakeId));

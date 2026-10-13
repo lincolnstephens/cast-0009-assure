@@ -219,7 +219,7 @@ describe("Policy Guide chat (stub mode)", () => {
     // The answer raised a Record entry (line 12), reviewed by the officer.
     const guideEntries = org!.entries.filter((e) => e.source === "guide");
     expect(guideEntries).toHaveLength(1);
-    expect(guideEntries[0].line).toBe(12);
+    expect(guideEntries[0].area).toBe(1); // v1.7: the DPO advisory role, module 1
     expect(guideEntries[0].reviewer).toBe("Test Admin User");
     expect(guideEntries[0].reviewed).toBe(true);
     expect(guideEntries[0].ill).toBe(false);

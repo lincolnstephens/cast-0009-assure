@@ -54,6 +54,68 @@ export const EFFECTIVE_UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
 export const EFFECTIVE_UPLOAD_MAX_MB = EFFECTIVE_UPLOAD_MAX_BYTES / (1024 * 1024);
 
 // ---------------------------------------------------------------------------
+// What the client may see (v1.7, FRAGO 07 3.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * The one rule every client-facing reader of `doc.documents` goes through.
+ * A document is live when the operator has published it, it is not a test
+ * seat's, a newer version has not superseded it, and, if the client
+ * submitted it, the operator has accepted it. A submission the operator has
+ * not accepted is never published, never listed in a section, never on a
+ * module page and never counted, whatever its other fields say.
+ */
+export function isLiveDocument(d: DocumentRecord): boolean {
+  if (!d.published) return false;
+  if (d.test) return false;
+  if (d.supersededBy) return false;
+  if (d.submission && d.submission.state !== "accepted") return false;
+  return true;
+}
+
+export const SUBMISSION_STATE_LABEL: Record<"submitted" | "returned" | "accepted", string> = {
+  submitted: "Submitted, awaiting MITMARK review",
+  returned: "Returned by MITMARK",
+  accepted: "Accepted and published",
+};
+
+/**
+ * The client's own submissions, newest first, for the Documents page. A test
+ * seat sees only test submissions; the client never sees a test seat's.
+ */
+export function submissionsFor(doc: OrgDoc, viewerIsTest: boolean) {
+  return doc.documents
+    .filter((d) => d.submission && Boolean(d.test) === viewerIsTest)
+    .sort((a, b) => (a.submission!.submittedAt < b.submission!.submittedAt ? 1 : -1))
+    .slice(0, 50)
+    .map((d) => {
+      const s = d.submission!;
+      const earlier = d.supersedes ? doc.documents.find((x) => x.id === d.supersedes) : undefined;
+      return {
+        id: d.id,
+        title: d.title,
+        area: d.area,
+        kind: d.kind,
+        note: s.note,
+        state: s.state,
+        stateLabel: SUBMISSION_STATE_LABEL[s.state],
+        submittedAt: s.submittedAt,
+        decidedAt: s.decidedAt,
+        returnReason: s.state === "returned" ? s.returnReason : "",
+        supersedesTitle: earlier?.title ?? null,
+        test: Boolean(d.test),
+      };
+    });
+}
+
+/** Filed documents the client may submit a new version of: live files and links, not generated policies. */
+export function replaceableFor(doc: OrgDoc) {
+  return doc.documents
+    .filter((d) => isLiveDocument(d) && (d.kind === "file" || d.kind === "link"))
+    .map((d) => ({ id: d.id, title: d.title, area: d.area }));
+}
+
+// ---------------------------------------------------------------------------
 // Mapping a stored record onto the client's shape
 // ---------------------------------------------------------------------------
 
@@ -142,7 +204,7 @@ function policiesSectionItems(doc: OrgDoc): ComplianceDocument[] {
     }
   }
 
-  const filed = doc.documents.filter((d) => d.section === "policies" && d.published);
+  const filed = doc.documents.filter((d) => d.section === "policies" && isLiveDocument(d));
   items.push(...filed.map(toClientDocument));
   return items;
 }
@@ -183,7 +245,7 @@ function proceduresSectionItems(doc: OrgDoc): ComplianceDocument[] {
     const procedure = doc.procedures.find((p) => p.orgId === doc.id && p.area === area);
     if (procedure && procedure.publishedAt) items.push(procedureDocument(area, procedure));
   }
-  const filed = doc.documents.filter((d) => d.section === "procedures" && d.published);
+  const filed = doc.documents.filter((d) => d.section === "procedures" && isLiveDocument(d));
   items.push(...filed.map(toClientDocument));
   return items;
 }
@@ -220,7 +282,7 @@ function unfiledTrackerItem(doc: OrgDoc, t: (typeof TRACKER_DOCUMENTS)[number]):
 }
 
 function trackersSectionItems(doc: OrgDoc): ComplianceDocument[] {
-  const filed = doc.documents.filter((d) => d.section === "trackers" && d.published);
+  const filed = doc.documents.filter((d) => d.section === "trackers" && isLiveDocument(d));
   const matches = (d: DocumentRecord, t: (typeof TRACKER_DOCUMENTS)[number]) =>
     [t.title, ...(t.aliases ?? [])].some((name) => d.title.trim().toLowerCase() === name.trim().toLowerCase());
 

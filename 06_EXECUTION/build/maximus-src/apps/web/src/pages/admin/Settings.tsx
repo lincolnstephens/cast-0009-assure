@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   AREAS,
   DEFAULT_JOURNEY_NOTE,
@@ -9,7 +9,6 @@ import {
   lineStatusSchema,
 } from "@maximus/shared";
 import type { Jurisdiction, LineStatus, OrgSettings as BaseOrgSettings } from "@maximus/shared";
-import { LINES } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { useAdmin } from "../../store/admin";
 import { RetentionScheduleEditor } from "../../components/RetentionScheduleEditor";
@@ -44,8 +43,8 @@ interface TrackerFields {
 type OrgSettings = BaseOrgSettings & TrackerFields;
 
 /**
- * The operator's settings: rates and names for the statement, the twelve
- * line statuses, the illustrative demo switch, and the client accent
+ * The operator's settings: rates and names for the statement, the eight
+ * module statuses, the illustrative demo switch, and the client accent
  * colour. The Information Officer never sees this page.
  */
 export function AdminSettingsPage() {
@@ -64,13 +63,24 @@ export function AdminSettingsPage() {
   const [newRole, setNewRole] = useState("");
   const [rolesError, setRolesError] = useState<string | null>(null);
 
+  // v1.7. The settings on screen always belong to the organisation the
+  // switcher shows. A switch while a load is in flight could otherwise show
+  // one organisation's settings while every save went to another: the gate
+  // caught a demo switch landing on a different organisation (DC-67).
+  const [settingsOrg, setSettingsOrg] = useState<string | null>(null);
+  const currentOrg = useRef(selectedAccountId);
+  currentOrg.current = selectedAccountId;
+
   const load = useCallback(async () => {
     if (!selectedAccountId) return;
+    const org = selectedAccountId;
     try {
       const res = await api<{ settings: OrgSettings; branding: Branding; name: string }>(
-        `/admin/settings?org=${selectedAccountId}`,
+        `/admin/settings?org=${org}`,
       );
+      if (currentOrg.current !== org) return;
       setSettings(res.settings);
+      setSettingsOrg(org);
       setBranding(res.branding);
       setAccent(res.branding.accent);
       setError(null);
@@ -81,15 +91,20 @@ export function AdminSettingsPage() {
 
   useEffect(() => {
     setSettings(null);
+    setSettingsOrg(null);
     void load();
   }, [load]);
 
   async function saveSettings(next: Partial<OrgSettings>) {
-    if (!selectedAccountId) return;
-    const res = await api<{ settings: OrgSettings }>(`/admin/settings?org=${selectedAccountId}`, {
+    // Saves go to the organisation whose settings are on screen, and only
+    // while that is still the one the switcher shows.
+    const org = settingsOrg;
+    if (!org || org !== currentOrg.current) throw new ApiError(409, "Choose the organisation again; its settings are reloading.");
+    const res = await api<{ settings: OrgSettings }>(`/admin/settings?org=${org}`, {
       method: "PUT",
       body: JSON.stringify(next),
     });
+    if (currentOrg.current !== org) return res.settings;
     setSettings(res.settings);
     return res.settings;
   }
@@ -209,12 +224,13 @@ export function AdminSettingsPage() {
     }
   }
 
-  async function changeLineStatus(lineId: number, status: LineStatus) {
+  async function changeModuleStatus(area: number, status: LineStatus) {
     if (!settings) return;
-    const lineStatus = { ...settings.lineStatus, [String(lineId)]: status };
-    setSettings({ ...settings, lineStatus });
+    const moduleStatus = { ...(settings.moduleStatus ?? {}), [String(area)]: status };
+    setSettings({ ...settings, moduleStatus });
     try {
-      await saveSettings({ lineStatus });
+      // The server merges by module, so only the one that changed is sent.
+      await saveSettings({ moduleStatus: { [String(area)]: status } });
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to change that status.");
@@ -246,7 +262,7 @@ export function AdminSettingsPage() {
       </p>
     );
   }
-  if (!settings) return <p className="text-sm text-hud-muted">Loading…</p>;
+  if (!settings || settingsOrg !== selectedAccountId) return <p className="text-sm text-hud-muted">Loading…</p>;
 
   return (
     <div className="max-w-4xl">
@@ -586,16 +602,22 @@ export function AdminSettingsPage() {
       )}
 
       <div className="mt-4 rounded border border-hud-line bg-hud-panel/60 p-4">
-        <h2 className="text-sm font-semibold">Service line status</h2>
+        <h2 className="text-sm font-semibold">Module status</h2>
+        <p className="mt-1 text-[13px] text-hud-muted">
+          What the client's Statement shows for each module. A new organisation starts with every
+          module Available.
+        </p>
         <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-2 text-[13px]">
-          {LINES.map((l) => (
-            <FragmentRow key={l.id}>
-              <span>
-                {l.id}. {l.short}
-              </span>
+          {AREAS.map((a) => (
+            <FragmentRow key={a.id}>
+              <label htmlFor={`moduleStatus${a.id}`}>
+                {a.id}. {a.name}
+              </label>
               <select
-                value={settings.lineStatus[String(l.id)] ?? "Available"}
-                onChange={(e) => void changeLineStatus(l.id, e.target.value as LineStatus)}
+                id={`moduleStatus${a.id}`}
+                data-testid={`module-status-${a.id}`}
+                value={settings.moduleStatus?.[String(a.id)] ?? "Available"}
+                onChange={(e) => void changeModuleStatus(a.id, e.target.value as LineStatus)}
                 className="rounded border border-hud-line bg-hud-bg px-2 py-1 text-[13px]"
               >
                 {STATUS_OPTS.map((o) => (

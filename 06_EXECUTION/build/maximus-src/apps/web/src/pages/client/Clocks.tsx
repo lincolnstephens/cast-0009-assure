@@ -3,7 +3,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { StatusLamp } from "../../components/StatusLamp";
 import { api, ApiError } from "../../lib/api";
 import { formatCountdown, formatLondon } from "../../lib/format";
-import { PREVIEW_READ_ONLY } from "../../lib/preview";
+import { PREVIEW_SUBMIT_MESSAGE } from "../../lib/preview";
 import { usePreviewing } from "../../lib/usePreviewing";
 
 interface ClockItem {
@@ -40,6 +40,7 @@ export function ClocksPage() {
   const [now, setNow] = useState(() => new Date());
   const [openClock, setOpenClock] = useState<ClockDetail | null>(null);
   const [showRaise, setShowRaise] = useState(false);
+  const previewing = usePreviewing();
 
   const load = useCallback(async () => {
     try {
@@ -82,6 +83,13 @@ export function ClocksPage() {
           Raise a request
         </button>
       </div>
+
+      {/* v1.7 (FRAGO 07 3.3): in client view the request form opens but cannot submit, and says why here too. */}
+      {previewing && (
+        <p data-testid="request-readonly" className="mt-3 text-[13px] text-client-muted">
+          {PREVIEW_SUBMIT_MESSAGE}
+        </p>
+      )}
 
       {error && (
         <p className="mt-4 border-l-2 border-status-red pl-3 text-sm text-status-red" role="alert">
@@ -341,6 +349,12 @@ function RaiseRequestModal({
           </p>
         )}
 
+        {previewing && (
+          <p data-testid="request-readonly-form" className="mt-3 text-[13px] text-client-muted">
+            {PREVIEW_SUBMIT_MESSAGE}
+          </p>
+        )}
+
         <div className="mt-5 flex justify-end gap-3">
           <button type="button" onClick={onClose} className="px-3 py-2 text-sm text-client-muted hover:text-client-text">
             Cancel
@@ -348,7 +362,7 @@ function RaiseRequestModal({
           <button
             type="submit"
             disabled={busy || previewing || details.trim().length === 0}
-            title={previewing ? PREVIEW_READ_ONLY : undefined}
+            title={previewing ? PREVIEW_SUBMIT_MESSAGE : undefined}
             className="rounded bg-client-accent px-4 py-2 text-sm font-medium text-white hover:bg-client-accent/90 disabled:opacity-60"
           >
             {busy ? "Submitting…" : "Submit request"}

@@ -12,6 +12,8 @@ interface UserRow {
   orgName: string | null;
   status: "active" | "disabled" | "must_change_password";
   lastSignInAt: string | null;
+  /** v1.7. A client test seat; the flag is never removed. */
+  testSeat?: boolean;
 }
 
 const STATUS_LABEL: Record<UserRow["status"], string> = {
@@ -60,6 +62,7 @@ export function AdminUsersPage() {
           role,
           orgId: role === "client" ? String(form.get("orgId") ?? "") || null : null,
           displayName: String(form.get("displayName") ?? "") || undefined,
+          testSeat: role === "client" && form.get("testSeat") === "on",
         }),
       });
       setShown({ email: res.user.email, password: res.oneTimePassword });
@@ -162,6 +165,19 @@ export function AdminUsersPage() {
           <span className="mb-1 block text-[11px] uppercase tracking-wider text-hud-muted">Display name, optional</span>
           <input name="displayName" className="w-full rounded border border-hud-line bg-hud-bg px-2 py-1.5" />
         </label>
+        <label className="flex items-start gap-2 text-[13px] sm:col-span-5">
+          <input
+            type="checkbox"
+            name="testSeat"
+            data-testid="user-test-seat"
+            disabled={role !== "client"}
+            className="mt-0.5 disabled:opacity-50"
+          />
+          <span className={role !== "client" ? "opacity-50" : ""}>
+            Test seat (for trying the client's side; its writes are tagged test and kept out of the
+            Record, the counters and the Statement)
+          </span>
+        </label>
         <div className="sm:col-span-5">
           <button
             type="submit"
@@ -191,7 +207,17 @@ export function AdminUsersPage() {
             {users.map((u) => (
               <tr key={u.id} data-testid="user-row" data-user-id={u.id}>
                 <td className="py-2 pr-3">{u.email}</td>
-                <td className="py-2 pr-3">{u.role === "mitmark_admin" ? "Manager" : "Client user"}</td>
+                <td className="py-2 pr-3">
+                  {u.role === "mitmark_admin" ? "Manager" : "Client user"}
+                  {u.testSeat && (
+                    <span
+                      data-testid="test-seat-label"
+                      className="ml-2 rounded border border-status-amber px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-status-amber"
+                    >
+                      Test seat
+                    </span>
+                  )}
+                </td>
                 <td className="py-2 pr-3">{u.role === "mitmark_admin" ? "All" : (u.orgName ?? u.orgId)}</td>
                 <td className="py-2 pr-3">{STATUS_LABEL[u.status]}</td>
                 <td className="py-2 pr-3">{u.lastSignInAt ? formatLondon(u.lastSignInAt) : "Never"}</td>

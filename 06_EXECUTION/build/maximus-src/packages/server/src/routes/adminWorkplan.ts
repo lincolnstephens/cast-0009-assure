@@ -20,7 +20,7 @@ import { writeAudit } from "../lib/audit.ts";
 import { requireAuth, requireRole, type AppEnv, adminOrgOf } from "../lib/middleware.ts";
 import { raiseEntry } from "../lib/raiseEntry.ts";
 import { overallStatus, ownerLabel, taskRag, today } from "../lib/tracker.ts";
-import { AREA_LINE, applyLibraryToDoc, hoursForTask } from "../lib/workplan.ts";
+import { applyLibraryToDoc, hoursForTask } from "../lib/workplan.ts";
 
 /**
  * The admin's side of the workplan: create, edit and remove tasks by hand;
@@ -53,9 +53,13 @@ export function closeTaskAndRaiseEntry(
   input: { reviewer: string; outcome: string },
 ): void {
   if (task.status !== "done" || task.closedAt !== null) return;
+  // v1.7 (FRAGO 07 3.2). Closing, by a drop on Completed or by the status
+  // select, dates the completion today.
   task.closedAt = new Date().toISOString();
+  // A task closed, reopened and closed again has already booked its work once.
+  if (task.recordEntryId !== null) return;
   const entry = raiseEntry(doc, {
-    line: AREA_LINE[task.area as keyof typeof AREA_LINE],
+    area: task.area,
     what: `Closed: ${task.title}`,
     outcome: input.outcome,
     hours: hoursForTask(task, LIBRARY_HOURS_BY_ID),
@@ -172,8 +176,12 @@ adminWorkplanRoutes.patch("/workplan/:id", async (c) => {
     if (p.notes !== undefined) task.notes = p.notes;
 
     const hadEntry = task.recordEntryId !== null;
+    const fromStatus = task.status;
     if (p.status !== undefined) {
       task.status = p.status;
+      // v1.7: a task moved out of done is open again, so it has no completion
+      // date until it is closed again (and is then dated that day).
+      if (p.status !== "done" && fromStatus === "done") task.closedAt = null;
       // Moving a task out of done again does not delete the entry it
       // already raised - the work it recorded still happened - and moving
       // it back to done later does not raise a second one, since
@@ -187,7 +195,7 @@ adminWorkplanRoutes.patch("/workplan/:id", async (c) => {
 
     task.updatedBy = user.displayName;
     task.updatedAt = new Date().toISOString();
-    return { task, entryCreated };
+    return { task, entryCreated, fromStatus };
   });
 
   if (!result) return c.json({ error: "Task not found" }, 404);
@@ -197,9 +205,11 @@ adminWorkplanRoutes.patch("/workplan/:id", async (c) => {
     actorId: user.id,
     actorName: user.displayName,
     action: "workplan.edit",
-    detail: result.entryCreated
-      ? `Task ${id} edited and closed; Record entry ${result.task.recordEntryId} created.`
-      : `Task ${id} edited.`,
+    detail:
+      (p.status !== undefined && p.status !== result.fromStatus
+        ? `Task ${id} ("${result.task.title}") moved from ${TASK_STATUS_LABEL[result.fromStatus]} to ${TASK_STATUS_LABEL[result.task.status]}.`
+        : `Task ${id} edited.`) +
+      (result.entryCreated ? ` Closed; Record entry ${result.task.recordEntryId} created.` : ""),
   });
   return c.json(result.task);
 });

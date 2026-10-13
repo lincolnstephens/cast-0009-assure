@@ -801,6 +801,35 @@ export const documentInputSchema = z.object({
 });
 export type DocumentInput = z.infer<typeof documentInputSchema>;
 
+/**
+ * v1.7 (FRAGO 07 3.1). What the client sends to offer a document. It is an
+ * offer, not a filing: nothing is published until the operator accepts it in
+ * the review queue, and the operator chooses the section then.
+ */
+export const clientDocumentSubmitSchema = z.object({
+  title: z.string().trim().min(1).max(300),
+  area: z.coerce.number().int().min(1).max(8),
+  /** One line of what it is. */
+  note: z.string().trim().min(1).max(300),
+  kind: z.enum(["file", "link"]),
+  url: z.string().trim().max(1000).default(""),
+  fileBase64: z.string().default(""),
+  fileName: z.string().trim().max(300).default(""),
+  contentType: z.string().trim().max(200).default(""),
+  /** The published document this is a new version of, if any. */
+  supersedes: z.string().trim().max(128).nullable().default(null),
+});
+export type ClientDocumentSubmit = z.infer<typeof clientDocumentSubmitSchema>;
+
+/** v1.7. The operator's decision on a client submission. */
+export const acceptSubmissionSchema = z.object({
+  section: documentSectionSchema,
+  area: z.coerce.number().int().min(1).max(8).optional(),
+});
+export const returnSubmissionSchema = z.object({
+  reason: z.string().trim().min(1).max(300),
+});
+
 export const documentsResponseSchema = z.object({
   sections: z.array(
     z.object({
