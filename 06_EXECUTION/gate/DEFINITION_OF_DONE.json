@@ -1,13 +1,13 @@
 {
-  "iteration": "v1.7",
-  "written": "2026-10-13",
+  "iteration": "v1.8",
+  "written": "2026-10-14",
   "lines": [
     {
       "id": 1,
       "line": "Sign-in succeeds and lands on the client portal.",
       "drive": "playwright",
       "check": "sign_in_lands_on_portal",
-      "pass": "The sign-in form accepts the Information Officer's demo account and the client portal's Compliance Tracker nav item (data-view='tracker') is present within 5 seconds.",
+      "pass": "The sign-in form accepts the client seat the gate drives (v1.8: the gate's own seat on the demo organisation, gate-demo-client@gate.invalid, since the demo client account is disabled; enabled for the run and disabled at its end) and the client portal's Compliance Tracker nav item (data-view='tracker') is present within 5 seconds.",
       "email_selector": "input[type='email']",
       "password_selector": "input[type='password']",
       "submit_selector": "button[type='submit']",
@@ -1238,6 +1238,90 @@
         "390x844"
       ],
       "added": "v1.7"
+    },
+    {
+      "id": 71,
+      "line": "The organisation logo upload takes PNG or SVG up to 500 KB, refuses anything else, and is a manager's action only.",
+      "drive": "playwright",
+      "check": "logo_upload_limits",
+      "pass": "On the gate organisation, PUT /api/admin/organisations/:id/logo refuses a GIF, plain text, an SVG with a script, an SVG with an event handler (400 each) and a PNG of 500 KB and one byte (413), leaving no logo; takes a plain SVG (served back as image/svg+xml) and a PNG; refuses a client seat (401 or 403). The gate organisation has no logo afterwards. /admin/organisations carries org-logo-input accepting png and svg.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.8"
+    },
+    {
+      "id": 72,
+      "line": "A logo is served only to its own organisation's sessions and client view; no logo reaches the demo or gate organisations.",
+      "drive": "playwright",
+      "check": "logo_isolation",
+      "pass": "With a neutral test logo set on the gate organisation: the gate client seat gets it from /api/branding/logo and its /auth/me branding.logoLight names it; the demo seat gets none, with or without a preview marker naming the gate organisation; client view of the gate organisation gets it and of the demo does not; the operator outside client view gets none. The client organisation's logo is set and reaches neither the demo nor the gate seat (compared by bytes, no client view of it opened). In the browser the gate seat shows client-logo-sidebar and client-logo-header, loaded, with alt text, unfiltered, served from /api/branding/logo; the demo seat shows no logo. The test logo is removed.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.8"
+    },
+    {
+      "id": 73,
+      "line": "With no logo the portal shows the name as text; the Organisations list shows a set logo and the switcher stays text.",
+      "drive": "playwright",
+      "check": "logo_fallback_text",
+      "pass": "The demo client's portal carries client-name-fallback (sidebar) and client-name-fallback-header with text and no client-logo-*; /admin/organisations shows org-logo-thumb, loaded, on the client organisation's row and org-logo-none on the demo's; org-switcher is a select with no image.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.8"
+    },
+    {
+      "id": 74,
+      "line": "Every client page carries the MITMARK footer and, from 640px, the watermark; neither is on the admin workspace; View as client shows the same; the printed Statement keeps the watermark.",
+      "drive": "playwright",
+      "check": "footer_watermark",
+      "pass": "On every client nav view, the client Value page and all eight module pages: client-footer reads 'Delivered by MITMARK Intelligence' with the MITMARK mark; mitmark-watermark is present, and at 640px and wider is shown, loaded, at an effective opacity between 4 and 8 per cent, within 40px of the bottom right; at 390 it is hidden. Under print media the Statement shows the watermark (wide widths). /admin, /admin/organisations, /admin/settings, /admin/jobs and /admin/documents carry neither. View as client shows both.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.8"
+    },
+    {
+      "id": 75,
+      "line": "With the watermark present, text on every client page keeps its contrast, and the footer is 4.5:1 or better.",
+      "drive": "playwright",
+      "check": "watermark_contrast",
+      "pass": "On every client page at each width, every visible text element the watermark could lie beneath (in the scrolling content, any element in the mark's column whose backdrop is beneath the mark; elsewhere, any that overlaps it) measures at least 4.5:1 (3:1 for large text) against its composited background blended with the mark's darkest colour at the mark's effective opacity; the footer text measures at least 4.5:1.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.8"
+    },
+    {
+      "id": 76,
+      "line": "The client organisation is configured for first use as FRAGO 08 3.1, with its tasks and documents unchanged.",
+      "drive": "api",
+      "check": "client_org_ready",
+      "pass": "Read only, never a client view: GET /api/admin/settings?org=org-f2b4afdf0d gives a name that matches the restricted list (never printed), equal to the display name and the Statement name; ioName 'Information Officer'; lead a name followed by ', Chief Information Security Officer, MITMARK Intelligence'; module status 1 to 8 all Live; no retainer; show illustrative off; 19 tasks and 11 documents; a PNG logo, served to the operator, byte-identical to the restricted file.",
+      "applies_to": [
+        "1920x1080"
+      ],
+      "added": "v1.8"
+    },
+    {
+      "id": 77,
+      "line": "The client's logo file exists nowhere under the job folder but material/restricted, and not in the built bundle.",
+      "drive": "static",
+      "check": "logo_file_nowhere_else",
+      "pass": "No file under the job folder outside .git, node_modules and material (the built web bundle and function bundle included, both present) is byte-identical to, or contains, material/restricted/client_logo.png. Compared by hash and bytes; nothing printed.",
+      "added": "v1.8"
     }
   ]
 }

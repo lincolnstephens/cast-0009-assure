@@ -250,4 +250,12 @@ body {
   main {
     padding: 0 !important;
   }
+  /* v1.8 (FRAGO 08 3.3): the MITMARK watermark stays on the printed
+     Statement, bottom right of each page, at the same low opacity. */
+  .mm-watermark {
+    display: block !important;
+    position: fixed !important;
+    right: 0 !important;
+    bottom: 0 !important;
+  }
 }

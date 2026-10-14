@@ -653,3 +653,112 @@ Some entries follow their line, not their content. The demo's illustrative "Refr
 ## The smallest next decision for Sunray
 
 **Set a working `ANTHROPIC_API_KEY` on the site (DC-19), or say the meeting runs on passages.** With the key, Quick questions writes a cited answer from the client's own documents. Without it, it shows the passages, which is honest but plainer. Nothing else in the product waits on it.
+
+
+# v1.8, the client organisation ready for its Information Officer
+
+**Live:** https://assure.tessera-monitor.com. https://tessera-assure.netlify.app serves the same deploy.
+**Production deploy:** `6acf5487aa8f49901b804151`, 2026-10-14 at about 11:08 BST. It is the only production deploy of v1.8; two drafts came before it (`6acf4f45990417f742d48ce9`, `6acf52b43bbad75bb40e47b8`).
+**Gate:** PASS, 226 of 226, against the production address on run 2, after one gate-only fix. That is the static checks plus 76 live definition-of-done lines (line 17 stays retired) at 1920x1080, 1366x768 and 390x844. Unit and integration tests: 301 of 301.
+**Spend:** no new money committed.
+- What it used: build-session time, local compute, and three deploys on the existing Netlify plan (two drafts, one production).
+- No new dependency. The logo sits in Netlify Blobs beside the organisation document, as FRAGO 08 section 4 says.
+- No environment variable or secret was changed, and no real person's password was reset.
+
+**Built under:** `06_EXECUTION/FRAGO_08_CLIENT_READY.md`, issued 14 October (DC-69). It was due live by 1800 BST on Wednesday 15 October and went live at about 11:08 on Wednesday 14 October.
+
+## What v1.8 adds
+
+**A branding logo per organisation (3.2).**
+- **Upload.** On **Organisations**, each row has **Upload logo**, **Replace logo** and **Remove logo**. Each acts on the organisation its path names, never on the switcher's choice, so the DC-63 and DC-67 class of fault cannot arise here. Each writes `branding.logo.set` or `branding.logo.remove` to that organisation's audit.
+- **What it accepts.**
+  - A PNG or SVG of up to 500 KB, the type read from the bytes rather than the name: a PNG by its signature, an SVG by its root element.
+  - Refused with 413: anything over 500 KB.
+  - Refused with 400: anything else, including an SVG that carries script, event handlers, embedded documents or outside references.
+- **Where it is kept.** The bytes sit in the store at `branding/<organisation id>/logo`. The organisation document holds the type, size, a version and who set it. There is no public URL.
+- **Who receives it.**
+  - `GET /api/branding/logo` sits behind the same guard as every client read (`requireClientSeat`). It serves the signed-in seat's own organisation, or, in View as client, the organisation being viewed. No route takes an organisation id from a client.
+  - It is served inline, with `nosniff` and a sandboxed, sourceless content security policy, so an SVG opened on its own runs nothing.
+  - The operator's thumbnail on Organisations comes from a manager-only route.
+- **What the client sees.**
+  - `/auth/me` carries the logo's API path, with its version, as `branding.logoLight`.
+  - The portal shows the logo at the head of the menu and in the page header, in place of the name, with the name as its alt text.
+  - With no logo, or if it fails to load, the name shows as text.
+  - The light portal shows the mark as uploaded and never inverts or filters it.
+- **The organisation's name.** A new `PATCH /api/admin/organisations/:id` sets the organisation's own name, for a manager. Until now only the seed or creation could. The audit row says the name changed and does not repeat it.
+
+**The MITMARK mark on the client view (3.3).**
+- **Footer.** Every client page ends with "Delivered by MITMARK Intelligence" beside the MitmarkLogo mark, in the portal's text colour: 14:1 on the page.
+- **Watermark.**
+  - The MitmarkLogo mark at 6 per cent opacity, fixed at the bottom right of the content area: 56px wide from 640px, 80px from 768px.
+  - From 640px the content area's right padding becomes a gutter the content never enters (96px, then 128px), and the mark sits in it beneath the content layer. So it is never under text.
+  - It is hidden below 640px and is kept on the printed Statement by the print stylesheet.
+  - The admin layout never renders it. View as client renders the client layout, so it shows there exactly as the client sees it.
+- **Why a gutter.** Measured worst case, the house muted grey (`#6b7280`) on the page background gives 4.63:1. Under the mark's darkest colour, even at 3 per cent, that falls below 4.5:1; at 6 per cent it is about 4.2:1. Lowering the opacity until it passed would make the mark invisible, and darkening the house token would change every client page. Keeping text out of the mark's column keeps both the token and the 6 per cent.
+
+**Client view serves the seat that can sign in.** Client view now serves the organisation's active client seat ahead of a disabled one, and a disabled seat only when there is no other. Before, it served the first client seat on the list, active or not. This was found because Sunray disabled the demo client seat (below).
+
+## Configuration of the client organisation (3.1 and 3.2)
+
+Done through the API as the demo manager, at 11:09 BST, after the production deploy. The name was read at run time from `material/restricted/CLIENT.md` and the contract lead from FRAGO 08's own sentence. The logo was read from `material/restricted/client_logo.png` and sent as bytes. None of the three was written to a file, printed, or saved. The script lived in the session's scratch folder, outside the job folder. A dry run came first.
+
+| | Before | After |
+|---|---|---|
+| Organisation name, display name, Statement name | not the trading name | all three the trading name (checked against the restricted list, not printed) |
+| Information Officer | "Information Officer" | unchanged |
+| MITMARK contract lead | empty | the operator's name with "Chief Information Security Officer, MITMARK Intelligence" |
+| Module status, 1 to 8 | all Available | all Live |
+| Retainer | not entered | not entered |
+| Hourly rate, day rate | £45, £650 (house figures) | unchanged |
+| Show illustrative | off | off |
+| Journey stage | 3 | 3 |
+| Logo | none | PNG, 37,934 bytes, version 1, served back byte-identical |
+| Tasks | 19 | 19, workplan identical by hash |
+| Documents | 11 | 11, identical by hash |
+| Audit entries | 40 | 43: `organisation.rename`, `settings.update`, `branding.logo.set`, all under the manager's id |
+
+Only three settings changed (`clientName`, `lead`, `moduleStatus`) and two branding fields (`displayName`, `logo`).
+
+## Calls the order left to the build (DC-70)
+
+1. **The demo client seat is disabled, and the gate needs a client.** Sunray re-enabled only the demo manager, and about sixty gate lines sign in as the demo client.
+   - Re-enabling `demo@demo.local` would undo Sunray's decision, so I did not do it.
+   - Instead the gate finds or creates its own client seat on the demo organisation, `gate-demo-client@gate.invalid`. It enables the seat for the run, gives it a one-time password, changes that at first sign-in, and disables it again at the end of the run, exactly as it has handled its own users since v1.5 (DC-55).
+   - At rest, no demo client account can sign in.
+2. **"Do not reset any user's password."** I read this as any real person's account. The gate's own synthetic users (`*@gate.invalid`) have been given one-time passwords on every run since v1.5. The gate could not run without that, and those accounts are disabled at the end of each run.
+3. **Client view serves an active seat first.** This is the product fix above. Without it, View as client of the demo would have served the disabled seat's own thread. The gate's identity line (33) would then compare two different people.
+4. **The footer text.** The order's "Delivered by MITMARK Intelligence" replaces v1.0's "Tessera Assure, by MITMARK Intelligence", and the footer now shows on every client page, not only when branding loaded.
+5. **The gate never opens a client view of the client organisation.** Opening one writes a `client_view.open` row in its audit. The positive logo case is proved on the gate's own organisation with a neutral generated image, which is removed again. The client organisation is checked by reads only: its settings, counts and logo bytes, and that its logo reaches neither the demo nor the gate seats.
+6. **Order of work.** The order puts configuration after the gate passes. The gate itself (3.5) must check the configured settings, so I configured after the production deploy and the draft subset runs, and before the full gate run. The full gate is therefore the proof of both.
+
+## Deviations
+
+- **The demo client account is not the gate's client.** See DC-70, item 1. Line 1's pass wording now names the seat the gate drives.
+- **Rates were left at the house figures.** The order says "rates and retainer: leave blank". The retainer is blank. The hourly and day rates have never been blank: the settings hold £45 and £650 from creation, and a rate cannot be empty in the schema. They were left as they were. The Statement still says the fee is not entered.
+- **The watermark sits in a reserved gutter** rather than over the content (see "Why a gutter").
+- **One small product fix outside branding:** client view prefers the active seat.
+
+## What the gate caught
+
+| Run | Target | Result |
+|---|---|---|
+| Subset | Draft `6acf4f45990417f742d48ce9` | 2 of 9. Every client sign-in was refused: the demo client account is disabled. Led to DC-70, item 1 |
+| Subset | Draft `6acf52b43bbad75bb40e47b8` | Lines 1, 7, 33 and 71 to 75 at 1920, 8, 74 and 75 at 390, and 74 and 75 at 1366: all pass except the client-logo half of 72 and 73, which waited on the configuration |
+| 1 | Production `6acf5487aa8f49901b804151`, after configuration | 223 of 226 |
+| Fix pass 1 (gate only) | | Below |
+| 2 | Production `6acf5487aa8f49901b804151` | **226 of 226** |
+
+**Run 1's failures.** Line 73 at all three widths: the Organisations list thumbnail "did not load". The gate read the image's width a moment after the table rendered, before a 38 KB image had arrived. In a browser the thumbnail loads at its full 960px width with a 200 response, so the product was right. The gate now waits for the image's load or error event (up to 8 seconds) before measuring, in lines 72 and 73 alike. Line 73 then passed at all three widths on its own before run 2. No product change was needed and no redeploy was made.
+
+## What waits on whom
+
+- **The operator** (FRAGO 08 3.4, step 1):
+  - review the organisation in View as client;
+  - confirm or change the eight module statuses and the Information Officer's display name;
+  - check the hourly and day rates;
+  - create a test seat and walk a request, an upload and a Quick question.
+- **Sunray:**
+  - rotate `SESSION_SECRET`;
+  - confirm Block 5 consent, after which the Information Officer's password is reset in Users and reaches her through the operator;
+  - the Anthropic key, when there is one (DC-19).
+- **After the meeting:** the Statement's numbers (retainer, contract dates).

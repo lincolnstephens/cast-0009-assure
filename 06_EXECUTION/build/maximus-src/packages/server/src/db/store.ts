@@ -394,6 +394,25 @@ export async function deleteDocumentBlob(orgId: string, documentId: string): Pro
 }
 
 // ---------------------------------------------------------------------------
+// v1.8. The organisation's branding logo (FRAGO 08 3.2). One per organisation,
+// beside its document; never a public URL.
+// ---------------------------------------------------------------------------
+
+export const brandingLogoKey = (orgId: string) => `branding/${orgId}/logo`;
+
+export async function readBrandingLogo(orgId: string): Promise<Uint8Array | null> {
+  return getDriver().getBytes(brandingLogoKey(orgId));
+}
+
+export async function writeBrandingLogo(orgId: string, bytes: Uint8Array): Promise<void> {
+  await getDriver().setBytes(brandingLogoKey(orgId), bytes);
+}
+
+export async function deleteBrandingLogo(orgId: string): Promise<void> {
+  await getDriver().del(brandingLogoKey(orgId));
+}
+
+// ---------------------------------------------------------------------------
 // v1.7. The per-document corpus Quick questions reads (FRAGO 07 3.5)
 // ---------------------------------------------------------------------------
 

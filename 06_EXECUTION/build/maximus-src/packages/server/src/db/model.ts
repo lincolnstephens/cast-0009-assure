@@ -92,6 +92,22 @@ export interface Branding {
   accent: string;
   /** Display name shown in the portal and on the statement. */
   displayName: string;
+  /**
+   * v1.8 (FRAGO 08 3.2). The client's own logo, uploaded by the operator.
+   * The bytes sit in the store beside the organisation (brandingLogoKey) and
+   * are served only through the API to that organisation's sessions. Absent
+   * means the portal shows the display name as text.
+   */
+  logo?: BrandingLogo;
+}
+
+export interface BrandingLogo {
+  contentType: 'image/png' | 'image/svg+xml';
+  sizeBytes: number;
+  /** Bumped on every upload, so the portal never shows a replaced logo from cache. */
+  version: number;
+  updatedAt: Iso;
+  updatedBy: string;
 }
 
 export interface PolicyRecord {

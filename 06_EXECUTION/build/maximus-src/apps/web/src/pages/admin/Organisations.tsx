@@ -10,6 +10,19 @@ interface OrgRow {
   regulationLabel: string;
   userCount: number;
   taskCount: number;
+  /** v1.8. Set when the organisation has a branding logo. */
+  logoVersion: number | null;
+}
+
+const LOGO_MAX_BYTES = 500 * 1024;
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ""));
+    reader.onerror = () => reject(new Error("read"));
+    reader.readAsDataURL(file);
+  });
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -70,6 +83,44 @@ export function AdminOrganisationsPage() {
       setPending({ org, startDate, willCreate: res.willCreate });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to count the tasks.");
+    }
+  }
+
+  // v1.8 (FRAGO 08 3.2). The logo is set on the organisation named in the
+  // row, never through the switcher, so it cannot land on another one.
+  async function uploadLogo(org: OrgRow, file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    setNotice(null);
+    if (file.size > LOGO_MAX_BYTES) {
+      setError("A logo can be up to 500 KB; this one is larger.");
+      return;
+    }
+    if (!/\.(png|svg)$/i.test(file.name) && !/^image\/(png|svg\+xml)$/.test(file.type)) {
+      setError("A logo must be a PNG or SVG image.");
+      return;
+    }
+    try {
+      await api(`/admin/organisations/${org.id}/logo`, {
+        method: "PUT",
+        body: JSON.stringify({ fileName: file.name, dataBase64: await fileToBase64(file) }),
+      });
+      setNotice(`Logo set for ${org.name}. Its client pages show it in place of the name.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Unable to set the logo.");
+    }
+  }
+
+  async function removeLogo(org: OrgRow) {
+    setError(null);
+    setNotice(null);
+    try {
+      await api(`/admin/organisations/${org.id}/logo`, { method: "DELETE" });
+      setNotice(`Logo removed for ${org.name}. Its client pages show the name as text.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Unable to remove the logo.");
     }
   }
 
@@ -175,9 +226,10 @@ export function AdminOrganisationsPage() {
       {/* The table appears once its rows have arrived, never empty while loading. */}
       {orgs !== null && (
       <div className="overflow-x-auto">
-        <table data-testid="organisations-table" className="w-full min-w-[640px] text-left text-[13px]">
+        <table data-testid="organisations-table" className="w-full min-w-[720px] text-left text-[13px]">
           <thead className="text-[11px] uppercase tracking-wider text-hud-muted">
             <tr>
+              <th className="py-2 pr-3">Logo</th>
               <th className="py-2 pr-3">Name</th>
               <th className="py-2 pr-3">Jurisdiction</th>
               <th className="py-2 pr-3">Users</th>
@@ -188,6 +240,22 @@ export function AdminOrganisationsPage() {
           <tbody className="divide-y divide-hud-line">
             {orgs.map((o) => (
               <tr key={o.id} data-testid="organisation-row" data-org-id={o.id}>
+                <td className="py-2 pr-3 align-top">
+                  {o.logoVersion !== null ? (
+                    <span className="inline-block rounded bg-white p-1">
+                      <img
+                        data-testid="org-logo-thumb"
+                        src={`/api/admin/organisations/${o.id}/logo?v=${o.logoVersion}`}
+                        alt={o.name}
+                        className="block h-8 w-auto max-w-[120px] object-contain"
+                      />
+                    </span>
+                  ) : (
+                    <span data-testid="org-logo-none" className="text-[12px] text-hud-muted">
+                      None
+                    </span>
+                  )}
+                </td>
                 <td className="py-2 pr-3">
                   {o.name}
                   {o.id === selectedAccountId && <span className="ml-2 text-[11px] text-hud-gold">(selected)</span>}
@@ -216,6 +284,30 @@ export function AdminOrganisationsPage() {
                   >
                     Apply task library
                   </button>
+                  <label className="cursor-pointer rounded border border-hud-line px-2 py-0.5 text-[12px] hover:border-hud-accent">
+                    {o.logoVersion !== null ? "Replace logo" : "Upload logo"}
+                    <input
+                      type="file"
+                      accept=".png,.svg,image/png,image/svg+xml"
+                      data-testid="org-logo-input"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.currentTarget.files?.[0];
+                        e.currentTarget.value = "";
+                        void uploadLogo(o, file);
+                      }}
+                    />
+                  </label>
+                  {o.logoVersion !== null && (
+                    <button
+                      type="button"
+                      data-testid="org-logo-remove"
+                      onClick={() => void removeLogo(o)}
+                      className="rounded border border-hud-line px-2 py-0.5 text-[12px] hover:border-hud-accent"
+                    >
+                      Remove logo
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

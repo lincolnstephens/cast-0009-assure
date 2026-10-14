@@ -18,6 +18,7 @@ import { adminRecordRoutes } from "./routes/adminRecord.ts";
 import { adminReviewRoutes } from "./routes/adminReview.ts";
 import { adminWorkplanRoutes } from "./routes/adminWorkplan.ts";
 import { authRoutes } from "./routes/auth.ts";
+import { brandingRoutes } from "./routes/branding.ts";
 import { chatRoutes } from "./routes/chat.ts";
 import { clockRoutes, requestRoutes } from "./routes/clocks.ts";
 import { exportRoutes } from "./routes/exports.ts";
@@ -78,6 +79,7 @@ app.use("*", async (c, next) => {
 });
 
 app.route("/auth", authRoutes);
+app.route("/branding", brandingRoutes);
 app.route("/chat", chatRoutes);
 app.route("/clocks", clockRoutes);
 app.route("/exports", exportRoutes);

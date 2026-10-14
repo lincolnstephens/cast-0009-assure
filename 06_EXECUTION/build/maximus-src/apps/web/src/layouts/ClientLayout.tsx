@@ -2,7 +2,7 @@ import type { ClientBranding } from "@maximus/shared";
 import type { CSSProperties } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { ClientLogo } from "../components/ClientLogo";
-import { ClientPoweredBy } from "../components/ClientPoweredBy";
+import { ClientPoweredBy, MitmarkWatermark } from "../components/ClientPoweredBy";
 import { ClientViewBanner } from "../components/ClientViewBanner";
 import { useAuth } from "../store/auth";
 
@@ -45,7 +45,7 @@ export function ClientLayout() {
       <aside className="flex w-full shrink-0 flex-col border-b border-client-line bg-client-surface sm:w-44 sm:border-b-0 sm:border-r md:w-56">
         <div className="border-b border-client-line px-4 py-4 sm:px-5 sm:py-5">
           {theme ? (
-            <ClientLogo branding={theme} />
+            <ClientLogo branding={theme} place="sidebar" />
           ) : (
             <div className="text-sm font-semibold tracking-[0.25em] text-client-text">
               Client portal
@@ -87,7 +87,7 @@ export function ClientLayout() {
       <div className="flex min-w-0 flex-1 flex-col bg-client-bg">
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-client-line bg-client-surface px-4 py-3 sm:px-8 sm:py-4">
           <div className="min-w-0 truncate text-sm font-medium text-client-text">
-            {theme?.displayName ?? user?.clientAccountName ?? ""}
+            {theme ? <ClientLogo branding={theme} place="header" /> : (user?.clientAccountName ?? "")}
           </div>
           <div className="flex items-center gap-3">
             <div
@@ -111,9 +111,15 @@ export function ClientLayout() {
             </Link>
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto bg-client-bg px-4 py-6 leading-relaxed text-client-text sm:px-8 sm:py-10">
-          <Outlet />
-          {theme && <ClientPoweredBy text={theme.poweredByText} />}
+        {/* v1.8 (FRAGO 08 3.3): from 640px the right padding is a gutter the
+            content never enters, and the watermark sits in it beneath the
+            content layer, so it is never under text. */}
+        <main className="min-h-0 flex-1 overflow-y-auto bg-client-bg px-4 py-6 leading-relaxed text-client-text sm:py-10 sm:pl-8 sm:pr-24 md:pr-32">
+          <div data-testid="client-content" className="relative z-[1]">
+            <Outlet />
+            <ClientPoweredBy />
+          </div>
+          <MitmarkWatermark />
         </main>
       </div>
       </div>

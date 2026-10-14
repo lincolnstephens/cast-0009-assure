@@ -1,8 +1,8 @@
 ---
 document: OPERATOR_BRIEF
 job: CAST-0009 ASSURE
-product: Tessera Assure v1.7
-version: v1.7
+product: Tessera Assure v1.8
+version: v1.8
 status: FOR THE MITMARK OPERATOR
 authority: Seagull, written by the build session under T02 A6
 register_id: T18
@@ -559,6 +559,49 @@ Once a week, in this order:
 3. **Jobs.** Move the board to where the work actually is. Close work on the day it is done.
 4. **Figures.** Update the counts if they changed.
 
+## 5m. The client's organisation, ready for her (v1.8)
+
+### What has been set for you
+
+On 14 October the build set the client's organisation for first use, as Sunray ordered:
+- **Name.** The organisation's name, its display name and the name on the Statement are the client's trading name, as on its logo. Sunray decided this.
+- **Information Officer.** Set to the role, "Information Officer". Change it to her name in **Settings** if she wants it.
+- **Contract lead.** You, with your title, as the Statement's signatory.
+- **Module status.** All eight are **Live**, because you have MITMARK work in every module. Confirm each one, or change it, in **Settings**.
+- **Fee.** Nothing entered. The Statement keeps saying the fee is not entered until you enter it after the meeting. The hourly rate and the day rate still show the house figures (£45 and £650); check them when you enter the fee.
+- **Logo.** The client's logo, on its account only.
+
+Nothing else was touched. The 19 tasks, the 11 documents, the links, the journey stage and the retention schedule are as you left them. The three changes are in the audit log under the manager's name.
+
+### Her logo, and how to change it
+
+**Organisations** in the admin workspace now has a **Logo** column:
+- **Upload logo**, **Replace logo** and **Remove logo** act on that row's organisation only, whatever the switcher says.
+- A logo is a PNG or SVG of up to 500 KB.
+- An SVG that carries scripts or links to outside files is refused; save it as a plain SVG or a PNG.
+
+The logo is kept with the organisation, never at a public address. Only her own sign-in, and you in **View as client** for her organisation, can load it.
+
+Her portal shows the logo at the top of the menu and in the page header, in place of the name. The name stays as its text alternative, and it is shown instead whenever no logo is set. The logo is shown as uploaded and is never recoloured. The organisation switcher stays as text.
+
+### The MITMARK mark on her pages
+
+Every client page now ends with "Delivered by MITMARK Intelligence" beside the MITMARK mark.
+
+A faint MITMARK mark also sits at the bottom right of her pages, at about 6 per cent strength:
+- It sits in a margin her pages keep clear, so it is never behind words, and the gate measures this on every page at every width.
+- It is hidden on phones.
+- It stays on the printed Statement, in the corner of the page.
+- **View as client** shows it exactly as she will.
+- Your admin pages carry neither the footer nor the mark.
+
+### What to do before she signs in (FRAGO 08 3.4)
+
+1. Open her organisation in **View as client** and read every page as she will see it.
+2. In **Users**, create a test seat for her organisation. Sign in as it and walk a request, an upload and a Quick question. Accept or return what it sends; nothing it does reaches her figures.
+3. Sunray rotates the session secret. Every signed-in session ends, yours included; sign in again.
+4. After Sunray confirms Block 5 consent, reset her password in **Users** and give it to her yourself, in person or by phone, never in the same message as the address.
+
 ## 6. Importing the v0.1 export
 
 If you have a record file from the earlier single-page version, **Record** has an import.
@@ -600,7 +643,7 @@ Do not edit its wording. It was written to be forwardable to a sceptical finance
 
 ## 9. What not to put in it
 
-- **No client name** unless you have set the display name deliberately and Sunray has cleared it. The address, the page title and the source carry no client name.
+- **No client name** outside her own organisation's name, display name and logo, which Sunray cleared on 14 October. The address, the page title, the source and the build carry no client name. Do not put her name or the client's name in entries, task notes or document titles that could be forwarded beyond her.
 - **No personal data of any data subject.** Entries describe the work, not the people. "Handled a data request from a former member of staff" is right. A name, a case reference or any detail that identifies the person is not.
 - **No marketing.** The client side has none and should keep none.
 
@@ -614,6 +657,7 @@ The product is multi-tenant. A second retained client is a second organisation, 
 - **Quick questions has no working model key.** A key reaches the site from the Netlify team, and the Anthropic API refuses it (DC-19). So Quick questions shows the matching passages rather than a written answer, and says so in one sentence. It works, and it is honest. A written answer needs Sunray to set a working key on the site.
 - **Uploaded PDFs are not read** on this deployment. They are filed and downloadable, and marked "Not searchable". Every file filed so far is a .docx or .xlsx.
 - The posture and the exposure alerts carry demo data and say so on screen. Do not present them as live monitoring.
+- **The logo is one image.** There is no separate version for dark backgrounds; the client portal is light and stays light.
 
 ## 12. If something looks wrong
 

@@ -12,6 +12,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { OrgDoc, UserRecord } from "../db/model.ts";
 import { mutateUsers, readOrg, readUsers } from "../db/store.ts";
 import { writeAudit } from "../lib/audit.ts";
+import { logoPath } from "../lib/logo.ts";
 import { previewOrgOf, requireAuth, type AppEnv } from "../lib/middleware.ts";
 import {
   createSession,
@@ -229,6 +230,10 @@ async function toSessionUser(user: UserRecord) {
  * single source of the palette; no tenant's colours are hardcoded anywhere.
  */
 function toClientBranding(org: OrgDoc): ClientBranding {
-  return brandingFor(org.branding.displayName || org.name, org.branding.accent);
+  // v1.8: the logo travels as an API path, served only to this
+  // organisation's sessions (routes/branding.ts); absent means text.
+  const branding = brandingFor(org.branding.displayName || org.name, org.branding.accent);
+  const logo = logoPath(org.branding.logo);
+  return logo ? { ...branding, logoLight: logo } : branding;
 }
 

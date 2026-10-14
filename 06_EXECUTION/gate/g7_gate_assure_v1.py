@@ -97,7 +97,7 @@ import sys
 CONFIG = {
     # Identity of the run, for the report header.
     "codename": "ASSURE",
-    "iteration": "v1.7",
+    "iteration": "v1.8",
 
     # What is gated. Either a deployed URL or a path to a local artefact.
     # Passed on the command line; these are the defaults.
@@ -831,6 +831,12 @@ def _credentials(cfg, role):
             os.environ.get(s["admin_email_env"], s["admin_email_default"]),
             os.environ.get(s["admin_password_env"], s["admin_password_default"]),
         )
+    # v1.8: the demo client seat (demo@demo.local) is disabled by Sunray and
+    # stays so. Unless an account is named in the environment, the client
+    # side is driven as the gate's own seat on the demo organisation, enabled
+    # for the run and disabled again at its end (_final_gate_cleanup).
+    if not os.environ.get(s["email_env"]):
+        return _gate_demo_client(cfg)
     return (
         os.environ.get(s["email_env"], s["email_default"]),
         os.environ.get(s["password_env"], s["password_default"]),
@@ -1060,9 +1066,7 @@ def _client_surface_views(line):
 
 def drv_sign_in_lands_on_portal(page, cfg, line, res, errors):
     """Line 1: the demo sign-in reaches the client portal."""
-    sign_in = cfg["sign_in"]
-    email = os.environ.get(sign_in["email_env"], sign_in["email_default"])
-    password = os.environ.get(sign_in["password_env"], sign_in["password_default"])
+    email, password = _credentials(cfg, "client")
     email_sel = line.get("email_selector", "input[type='email']")
     password_sel = line.get("password_selector", "input[type='password']")
     submit_sel = line.get("submit_selector", "button[type='submit']")
@@ -3190,6 +3194,8 @@ GATE_ORG_JOURNEY_NOTE = "Gate test organisation journey note."
 GATE_CLIENT_EMAIL = "gate-client@gate.invalid"
 GATE_MANAGER_EMAIL = "gate-manager@gate.invalid"
 # v1.7: the gate organisation's test seat (FRAGO 07 3.3) is disabled with the rest.
+GATE_DEMO_CLIENT_EMAIL = "gate-demo-client@gate.invalid"
+DEMO_ORG_ID = "demo"
 GATE_EMAILS = (GATE_CLIENT_EMAIL, GATE_MANAGER_EMAIL, "gate-test-seat@gate.invalid", "gate-second-seat@gate.invalid")
 SEED_FIXTURE = "06_EXECUTION/gate/fixtures/seed_manifest_fixture.json"
 PASSWORD_REQUIRED_CODE = "password_change_required"
@@ -3314,10 +3320,45 @@ def _safe_disable(cfg, operator=None):
         return [f"cleanup failed: {type(exc).__name__}"]
 
 
+def _gate_demo_client(cfg):
+    """v1.8. The gate's client seat on the demo organisation: found or
+    created, enabled, given a one-time password and past its first-sign-in
+    change, once per run. It is not among GATE_EMAILS, which lines disable
+    mid-run; it is disabled at the end of the run instead."""
+    if _GATE.get("demo_client"):
+        return _GATE["demo_client"]
+    operator = _ApiSeat(cfg, "admin")
+    s, body = operator.call("GET", "/admin/organisations")
+    if not _ok(s, body) or DEMO_ORG_ID not in {o.get("id") for o in body.get("organisations") or []}:
+        raise RuntimeError("the demo organisation is not listed")
+    _, otp, _ = _gate_user(operator, GATE_DEMO_CLIENT_EMAIL, "client", DEMO_ORG_ID)
+    seat = _ApiSeat(cfg, None, email=GATE_DEMO_CLIENT_EMAIL, password=otp)
+    pw = _new_password()
+    s, _ = seat.call("POST", "/auth/password", {"currentPassword": otp, "newPassword": pw})
+    if s != 200:
+        raise RuntimeError(f"first-sign-in password change for the gate demo seat returned {s}")
+    _GATE["demo_client"] = (GATE_DEMO_CLIENT_EMAIL, pw)
+    return _GATE["demo_client"]
+
+
+def _disable_gate_demo_client(cfg):
+    try:
+        operator = _ApiSeat(cfg, "admin")
+        u = _find_user(operator, GATE_DEMO_CLIENT_EMAIL)
+        if u is None:
+            return []
+        if u.get("status") != "disabled":
+            operator.call("POST", f"/admin/users/{u['id']}/disable")
+        u = _find_user(operator, GATE_DEMO_CLIENT_EMAIL)
+        return [] if u is None or u.get("status") == "disabled" else [GATE_DEMO_CLIENT_EMAIL]
+    except Exception as exc:
+        return [f"demo seat cleanup failed: {type(exc).__name__}"]
+
+
 def _final_gate_cleanup(cfg):
     if "_target" not in cfg:
         return
-    left = _safe_disable(cfg)
+    left = _safe_disable(cfg) + _disable_gate_demo_client(cfg)
     check("driven: every gate user disabled at the end of the run", not left,
           "none left enabled" if not left else ", ".join(left))
 
@@ -5373,6 +5414,618 @@ def drv_new_org_modules_available(page, cfg, line, res, errors):
     return ok, "eight Module status controls; a new organisation's modules are Available" if ok else "; ".join(problems[:6])
 
 
+# =============================================================================
+# v1.8 (FRAGO 08). Client branding, the MITMARK footer and watermark, and the
+# client organisation configured for first use.
+#
+# The client organisation is read, never written, by these lines: a client
+# view of it would itself write an audit row there, so the positive logo case
+# is proved on the gate's own organisation with a neutral generated image,
+# which is removed again before the line ends. The client's own logo is only
+# ever fetched to compare its length and hash; its bytes are never written.
+# =============================================================================
+
+CLIENT_ORG_ID = "org-f2b4afdf0d"
+CLIENT_ORG_TASKS = 19
+CLIENT_ORG_DOCUMENTS = 11
+CLIENT_IO_NAME = "Information Officer"
+CLIENT_LEAD_TITLE = "Chief Information Security Officer, MITMARK Intelligence"
+FOOTER_TEXT = "Delivered by MITMARK Intelligence"
+LOGO_MAX_BYTES = 500 * 1024
+RESTRICTED_LOGO = "material/restricted/client_logo.png"
+
+
+def _gate_png(width=48, height=16, rgb=(90, 90, 90)):
+    """A small neutral PNG for the gate organisation's test logo."""
+    import struct
+    import zlib
+
+    def chunk(kind, data):
+        return (struct.pack(">I", len(data)) + kind + data
+                + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
+    row = b"\x00" + bytes(rgb) * width
+    raw = row * height
+    return (b"\x89PNG\r\n\x1a\n"
+            + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw))
+            + chunk(b"IEND", b""))
+
+
+def _b64(data):
+    import base64
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    return base64.b64encode(data).decode("ascii")
+
+
+def _raw_bytes(seat, path, preview_query=None):
+    """GET a binary API path with the seat's cookies. Returns (status, bytes, content-type)."""
+    import urllib.error
+    import urllib.request
+    url = seat.base + path
+    if preview_query:
+        url += ("&" if "?" in url else "?") + "preview=" + urllib.request.quote(f"client:{preview_query}")
+    req = urllib.request.Request(url, method="GET")
+    try:
+        with seat.opener.open(req, timeout=30) as resp:
+            return resp.status, resp.read(), resp.headers.get("Content-Type", "")
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read(), exc.headers.get("Content-Type", "")
+
+
+def _org_rows(operator):
+    s, body = operator.call("GET", "/admin/organisations")
+    if not _ok(s, body):
+        raise RuntimeError(f"GET /admin/organisations returned {s}")
+    return {o["id"]: o for o in body.get("organisations") or []}
+
+
+def _set_gate_logo(operator, gid):
+    s, body = operator.call("PUT", f"/admin/organisations/{gid}/logo",
+                            {"fileName": "gate-logo.png", "dataBase64": _b64(_gate_png())})
+    if s != 200 or not (body or {}).get("logo"):
+        raise RuntimeError(f"setting the gate organisation's test logo returned {s}")
+    return body["logo"]
+
+
+def _clear_gate_logo(operator, gid):
+    operator.call("DELETE", f"/admin/organisations/{gid}/logo")
+
+
+def _gate_client_browser(page, cfg, operator):
+    """Sign the browser in as the gate organisation's client seat."""
+    gid = _gate_org(operator)[0]["id"]
+    _, _, pw = _gate_seat(cfg, operator, GATE_CLIENT_EMAIL, "client", gid)
+    if not _sign_in_with(page, cfg["_target"], GATE_CLIENT_EMAIL, pw):
+        return False
+    return _wait_for(page, "[data-view='tracker']", 10000)
+
+
+def _img_width(loc, timeout_ms=8000):
+    """An image's natural width once it has finished loading (0 if it failed, -1 if it never finished)."""
+    try:
+        loc.scroll_into_view_if_needed(timeout=timeout_ms)
+        return loc.evaluate("""(el) => new Promise((resolve) => {
+          const done = () => resolve(el.naturalWidth || 0);
+          if (el.complete) return done();
+          el.addEventListener('load', done, { once: true });
+          el.addEventListener('error', () => resolve(0), { once: true });
+          setTimeout(() => resolve(el.complete ? el.naturalWidth : -1), %d);
+        })""" % timeout_ms)
+    except Exception:
+        return -1
+
+
+def drv_logo_upload_limits(page, cfg, line, res, errors):
+    """Line 71: the logo upload takes PNG or SVG up to 500 KB, refuses any
+    other type, an unsafe SVG and an oversize file, is a manager's action
+    only, and the Organisations page offers the control."""
+    settle_ms = line.get("settle_ms", 500)
+    problems = []
+    operator = _ApiSeat(cfg, "admin")
+    gid = _gate_org(operator)[0]["id"]
+    if _api_only_once(line, res):
+        try:
+            png = _gate_png()
+            big = png + b"\x00" * (LOGO_MAX_BYTES + 1 - len(png))
+            cases = [
+                ("GIF", _b64(b"GIF89a" + b"\x00" * 32), 400),
+                ("plain text named .png", _b64("not an image"), 400),
+                ("SVG with a script", _b64('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>'), 400),
+                ("SVG with a handler", _b64('<svg xmlns="http://www.w3.org/2000/svg" onload="x()"></svg>'), 400),
+                ("PNG of 500 KB and one byte", _b64(big), 413),
+            ]
+            for label, data, want in cases:
+                s, _ = operator.call("PUT", f"/admin/organisations/{gid}/logo", {"fileName": "x.png", "dataBase64": data})
+                if s != want:
+                    problems.append(f"{label}: {s}, expected {want}")
+            if _org_rows(operator)[gid].get("logoVersion") is not None:
+                problems.append("a refused upload left a logo on the gate organisation")
+            svg = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="40" height="10"><rect width="40" height="10" fill="#777"/></svg>'
+            s, body = operator.call("PUT", f"/admin/organisations/{gid}/logo", {"fileName": "g.svg", "dataBase64": _b64(svg)})
+            if s != 200 or ((body or {}).get("logo") or {}).get("contentType") != "image/svg+xml":
+                problems.append(f"a plain SVG: {s}")
+            s2, raw, ctype = _raw_bytes(operator, f"/admin/organisations/{gid}/logo")
+            if s2 != 200 or not ctype.startswith("image/svg+xml"):
+                problems.append(f"the SVG served back: {s2} {ctype}")
+            s, body = operator.call("PUT", f"/admin/organisations/{gid}/logo", {"fileName": "g.png", "dataBase64": _b64(_gate_png())})
+            if s != 200 or ((body or {}).get("logo") or {}).get("contentType") != "image/png":
+                problems.append(f"a PNG: {s}")
+            seat, _ = _gate_client_seat(cfg, operator)
+            s, _ = seat.call("PUT", f"/admin/organisations/{gid}/logo", {"dataBase64": _b64(_gate_png())})
+            if s not in (401, 403):
+                problems.append(f"a client seat setting a logo: {s}")
+        finally:
+            _clear_gate_logo(operator, gid)
+        if _org_rows(operator)[gid].get("logoVersion") is not None:
+            problems.append("the gate organisation kept a logo after the line")
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator"
+    page.goto(cfg["_target"].rstrip("/") + "/admin/organisations")
+    _wait_for(page, "[data-testid='organisation-row']", 10000)
+    page.wait_for_timeout(settle_ms)
+    inputs = page.locator("[data-testid='org-logo-input']")
+    if inputs.count() == 0:
+        problems.append("no logo upload control on the Organisations page")
+    else:
+        accept = inputs.first.get_attribute("accept") or ""
+        if "png" not in accept or "svg" not in accept:
+            problems.append(f"the upload control accepts '{accept}'")
+    ok = not problems
+    return ok, ("PNG and SVG taken; GIF, text, unsafe SVG and 500 KB + 1 refused; manager only; control on Organisations"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_logo_isolation(page, cfg, line, res, errors):
+    """Line 72: a logo set on one organisation is served to that
+    organisation's sessions and its client view only. Proved on the gate
+    organisation with a neutral test logo, removed afterwards; the client
+    organisation's logo is checked to reach neither the demo nor the gate
+    organisation, without opening a client view of it."""
+    settle_ms = line.get("settle_ms", 600)
+    problems = []
+    operator = _ApiSeat(cfg, "admin")
+    gid = _gate_org(operator)[0]["id"]
+    demo = _preview_org_id(operator)
+    demo_seat = _ApiSeat(cfg, "client")
+    try:
+        logo = _set_gate_logo(operator, gid)
+        expected = _gate_png()
+        if _api_only_once(line, res):
+            gate_seat, _ = _gate_client_seat(cfg, operator)
+            s, raw, ctype = _raw_bytes(gate_seat, "/branding/logo")
+            if s != 200 or raw != expected or not ctype.startswith("image/png"):
+                problems.append(f"gate seat's own logo: {s}")
+            me = gate_seat.call("GET", "/auth/me")[1] or {}
+            if ((me.get("branding") or {}).get("logoLight") or "") != f"/branding/logo?v={logo['version']}":
+                problems.append("the gate seat's branding does not carry its logo path")
+            for label, seat, pq in (("demo seat", demo_seat, None), ("demo seat naming the gate organisation", demo_seat, gid)):
+                s, raw, _ = _raw_bytes(seat, "/branding/logo", pq)
+                if s == 200 or raw == expected:
+                    problems.append(f"{label} received a logo ({s})")
+            if ((demo_seat.call("GET", "/auth/me")[1] or {}).get("branding") or {}).get("logoLight"):
+                problems.append("the demo seat's branding carries a logo")
+            s, raw, _ = _raw_bytes(operator, "/branding/logo", gid)
+            if s != 200 or raw != expected:
+                problems.append(f"client view of the gate organisation: {s}")
+            s, raw, _ = _raw_bytes(operator, "/branding/logo", demo)
+            if s == 200:
+                problems.append("client view of the demo served a logo")
+            s, raw, _ = _raw_bytes(operator, "/branding/logo")
+            if s == 200:
+                problems.append("the operator outside client view was served a client logo")
+            # The client organisation's own logo: present, and served to no other organisation.
+            rows = _org_rows(operator)
+            client_row = rows.get(CLIENT_ORG_ID)
+            if client_row is None or client_row.get("logoVersion") is None:
+                problems.append("the client organisation has no logo set")
+            else:
+                s, client_logo, _ = _raw_bytes(operator, f"/admin/organisations/{CLIENT_ORG_ID}/logo")
+                for label, seat, pq in (("demo seat", demo_seat, None), ("gate seat", gate_seat, None),
+                                        ("demo seat naming the client organisation", demo_seat, CLIENT_ORG_ID)):
+                    s2, raw, _ = _raw_bytes(seat, "/branding/logo", pq)
+                    if s2 == 200 and raw == client_logo:
+                        problems.append(f"{label} received the client organisation's logo")
+            for oid in (demo,):
+                if rows.get(oid, {}).get("logoVersion") is not None:
+                    problems.append("the demo organisation has a logo")
+        # In the browser: the gate seat sees its logo in sidebar and header, alt is the name.
+        if not _gate_client_browser(page, cfg, operator):
+            return False, "could not sign in as the gate client seat"
+        page.wait_for_timeout(settle_ms)
+        for place in ("sidebar", "header"):
+            img = page.locator(f"[data-testid='client-logo-{place}']")
+            if img.count() == 0:
+                problems.append(f"gate seat: no logo in the {place}")
+                continue
+            w = _img_width(img.first)
+            alt = img.first.get_attribute("alt") or ""
+            if w <= 0:
+                problems.append(f"gate seat: {place} logo did not load")
+            if not alt.strip():
+                problems.append(f"gate seat: {place} logo has no alt text")
+            if (img.first.evaluate("(el) => getComputedStyle(el).filter") or "none") != "none":
+                problems.append(f"gate seat: {place} logo is filtered")
+            src = img.first.get_attribute("src") or ""
+            if not src.startswith("/api/branding/logo"):
+                problems.append(f"gate seat: {place} logo is not served through the API")
+    finally:
+        _clear_gate_logo(operator, gid)
+    # The demo seat in the browser: no logo, the name as text.
+    _sign_in(page, cfg, "client", cfg["_target"])
+    _wait_for(page, "[data-view='tracker']", 10000)
+    page.wait_for_timeout(settle_ms)
+    if page.locator("[data-testid^='client-logo-']").count():
+        problems.append("the demo seat's portal shows a logo")
+    if _org_rows(operator)[gid].get("logoVersion") is not None:
+        problems.append("the gate organisation kept its test logo")
+    ok = not problems
+    return ok, ("logo served to its own organisation's seat and client view only; the client organisation's logo "
+                "reaches neither the demo nor the gate organisation; gate test logo removed"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_logo_fallback_text(page, cfg, line, res, errors):
+    """Line 73: with no logo, the portal shows the display name as text in
+    the sidebar and header; the admin Organisations list shows a set logo as
+    a thumbnail and the switcher stays text."""
+    settle_ms = line.get("settle_ms", 500)
+    problems = []
+    if not _sign_in(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the demo client"
+    _enter_view(page, "tracker", None, settle_ms, cfg, "client")
+    _wait_for(page, "[data-testid='client-name-fallback']", 8000)
+    side = page.locator("[data-testid='client-name-fallback']")
+    head = page.locator("[data-testid='client-name-fallback-header']")
+    if side.count() == 0 or not _text(side.first):
+        problems.append("no text name in the sidebar")
+    if head.count() == 0 or not _text(head.first):
+        problems.append("no text name in the header")
+    if page.locator("[data-testid^='client-logo-']").count():
+        problems.append("a logo is shown with none set")
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator"
+    page.goto(cfg["_target"].rstrip("/") + "/admin/organisations")
+    _wait_for(page, "[data-testid='organisation-row']", 10000)
+    page.wait_for_timeout(settle_ms)
+    row = page.locator(f"[data-testid='organisation-row'][data-org-id='{CLIENT_ORG_ID}']")
+    if row.count() == 0:
+        problems.append("the client organisation is not on the Organisations list")
+    else:
+        thumb = row.first.locator("[data-testid='org-logo-thumb']")
+        if thumb.count() == 0:
+            problems.append("the client organisation's logo is not on the Organisations list")
+        elif _img_width(thumb.first) <= 0:
+            problems.append("the Organisations list thumbnail did not load")
+    demo = _preview_org_id(_ApiSeat(cfg, "admin"))
+    drow = page.locator(f"[data-testid='organisation-row'][data-org-id='{demo}']")
+    if drow.count() and drow.first.locator("[data-testid='org-logo-none']").count() == 0:
+        problems.append("the demo row does not say None")
+    sw = page.locator("[data-testid='org-switcher']")
+    if sw.count() == 0:
+        problems.append("no organisation switcher")
+    elif sw.first.locator("img").count() or sw.first.evaluate("(el) => el.tagName") != "SELECT":
+        problems.append("the switcher is not plain text")
+    ok = not problems
+    return ok, ("name as text in sidebar and header with no logo; the logo on the Organisations list; switcher text"
+                if ok else "; ".join(problems[:6]))
+
+
+def _watermark_state(page):
+    return page.evaluate("""() => {
+      const w = document.querySelector("[data-testid='mitmark-watermark']");
+      if (!w) return { present: false };
+      const img = w.querySelector('img');
+      const r = w.getBoundingClientRect();
+      let op = 1;
+      for (let el = img || w; el && el !== document.documentElement; el = el.parentElement) {
+        op *= parseFloat(getComputedStyle(el).opacity || '1');
+      }
+      const visible = getComputedStyle(w).display !== 'none' && r.width > 0 && r.height > 0;
+      return { present: true, visible, opacity: op, right: window.innerWidth - r.right,
+               bottom: window.innerHeight - r.bottom, loaded: !!img && img.complete && img.naturalWidth > 0 };
+    }""")
+
+
+def _footer_ok(page):
+    f = page.locator("[data-testid='client-footer']")
+    if f.count() == 0:
+        return "no footer"
+    if FOOTER_TEXT not in _text(f.first):
+        return f"footer reads '{_text(f.first)[:60]}'"
+    if f.first.locator("img").count() == 0:
+        return "no MITMARK mark in the footer"
+    return None
+
+
+def drv_footer_watermark(page, cfg, line, res, errors):
+    """Line 74: every client page carries the footer and, from 640px, the
+    watermark at about 6 per cent bottom right; neither is on an admin page;
+    the same mark shows in View as client; the printed Statement keeps it."""
+    settle_ms = line.get("settle_ms", 450)
+    wide = res["width"] >= 640
+    problems = []
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the demo client"
+    views = _client_surface_views(line)
+    for v in views:
+        if not _enter_any(page, cfg, v, None, settle_ms, "client"):
+            problems.append(f"{v}: not reached")
+            continue
+        _wait_for(page, "[data-testid='client-footer']", 6000)
+        bad = _footer_ok(page)
+        if bad:
+            problems.append(f"{v}: {bad}")
+        st = _watermark_state(page)
+        if not st.get("present"):
+            problems.append(f"{v}: no watermark")
+        elif wide:
+            if not st["visible"] or not st["loaded"]:
+                problems.append(f"{v}: watermark not shown")
+            elif not (0.04 <= st["opacity"] <= 0.08):
+                problems.append(f"{v}: watermark opacity {st['opacity']:.3f}")
+            elif st["right"] > 40 or st["bottom"] > 40:
+                problems.append(f"{v}: watermark not bottom right ({st['right']:.0f}, {st['bottom']:.0f})")
+        elif st["visible"]:
+            problems.append(f"{v}: watermark shown below 640px")
+    if wide:
+        _enter_view(page, "statement", None, settle_ms, cfg, "client")
+        _wait_for(page, "[data-testid='statement']", 6000)
+        try:
+            page.emulate_media(media="print")
+            page.wait_for_timeout(200)
+            st = _watermark_state(page)
+            if not st.get("visible"):
+                problems.append("the printed Statement has no watermark")
+        finally:
+            page.emulate_media(media="screen")
+            page.wait_for_timeout(100)
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator"
+    for path in line.get("admin_paths", ["/admin", "/admin/organisations", "/admin/settings", "/admin/jobs", "/admin/documents"]):
+        page.goto(cfg["_target"].rstrip("/") + path)
+        _wait_for(page, "[data-view='queue']", 8000)
+        page.wait_for_timeout(settle_ms)
+        if page.locator("[data-testid='mitmark-watermark'], [data-testid='client-footer']").count():
+            problems.append(f"admin {path}: client footer or watermark present")
+    if not _enter_view(page, "client-view", None, settle_ms, cfg, "admin"):
+        problems.append("could not open View as client")
+    else:
+        _wait_for(page, "[data-testid='client-view-banner']", 8000)
+        _wait_for(page, "[data-testid='client-footer']", 6000)
+        st = _watermark_state(page)
+        if _footer_ok(page):
+            problems.append(f"View as client: {_footer_ok(page)}")
+        if not st.get("present") or (wide and not st.get("visible")):
+            problems.append("View as client: no watermark")
+        _leave_client_view(page, settle_ms)
+    ok = not problems
+    return ok, (f"{len(views)} client pages carry the footer and the watermark"
+                f"{' (shown, about 6%, bottom right; on the printed Statement)' if wide else ' (hidden below 640px)'};"
+                " none on admin pages; same in View as client" if ok else "; ".join(problems[:6]))
+
+
+_WATERMARK_CONTRAST_JS = r"""
+async () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1; canvas.height = 1;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const rgba = (col) => {
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = '#000'; ctx.fillStyle = col; ctx.fillRect(0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2], d[3] / 255];
+  };
+  const over = (top, under) => { const a = top[3]; return [0, 1, 2].map((i) => top[i] * a + under[i] * (1 - a)); };
+  const lum = (rgb) => {
+    const c = rgb.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+
+  const wm = document.querySelector("[data-testid='mitmark-watermark']");
+  const content = document.querySelector("[data-testid='client-content']");
+  const main = content ? content.closest('main') : null;
+  let wmRect = null, wmOpacity = 0, worst = null;
+  if (wm && getComputedStyle(wm).display !== 'none') {
+    const img = wm.querySelector('img');
+    wmRect = wm.getBoundingClientRect();
+    wmOpacity = 1;
+    for (let el = img || wm; el && el !== document.documentElement; el = el.parentElement) wmOpacity *= parseFloat(getComputedStyle(el).opacity || '1');
+    // The darkest colour in the mark, read from the mark itself: the worst case under any glyph.
+    try {
+      const svg = await (await fetch(img.getAttribute('src'))).text();
+      const cols = Array.from(new Set((svg.match(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g) || [])));
+      for (const c of cols) { const v = rgba(c); if (!worst || lum(v) < lum(worst)) worst = v; }
+    } catch (e) { worst = [0, 0, 0, 1]; }
+    if (!worst) worst = [0, 0, 0, 1];
+  }
+
+  // The element's background as composited, and whether that background lies
+  // above the watermark (inside the content layer) or beneath it.
+  const backdrop = (el) => {
+    const layers = [];
+    let n = el, aboveMark = false;
+    for (; n && n.nodeType === 1; n = n.parentElement) {
+      const c = rgba(getComputedStyle(n).backgroundColor);
+      if (c[3] > 0) layers.push(c);
+      if (c[3] >= 0.999) { aboveMark = !!content && content.contains(n) ; break; }
+    }
+    let base = [255, 255, 255];
+    for (let i = layers.length - 1; i >= 0; i--) base = over(layers[i], base);
+    return { base, aboveMark };
+  };
+
+  const out = { measured: 0, overlapping: 0, minOverlap: null, footer: null, fails: [] };
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const seen = new Set();
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+    if (!t.textContent.trim()) continue;
+    const el = t.parentElement;
+    if (!el || seen.has(el)) continue;
+    seen.add(el);
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) continue;
+    if (el.closest("[aria-hidden='true'], .sr-only")) continue;
+    const { base, aboveMark } = backdrop(el);
+    const fg = over(rgba(cs.color), base);
+    const size = parseFloat(cs.fontSize), weight = parseInt(cs.fontWeight, 10) || 400;
+    const large = size >= 24 || (size >= 18.66 && weight >= 700);
+    const isFooter = !!el.closest("[data-testid='client-footer']");
+    let overlaps = false;
+    if (wmRect && !aboveMark) {
+      const xo = r.left < wmRect.right && r.right > wmRect.left;
+      const yo = r.top < wmRect.bottom && r.bottom > wmRect.top;
+      // Inside the scrolling content area any element in the mark's column
+      // can pass beneath it; outside it, only one that already overlaps.
+      overlaps = (main && main.contains(el)) ? xo : (xo && yo);
+    }
+    if (!overlaps && !isFooter) continue;
+    out.measured += 1;
+    const bg = overlaps ? over([worst[0], worst[1], worst[2], wmOpacity], base) : base;
+    const ratioNow = Math.round(ratio(fg, bg) * 100) / 100;
+    const need = isFooter ? 4.5 : (large ? 3 : 4.5);
+    if (overlaps) {
+      out.overlapping += 1;
+      out.minOverlap = out.minOverlap === null ? ratioNow : Math.min(out.minOverlap, ratioNow);
+    }
+    if (isFooter) out.footer = out.footer === null ? ratioNow : Math.min(out.footer, ratioNow);
+    if (ratioNow < need) out.fails.push(`'${t.textContent.trim().slice(0, 30)}' ${ratioNow}:1`);
+  }
+  out.watermark = !!wmRect;
+  return out;
+}
+"""
+
+
+def drv_watermark_contrast(page, cfg, line, res, errors):
+    """Line 75: with the watermark present, text on every client page keeps
+    4.5:1 (3:1 for large text) wherever the mark can lie beneath it,
+    measured against the page blended with the mark's darkest colour at the
+    mark's opacity; the footer text is 4.5:1 or better."""
+    settle_ms = line.get("settle_ms", 450)
+    problems, overlapping, footer_min = [], 0, None
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the demo client"
+    views = _client_surface_views(line)
+    for v in views:
+        if not _enter_any(page, cfg, v, None, settle_ms, "client"):
+            problems.append(f"{v}: not reached")
+            continue
+        _wait_for(page, "[data-testid='client-footer']", 6000)
+        m = page.evaluate(_WATERMARK_CONTRAST_JS)
+        overlapping += m["overlapping"]
+        if m["footer"] is None:
+            problems.append(f"{v}: footer text not measured")
+        else:
+            footer_min = m["footer"] if footer_min is None else min(footer_min, m["footer"])
+        if res["width"] >= 640 and not m["watermark"]:
+            problems.append(f"{v}: no watermark to measure against")
+        for f in m["fails"]:
+            problems.append(f"{v}: {f}")
+    ok = not problems
+    return ok, (f"{len(views)} pages; {overlapping} text element(s) in the mark's column, none below the rule; "
+                f"footer lowest {footer_min}:1" if ok else "; ".join(problems[:6]))
+
+
+def drv_client_org_ready(page, cfg, line, res, errors):
+    """Line 76: the client organisation is configured as FRAGO 08 3.1, read
+    only: the name is the client's trading name (proved by the restricted
+    list, never printed) in all three places; the Information Officer is
+    the role; the contract lead carries the title; all eight modules are
+    Live; no fee; 19 tasks and 11 documents; its logo is a PNG and the
+    restricted file's own bytes."""
+    import hashlib
+    if not _api_only_once(line, res):
+        return True, "not repeated (API)"
+    problems = []
+    operator = _ApiSeat(cfg, "admin")
+    s, body = operator.call("GET", f"/admin/settings?org={CLIENT_ORG_ID}")
+    if not _ok(s, body):
+        return False, f"GET /admin/settings for the client organisation returned {s}"
+    st, br, name = body.get("settings") or {}, body.get("branding") or {}, body.get("name") or ""
+    terms = _restricted_terms_runtime(cfg) or []
+    if not terms:
+        problems.append("restricted list unreadable")
+    elif not name or not _restricted_hit_count(name, terms):
+        problems.append("the organisation name is not the client's trading name")
+    if not (name == br.get("displayName") == st.get("clientName")):
+        problems.append("name, display name and statement name differ")
+    if st.get("ioName") != CLIENT_IO_NAME:
+        problems.append("the Information Officer is not the role")
+    lead = st.get("lead") or ""
+    if not lead.endswith(", " + CLIENT_LEAD_TITLE) or not lead[: -len(CLIENT_LEAD_TITLE) - 2].strip():
+        problems.append("the contract lead is not a name with the title")
+    ms = st.get("moduleStatus") or {}
+    if sorted(ms) != [str(i) for i in range(1, 9)] or set(ms.values()) != {"Live"}:
+        problems.append(f"module status {ms}")
+    if st.get("retainer") not in ("", None):
+        problems.append("a retainer is entered")
+    if st.get("showIllustrative"):
+        problems.append("show illustrative is on")
+    row = _org_rows(operator).get(CLIENT_ORG_ID) or {}
+    if row.get("taskCount") != CLIENT_ORG_TASKS:
+        problems.append(f"{row.get('taskCount')} tasks, expected {CLIENT_ORG_TASKS}")
+    s, docs = operator.call("GET", f"/admin/documents?org={CLIENT_ORG_ID}")
+    n_docs = len((docs or {}).get("documents") or []) if _ok(s, docs) else None
+    if n_docs != CLIENT_ORG_DOCUMENTS:
+        problems.append(f"{n_docs} documents, expected {CLIENT_ORG_DOCUMENTS}")
+    logo = br.get("logo") or {}
+    if logo.get("contentType") != "image/png":
+        problems.append("no PNG logo set")
+    else:
+        s, raw, _ = _raw_bytes(operator, f"/admin/organisations/{CLIENT_ORG_ID}/logo")
+        src = cfg["root"] / RESTRICTED_LOGO
+        if s != 200:
+            problems.append(f"the logo is not served to the operator ({s})")
+        elif src.is_file() and hashlib.sha256(raw).digest() != hashlib.sha256(src.read_bytes()).digest():
+            problems.append("the logo set is not the restricted file")
+    ok = not problems
+    return ok, ("name set (restricted match, not printed); Information Officer role; lead with title; "
+                f"8 modules Live; no fee; {CLIENT_ORG_TASKS} tasks, {CLIENT_ORG_DOCUMENTS} documents; logo PNG"
+                if ok else "; ".join(problems[:8]))
+
+
+def sdrv_logo_file_nowhere_else(cfg, line):
+    """Line 77: the client's logo file exists only in material/restricted:
+    no file under the job folder outside it, and nothing in the built
+    bundle, has the same bytes. Compared by hash; nothing is printed."""
+    import hashlib
+    src = cfg["root"] / RESTRICTED_LOGO
+    if not src.is_file():
+        return False, "the restricted logo file is not readable; an absent file is not a pass"
+    want = src.read_bytes()
+    digest, size = hashlib.sha256(want).digest(), len(want)
+    skip = {".git", "node_modules", "material", "__pycache__", ".netlify", ".vite", "test-results", "playwright-report"}
+    hits, scanned = [], 0
+    for dirpath, dirnames, filenames in os.walk(cfg["root"]):
+        dirnames[:] = [d for d in dirnames if d not in skip]
+        for fn in filenames:
+            p = pathlib.Path(dirpath) / fn
+            try:
+                st = p.stat()
+            except OSError:
+                continue
+            scanned += 1
+            if st.st_size < size:
+                continue
+            data = p.read_bytes()
+            if (st.st_size == size and hashlib.sha256(data).digest() == digest) or (
+                    st.st_size > size and want in data):
+                hits.append(str(p.relative_to(cfg["root"])).replace("\\", "/"))
+    for rel in BUNDLE_PATHS:
+        if not (cfg["root"] / rel).exists():
+            hits.append(f"bundle missing: {rel}")
+    if hits:
+        return False, f"{len(hits)} file(s) carry the client's logo: " + "; ".join(hits[:5])
+    return True, f"{scanned} files under the job folder (bundle included) checked; the logo is only in material/restricted"
+
+
+STATIC_DRIVERS["logo_file_nowhere_else"] = sdrv_logo_file_nowhere_else
+
+
 DRIVERS = {
     "sign_in_lands_on_portal": drv_sign_in_lands_on_portal,
     "views_render": drv_views_render,
@@ -5450,6 +6103,13 @@ DRIVERS = {
     "guide_cites_documents": drv_guide_cites_documents,
     "review_queue_page": drv_review_queue_page,
     "new_org_modules_available": drv_new_org_modules_available,
+    # v1.8 (FRAGO 08)
+    "logo_upload_limits": drv_logo_upload_limits,
+    "logo_isolation": drv_logo_isolation,
+    "logo_fallback_text": drv_logo_fallback_text,
+    "footer_watermark": drv_footer_watermark,
+    "watermark_contrast": drv_watermark_contrast,
+    "client_org_ready": drv_client_org_ready,
 }
 
 

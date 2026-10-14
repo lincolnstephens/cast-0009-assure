@@ -115,8 +115,11 @@ export async function requireClientSeat(c: Context<AppEnv>, next: Next) {
 
   const doc = await readOrg(orgId);
   if (!doc) return c.json({ error: "No organisation" }, 404);
-  // The client's own seat, never the organisation's test seat (v1.7).
-  const seat = (await readUsers()).users.find((u) => u.role === "client" && u.orgId === orgId && !u.testSeat);
+  // The client's own seat, never the organisation's test seat (v1.7). v1.8:
+  // an active seat before a disabled one, so the view is what the client who
+  // can sign in sees; a disabled seat is served only when there is no other.
+  const seats = (await readUsers()).users.filter((u) => u.role === "client" && u.orgId === orgId && !u.testSeat);
+  const seat = seats.find((u) => !u.disabled) ?? seats[0];
   if (!seat) return c.json({ error: "This organisation has no client seat yet." }, 404);
 
   const ref = sessionRef(user.sessionId);

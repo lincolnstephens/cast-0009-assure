@@ -43,7 +43,8 @@ export const DEFAULT_BRANDING: ClientBranding = {
     accent: "#1E8A2E",
     accentMuted: "#166B22",
   },
-  poweredByText: "Tessera Assure, by MITMARK Intelligence",
+  // v1.8 (FRAGO 08 3.3): the footer line on every client page.
+  poweredByText: "Delivered by MITMARK Intelligence",
 };
 
 /** Build a tenant's branding from the operator's settings. */

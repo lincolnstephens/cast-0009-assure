@@ -3,8 +3,19 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { jurisdictionSchema } from "@maximus/shared";
 import { emptyOrgDoc, type DocumentRecord, type OrgDoc, type TaskRecord } from "../db/model.ts";
-import { listOrgIds, mutateOrg, newId, readOrg, readUsers, writeOrg } from "../db/store.ts";
-import { writeSystemAudit } from "../lib/audit.ts";
+import {
+  deleteBrandingLogo,
+  listOrgIds,
+  mutateOrg,
+  newId,
+  readBrandingLogo,
+  readOrg,
+  readUsers,
+  writeBrandingLogo,
+  writeOrg,
+} from "../db/store.ts";
+import { writeAudit, writeSystemAudit } from "../lib/audit.ts";
+import { checkLogo, logoResponse } from "../lib/logo.ts";
 import { requireAuth, requireRole, type AppEnv } from "../lib/middleware.ts";
 import { RETENTION_AREA, seedManifestSchema, tasksCreatedBy, type SeedManifest } from "../lib/seedManifest.ts";
 
@@ -36,6 +47,8 @@ adminOrganisationRoutes.get("/organisations", async (c) => {
       regulationLabel: d.settings.regulationLabel ?? "",
       userCount: users.filter((u) => u.orgId === d.id).length,
       taskCount: d.tasks.length,
+      // v1.8: whether a branding logo is set, and its version for the thumbnail.
+      logoVersion: d.branding.logo?.version ?? null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
   return c.json({ organisations });
@@ -76,6 +89,105 @@ adminOrganisationRoutes.post("/organisations", async (c) => {
     },
     201,
   );
+});
+
+// ---------------------------------------------------------------------------
+// v1.8 (FRAGO 08 3.1 and 3.2). The organisation's name and its branding logo.
+// Each names the organisation in its path, never through the switcher, so a
+// change cannot land on an organisation other than the one named.
+// ---------------------------------------------------------------------------
+
+const renameSchema = z.object({ name: z.string().trim().min(1).max(200) });
+
+adminOrganisationRoutes.patch("/organisations/:id", async (c) => {
+  const actor = c.get("user");
+  const orgId = c.req.param("id");
+  const parsed = renameSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Give the organisation a name." }, 400);
+  if (!(await readOrg(orgId))) return c.json({ error: "No such organisation." }, 404);
+  const name = parsed.data.name;
+  await mutateOrg(orgId, (doc) => {
+    doc.name = name;
+  });
+  // The name itself stays out of the audit detail: an audit row may be exported.
+  await writeAudit({
+    orgId,
+    actorId: actor.id,
+    actorName: actor.displayName,
+    action: "organisation.rename",
+    detail: "Organisation name changed.",
+  });
+  return c.json({ organisation: { id: orgId, name } });
+});
+
+const logoUploadSchema = z.object({
+  fileName: z.string().max(300).default(""),
+  dataBase64: z.string().min(1),
+});
+
+adminOrganisationRoutes.get("/organisations/:id/logo", async (c) => {
+  const orgId = c.req.param("id");
+  const doc = await readOrg(orgId);
+  const logo = doc?.branding.logo;
+  const bytes = logo ? await readBrandingLogo(orgId) : null;
+  if (!logo || !bytes) return c.json({ error: "No logo" }, 404);
+  return logoResponse(bytes, logo.contentType);
+});
+
+adminOrganisationRoutes.put("/organisations/:id/logo", async (c) => {
+  const actor = c.get("user");
+  const orgId = c.req.param("id");
+  const parsed = logoUploadSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Choose a PNG or SVG file." }, 400);
+  if (!(await readOrg(orgId))) return c.json({ error: "No such organisation." }, 404);
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(Buffer.from(parsed.data.dataBase64, "base64"));
+  } catch {
+    return c.json({ error: "That file could not be read." }, 400);
+  }
+  const check = checkLogo(bytes);
+  if (!check.ok) return c.json({ error: check.error }, check.status);
+
+  await writeBrandingLogo(orgId, bytes);
+  const logo = await mutateOrg(orgId, (doc) => {
+    doc.branding.logo = {
+      contentType: check.contentType,
+      sizeBytes: bytes.byteLength,
+      version: (doc.branding.logo?.version ?? 0) + 1,
+      updatedAt: new Date().toISOString(),
+      updatedBy: actor.displayName,
+    };
+    return doc.branding.logo;
+  });
+  await writeAudit({
+    orgId,
+    actorId: actor.id,
+    actorName: actor.displayName,
+    action: "branding.logo.set",
+    detail: `Client logo set (${check.contentType === "image/png" ? "PNG" : "SVG"}, ${Math.ceil(bytes.byteLength / 1024)} KB).`,
+  });
+  return c.json({ logo });
+});
+
+adminOrganisationRoutes.delete("/organisations/:id/logo", async (c) => {
+  const actor = c.get("user");
+  const orgId = c.req.param("id");
+  const doc = await readOrg(orgId);
+  if (!doc) return c.json({ error: "No such organisation." }, 404);
+  if (!doc.branding.logo) return c.json({ logo: null });
+  await mutateOrg(orgId, (d) => {
+    delete d.branding.logo;
+  });
+  await deleteBrandingLogo(orgId);
+  await writeAudit({
+    orgId,
+    actorId: actor.id,
+    actorName: actor.displayName,
+    action: "branding.logo.remove",
+    detail: "Client logo removed; the portal shows the name as text.",
+  });
+  return c.json({ logo: null });
 });
 
 // ---------------------------------------------------------------------------
