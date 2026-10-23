@@ -97,7 +97,7 @@ import sys
 CONFIG = {
     # Identity of the run, for the report header.
     "codename": "ASSURE",
-    "iteration": "v1.8",
+    "iteration": "v1.9",
 
     # What is gated. Either a deployed URL or a path to a local artefact.
     # Passed on the command line; these are the defaults.
@@ -1920,7 +1920,9 @@ def drv_jobs_page(page, cfg, line, res, errors):
     column_sel = line.get("column_selector", "[data-testid='job-column']")
     column_name_sel = line.get("column_name_selector", "[data-testid='job-column-name']")
     card_sel = line.get("card_selector", "[data-testid='job-card']")
-    blocked_sel = line.get("blocked_selector", "[data-testid='job-blocked']")
+    # v1.9 (FRAGO 09 3.3): the separate Blocked badge is gone; a blocked task
+    # carries the red mark with the word Blocked.
+    blocked_sel = line.get("blocked_selector", "[data-testid='status-mark'][data-word='Blocked']")
     confirm_testid = line.get("confirm_testid", "confirm-task")
     title = line.get("title", "Job management")
     strip_heading = line.get("strip_heading", "Waiting on you")
@@ -1983,8 +1985,10 @@ def drv_jobs_page(page, cfg, line, res, errors):
             continue
         if areas and not any(a in t for a in areas):
             problems.append(f"card[{i}] carries no module name: '{t[:60]}'")
-        if rag_labels and not any(r in t for r in rag_labels):
-            problems.append(f"card[{i}] carries no RAG label: '{t[:60]}'")
+        # v1.9 (FRAGO 09 3.3): one status mark with its word replaces the RAG label.
+        marks = cards.nth(i).locator("[data-testid='status-mark']")
+        if marks.count() != 1 or not _text(marks.first.locator("[data-testid='status-word']")):
+            problems.append(f"card[{i}] carries no single status mark with its word: '{t[:60]}'")
 
     if page.locator("[data-testid='task-table'], [data-testid='task-cards']").count() > 0:
         problems.append("a task table is still on Job management")
@@ -4738,9 +4742,14 @@ def _client_doc_ids(seat):
     return [i.get("id") for sec in body.get("sections") or [] for i in sec.get("items") or []], body
 
 
-def _submit_as(seat, title, area=3, supersedes=None, kind="file"):
-    payload = {"title": title, "area": area, "note": "Gate submission, one line.", "kind": kind,
-               "supersedes": supersedes}
+def _submit_as(seat, title, area=None, supersedes=None, kind="file", category="tracker"):
+    """v1.9 (FRAGO 09 3.2): the client sends a Category and never a module;
+    `area` is sent only to prove it is refused."""
+    payload = {"title": title, "note": "Gate submission, one line.", "kind": kind, "supersedes": supersedes}
+    if category is not None:
+        payload["category"] = category
+    if area is not None:
+        payload["area"] = area
     if kind == "file":
         payload.update({"fileBase64": _gate_docx_b64(), "fileName": "gate-submission.docx", "contentType": DOCX_TYPE})
     else:
@@ -4849,7 +4858,7 @@ def drv_client_upload_queue(page, cfg, line, res, errors):
                 problems.append(f"queue item {it['id']}: workingDaysWaiting {wd}, overdue {it.get('overdue')}")
 
         s, _ = operator.call("POST", f"/admin/review/{it2['id']}/return-document", {"reason": "Gate: send the signed copy."})
-        s1, _ = operator.call("POST", f"/admin/review/{it1['id']}/accept-document", {"section": "trackers"})
+        s1, _ = operator.call("POST", f"/admin/review/{it1['id']}/accept-document", {"section": "trackers", "area": 3})
         if s != 200 or s1 != 200:
             problems.append(f"return {s}, accept {s1}")
         ids, docs = _client_doc_ids(seat)
@@ -4867,7 +4876,7 @@ def drv_client_upload_queue(page, cfg, line, res, errors):
         if not it3 or it3["context"].get("supersedesTitle") != "Gate v1.7 first":
             problems.append("the new version's queue item does not name the version it supersedes")
         else:
-            operator.call("POST", f"/admin/review/{it3['id']}/accept-document", {"section": "trackers"})
+            operator.call("POST", f"/admin/review/{it3['id']}/accept-document", {"section": "trackers", "area": 3})
         ids, _ = _client_doc_ids(seat)
         if third_id not in ids or first_id in ids:
             problems.append("after acceptance the new version does not replace the earlier one for the client")
@@ -4917,7 +4926,7 @@ def drv_documents_pages(page, cfg, line, res, errors):
     if not _wait_for(page, "[data-testid='client-upload-form']", 8000):
         problems.append("client Documents: no upload form")
     else:
-        for name in ("title", "area", "note"):
+        for name in ("title", "category", "note"):
             if page.locator(f"[data-testid='client-upload-form'] [name='{name}']").count() == 0:
                 problems.append(f"upload form has no '{name}' field")
         if page.locator("[data-testid='client-upload-submit']").count() == 0:
@@ -5365,7 +5374,7 @@ def drv_review_queue_page(page, cfg, line, res, errors):
         if not _wait_for(page, item, 8000):
             return False, "no document_submission item on the review queue page"
         it = page.locator(item).filter(has_text="Gate v1.7 queue page").first
-        for tid in ("accept-section", "accept-document", "return-reason", "return-document"):
+        for tid in ("accept-section", "accept-module", "accept-document", "return-reason", "return-document"):
             if it.locator(f"[data-testid='{tid}']").count() == 0:
                 problems.append(f"no {tid}")
         if it.locator("[data-testid='return-document']").count() and it.locator("[data-testid='return-document']").first.is_enabled():
@@ -5629,11 +5638,17 @@ def drv_logo_isolation(page, cfg, line, res, errors):
             for oid in (demo,):
                 if rows.get(oid, {}).get("logoVersion") is not None:
                     problems.append("the demo organisation has a logo")
-        # In the browser: the gate seat sees its logo in sidebar and header, alt is the name.
+        # In the browser: the gate seat sees its logo at the head of the menu,
+        # alt is the name. v1.9 (FRAGO 09 3.4): once only; the page header
+        # carries the MITMARK mark instead, never the client's logo.
         if not _gate_client_browser(page, cfg, operator):
             return False, "could not sign in as the gate client seat"
         page.wait_for_timeout(settle_ms)
-        for place in ("sidebar", "header"):
+        if page.locator("[data-testid='client-logo-header']").count():
+            problems.append("gate seat: the client logo is still in the page header")
+        if page.locator("header [data-testid='header-mitmark']").count() != 1:
+            problems.append("gate seat: the page header does not carry the MITMARK mark")
+        for place in ("sidebar",):
             img = page.locator(f"[data-testid='client-logo-{place}']")
             if img.count() == 0:
                 problems.append(f"gate seat: no logo in the {place}")
@@ -5679,8 +5694,9 @@ def drv_logo_fallback_text(page, cfg, line, res, errors):
     head = page.locator("[data-testid='client-name-fallback-header']")
     if side.count() == 0 or not _text(side.first):
         problems.append("no text name in the sidebar")
-    if head.count() == 0 or not _text(head.first):
-        problems.append("no text name in the header")
+    # v1.9 (FRAGO 09 3.4): the header carries the MITMARK mark, not the name.
+    if head.count():
+        problems.append("the name is still repeated in the page header")
     if page.locator("[data-testid^='client-logo-']").count():
         problems.append("a logo is shown with none set")
     if not _ensure_role(page, cfg, "admin", cfg["_target"]):
@@ -6026,6 +6042,586 @@ def sdrv_logo_file_nowhere_else(cfg, line):
 STATIC_DRIVERS["logo_file_nowhere_else"] = sdrv_logo_file_nowhere_else
 
 
+# =============================================================================
+# v1.9 (FRAGO 09). Decision notes, the upload Category, status marks, both
+# marks in the client header, the client quick start, and a quiet client
+# organisation.
+# =============================================================================
+
+RUN_STARTED_AT = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+DECISION_NOTE_PREFIX = "MITMARK: "
+UPLOAD_CATEGORIES = [("policy", "Policy"), ("procedure", "Procedure"), ("tracker", "Tracker")]
+CATEGORY_SECTION = {"policy": "policies", "procedure": "procedures", "tracker": "trackers"}
+MARK_KINDS = {"done", "not_started", "in_progress", "red", "not_applicable"}
+QUICK_START = "07_HANDOVER/T27_CLIENT_QUICK_START.md"
+QUICK_START_MAX_WORDS = 650
+QUICK_START_FORBIDDEN = re.compile(
+    r"assure|\bcast\b|cast-\d|seagull|sunray|\brich\b|roberts|lurong|@|https?://|tessera-monitor", re.I)
+CLIENT_MENU_LABELS = ("Compliance Tracker", "Compliance Documents", "Job management",
+                      "Requests and clocks", "Statement for the CFO", "Quick questions")
+
+
+def _mark_word_ok(kind, word):
+    """The colour of a mark never contradicts its word (FRAGO 09 3.3)."""
+    if kind == "done":
+        return word == "Done"
+    if kind == "not_started":
+        return word in ("Not started", "Not started, due soon")
+    if kind == "in_progress":
+        return word in ("In progress", "In progress, due soon")
+    if kind == "red":
+        return word in ("Blocked", "Overdue, not started", "Overdue, in progress")
+    if kind == "not_applicable":
+        return word == "Not applicable"
+    return False
+
+
+_MARK_CONTRAST_JS = r"""
+(args) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1; canvas.height = 1;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const rgba = (col) => {
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = col; ctx.fillRect(0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2], d[3] / 255];
+  };
+  const over = (top, bottom) => {
+    const a = top[3];
+    return [0, 1, 2].map((i) => top[i] * a + bottom[i] * (1 - a)).concat([1]);
+  };
+  // The colour seen behind an element: its ancestors' backgrounds composited
+  // from the page up.
+  const backdrop = (el) => {
+    const stack = [];
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+      const c = rgba(getComputedStyle(n).backgroundColor);
+      if (c[3] > 0) stack.push(c);
+      if (c[3] >= 1) break;
+    }
+    let col = [255, 255, 255, 1];
+    for (let i = stack.length - 1; i >= 0; i--) col = over(stack[i], col);
+    return col;
+  };
+  const lum = (rgb) => {
+    const c = rgb.slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const out = [];
+  for (const m of Array.from(document.querySelectorAll(args.root + " [data-testid='status-mark']"))) {
+    if (!visible(m)) continue;
+    const bg = backdrop(m);
+    const edge = m.querySelector("[data-testid='status-mark-edge']");
+    const word = m.querySelector("[data-testid='status-word']");
+    const row = { kind: m.getAttribute('data-mark'), dataWord: m.getAttribute('data-word'),
+                  word: word ? (word.textContent || '').trim() : null, edge: null, words: null,
+                  hasIcon: !!m.querySelector("[data-testid='status-mark-icon']") };
+    if (edge) {
+      const s = getComputedStyle(edge).stroke;
+      const c = rgba(s && s !== 'none' ? s : getComputedStyle(edge).color);
+      row.edge = Math.round(ratio(over(c, bg), bg) * 100) / 100;
+    }
+    if (word) {
+      const c = rgba(getComputedStyle(word).color);
+      row.words = Math.round(ratio(over(c, bg), bg) * 100) / 100;
+    }
+    out.push(row);
+  }
+  return out;
+}
+"""
+
+
+def _marks_on(page, root, label, problems, min_edge=3.0, min_words=4.5):
+    """Every visible status mark under `root`: one of the marks, its word
+    present and agreeing with its colour, edge 3:1 and words 4.5:1."""
+    rows = page.evaluate(_MARK_CONTRAST_JS, {"root": root})
+    if not rows:
+        problems.append(f"{label}: no status marks")
+        return rows
+    for r in rows:
+        kind, word = r.get("kind"), r.get("word")
+        if kind not in MARK_KINDS:
+            problems.append(f"{label}: unknown mark '{kind}'")
+        if not word or word != r.get("dataWord"):
+            problems.append(f"{label}: mark '{kind}' has no word, or it differs from data-word")
+        elif not _mark_word_ok(kind, word):
+            problems.append(f"{label}: mark '{kind}' reads '{word}' (colour contradicts word)")
+        if not r.get("hasIcon"):
+            problems.append(f"{label}: mark '{kind}' has no icon")
+        if r.get("edge") is None or r["edge"] < min_edge:
+            problems.append(f"{label}: mark '{kind}' edge {r.get('edge')}:1, below {min_edge}:1")
+        if r.get("words") is None or r["words"] < min_words:
+            problems.append(f"{label}: words '{word}' {r.get('words')}:1, below {min_words}:1")
+    return rows
+
+
+def drv_decision_notes(page, cfg, line, res, errors):
+    """Line 78: a note given on Approve or Reject of a request and of a task
+    confirmation is stored and reaches the client on the right page; no note,
+    nothing shown; a test seat's note reaches no client; the audit entry says
+    a note was given and never repeats it. Proved on the gate organisation,
+    once, at the first resolution (API and browser)."""
+    if not _api_only_once(line, res):
+        return True, "API and browser level; run once, at the first resolution"
+    settle_ms = line.get("settle_ms", 600)
+    problems = []
+    tag = datetime.datetime.now().strftime("%H%M%S")
+    notes = {k: f"Gate v1.9 {k} note {tag}." for k in ("approve", "reject", "task", "reopen", "test_task", "test_req")}
+    created_tasks = []
+    clocks_to_close = []
+    tuser = None
+    try:
+        operator = _ApiSeat(cfg, "admin")
+        seat, gid = _gate_client_seat(cfg, operator)
+        tseat, tuser = _gate_test_seat(cfg, operator, gid)
+    except RuntimeError as exc:
+        return False, str(exc)
+    try:
+        # Requests: approve with a note, reject with a note, approve with none.
+        raised = {}
+        for key, kind in (("approve", "data_request"), ("reject", "concern"), ("none", "data_request")):
+            s, b = seat.call("POST", "/requests", {"type": kind, "details": f"Gate v1.9 request {key} {tag}"})
+            if s != 201:
+                return False, f"raising a request returned {s}"
+            raised[key] = b
+            clocks_to_close.append(b["clockId"])
+        s, b = tseat.call("POST", "/requests", {"type": "data_request", "details": f"Gate v1.9 test request {tag}"})
+        if s != 201:
+            return False, f"the test seat's request returned {s}"
+        raised["test"] = b
+        clocks_to_close.append(b["clockId"])
+        pend = {i["refId"]: i for i in _pending(operator, gid, "intake")}
+        for key, action, note in (("approve", "approve", notes["approve"]), ("reject", "reject", notes["reject"]),
+                                  ("none", "approve", None), ("test", "approve", notes["test_req"])):
+            item = pend.get(raised[key]["intakeId"])
+            if not item:
+                problems.append(f"request '{key}' is not in the queue")
+                continue
+            s, _ = operator.call("POST", f"/admin/review/{item['id']}/{action}", {"note": note} if note else {})
+            if s != 200:
+                problems.append(f"{action} of request '{key}' returned {s}")
+        lst = seat.call("GET", "/clocks")[1] or {}
+        by_id = {c.get("id"): c for c in (lst.get("active") or []) + (lst.get("closed") or [])}
+        for key, want in (("approve", notes["approve"]), ("reject", notes["reject"]), ("none", None)):
+            row = by_id.get(raised[key]["clockId"]) or {}
+            got = (row.get("decisionNote") or {}).get("text")
+            if got != want:
+                problems.append(f"request '{key}': the client's list carries note {got!r}, expected {want!r}")
+            det = seat.call("GET", f"/clocks/{raised[key]['clockId']}")[1] or {}
+            if (det.get("decisionNote") or {}).get("text") != want:
+                problems.append(f"request '{key}': the client's detail does not carry the note as given")
+        if raised["test"]["clockId"] in by_id or notes["test_req"] in json.dumps(lst):
+            problems.append("the client sees the test seat's request or its note")
+
+        # Task confirmations: accept with a note, reopen with a note, and a test
+        # seat's confirmation whose note must not reach the real task.
+        due = (datetime.date.today() + datetime.timedelta(days=40)).isoformat()
+        tasks = {}
+        for key in ("accept", "reopen"):
+            s, t = operator.call("POST", f"/admin/workplan?org={gid}", {
+                "area": 3, "phase": 1, "title": f"Gate v1.9 client task {key} {tag}", "ownerType": "client",
+                "ownerRole": "Information Officer", "dueAt": due, "recurrence": "once", "status": "in_progress"})
+            if s != 201:
+                return False, f"creating a gate task returned {s}"
+            tasks[key] = t["id"]
+            created_tasks.append(t["id"])
+            s, _ = seat.call("POST", f"/tracker/tasks/{t['id']}/confirm", {"note": "Gate: done."})
+            if s not in (200, 201):
+                problems.append(f"the client's confirmation of task '{key}' returned {s}")
+        pend = {i["refId"]: i for i in _pending(operator, gid, "task_confirmation") if not i.get("test")}
+        for key, action, note in (("accept", "approve", notes["task"]), ("reopen", "reject", notes["reopen"])):
+            item = pend.get(tasks[key])
+            if not item:
+                problems.append(f"task '{key}' confirmation is not in the queue")
+                continue
+            s, _ = operator.call("POST", f"/admin/review/{item['id']}/{action}", {"note": note})
+            if s != 200:
+                problems.append(f"{action} of task '{key}' returned {s}")
+        s, _ = tseat.call("POST", f"/tracker/tasks/{tasks['reopen']}/confirm", {"note": "Gate test seat."})
+        titem = next((i for i in _pending(operator, gid, "task_confirmation")
+                      if i.get("test") and i.get("refId") == tasks["reopen"]), None)
+        if not titem:
+            problems.append("the test seat's confirmation is not in the queue")
+        else:
+            operator.call("POST", f"/admin/review/{titem['id']}/approve", {"note": notes["test_task"]})
+        jobs = seat.call("GET", "/tracker/jobs")[1] or {}
+        jt = {t.get("id"): t for g in jobs.get("groups") or [] for t in g.get("tasks") or []}
+        for key, want in (("accept", notes["task"]), ("reopen", notes["reopen"])):
+            got = ((jt.get(tasks[key]) or {}).get("mitmarkNote") or {}).get("text")
+            if got != want:
+                problems.append(f"task '{key}': the client's Job management carries {got!r}, expected {want!r}")
+        if notes["test_task"] in json.dumps(jobs):
+            problems.append("the test seat's note reached the client's Job management")
+
+        # The audit says a note was given and never repeats it.
+        entries = _audit_entries(operator, f"/admin/audit?accountId={gid}")
+        text = json.dumps(entries)
+        for k, n in notes.items():
+            if n in text:
+                problems.append(f"the audit repeats the {k} note")
+        if not any("with a note to the client" in str(e.get("detail")) for e in entries):
+            problems.append("no audit entry says a note was given")
+
+        # In the browser, as the client sees it.
+        if not _gate_client_browser(page, cfg, operator):
+            problems.append("could not sign in as the gate client seat")
+        else:
+            page.goto(cfg["_target"].rstrip("/") + "/clocks")
+            if not _wait_for(page, "[data-testid='decision-note-client']", 8000):
+                problems.append("Requests and clocks shows no decision note")
+            else:
+                shown = [_text(x) for x in page.locator("[data-testid='decision-note-client']").all()]
+                if DECISION_NOTE_PREFIX + notes["approve"] not in shown:
+                    problems.append(f"Requests and clocks reads {shown[:3]}")
+                if page.locator("[data-testid='decision-note-date']").count() < len(shown):
+                    problems.append("a decision note on Requests and clocks has no date")
+            page.goto(cfg["_target"].rstrip("/") + "/jobs")
+            if not _wait_for(page, "[data-testid='job-card'] [data-testid='decision-note-client']", 8000):
+                problems.append("Job management shows no decision note on a card")
+            else:
+                shown = [_text(x) for x in page.locator("[data-testid='job-card'] [data-testid='decision-note-client']").all()]
+                if DECISION_NOTE_PREFIX + notes["task"] not in shown:
+                    problems.append(f"Job management reads {shown[:3]}")
+            page.wait_for_timeout(settle_ms)
+    except RuntimeError as exc:
+        problems.append(str(exc))
+    finally:
+        for tid in created_tasks:
+            operator.call("DELETE", f"/admin/workplan/{tid}?org={gid}")
+        for cid in clocks_to_close:
+            operator.call("POST", f"/admin/clocks/{cid}/close", {"outcome": "Gate v1.9 close.", "insideStatute": True})
+        _safe_disable(cfg, operator)
+        if tuser and tuser.get("id"):
+            operator.call("POST", f"/admin/users/{tuser['id']}/disable")
+    ok = not problems
+    return ok, ("notes on approve and reject of requests and task confirmations reach the client's Requests and clocks "
+                "and Job management; no note shows nothing; the test seat's notes reach no client; the audit never "
+                "repeats a note" if ok else "; ".join(problems[:6]))
+
+
+def drv_upload_category(page, cfg, line, res, errors):
+    """Line 79: the client's upload form offers Category (Policy, Procedure,
+    Tracker) and no module; a submission carries its category and cannot
+    carry a module; Accept pre-fills the section from the category and
+    refuses to publish without a module; a published submission appears on
+    its module page. The form is read at every width; the API and the
+    operator's Accept form once, at the first resolution, on the gate
+    organisation."""
+    settle_ms = line.get("settle_ms", 500)
+    problems = []
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    page.goto(cfg["_target"].rstrip("/") + "/documents")
+    if not _wait_for(page, "[data-testid='client-upload-form']", 8000):
+        return False, "client Documents: no upload form"
+    form = page.locator("[data-testid='client-upload-form']").first
+    sel = form.locator("[data-testid='upload-category']")
+    if sel.count() != 1:
+        problems.append("the upload form has no single Category control")
+    else:
+        opts = sel.first.evaluate("(el) => Array.from(el.options).filter(o => o.value).map(o => [o.value, o.textContent.trim()])")
+        if [tuple(o) for o in opts] != UPLOAD_CATEGORIES:
+            problems.append(f"Category options read {opts}")
+        if not sel.first.evaluate("(el) => el.required"):
+            problems.append("Category is not required")
+    if form.locator("[name='area'], [name='module'], [data-testid='upload-module']").count():
+        problems.append("the upload form still offers a module")
+    if "Module" in [_text(x) for x in form.locator("label").all()]:
+        problems.append("the upload form still labels a field Module")
+    if not _api_only_once(line, res):
+        ok = not problems
+        return ok, ("Category with Policy, Procedure, Tracker, required; no module on the form"
+                    if ok else "; ".join(problems[:6]))
+
+    try:
+        operator = _ApiSeat(cfg, "admin")
+        seat, gid = _gate_client_seat(cfg, operator)
+    except RuntimeError as exc:
+        return False, str(exc)
+    try:
+        s, b = _submit_as(seat, "Gate v1.9 module refused", area=3, category="tracker")
+        if s != 400:
+            problems.append(f"a client submission carrying a module returned {s}, expected 400")
+        s, b = _submit_as(seat, "Gate v1.9 no category", category=None)
+        if s != 400:
+            problems.append(f"a client submission with no category returned {s}, expected 400")
+        s, b = _submit_as(seat, "Gate v1.9 category", category="procedure")
+        if s != 201:
+            return False, f"a client submission with a category returned {s} {b}"
+        doc_id = b["id"]
+        docs = operator.call("GET", f"/admin/documents?org={gid}")[1] or {}
+        d = next((x for x in docs.get("documents") or [] if x.get("id") == doc_id), {})
+        if d.get("category") != "procedure" or d.get("area") is not None or d.get("published"):
+            problems.append(f"the stored submission: category {d.get('category')}, area {d.get('area')}, "
+                            f"published {d.get('published')}")
+        item = next((i for i in _pending(operator, gid, "document_submission")
+                     if i["context"].get("documentId") == doc_id), None)
+        if not item or item["context"].get("category") != "procedure":
+            problems.append("the queue item does not carry the client's category")
+        else:
+            # The operator's Accept form, in the browser: section pre-filled
+            # from the category, module empty and required.
+            if _ensure_role(page, cfg, "admin", cfg["_target"]):
+                try:
+                    _select_org(page, GATE_ORG_NAME, settle_ms)
+                    page.goto(cfg["_target"].rstrip("/") + "/admin")
+                    if not _wait_for(page, "[data-testid='submission-category']", 8000):
+                        problems.append("the review queue card shows no category")
+                    else:
+                        card = page.locator("[data-testid='review-item'][data-type='document_submission']").filter(
+                            has_text="Gate v1.9 category").first
+                        if "Procedure" not in _text(card.locator("[data-testid='submission-category']").first):
+                            problems.append("the queue card does not name the category Procedure")
+                        sec = card.locator("[data-testid='accept-section']")
+                        mod = card.locator("[data-testid='accept-module']")
+                        if sec.count() == 0 or sec.first.input_value() != "procedures":
+                            problems.append("Accept does not pre-fill the section from the category")
+                        if mod.count() == 0 or mod.first.input_value() != "":
+                            problems.append("Accept has no empty module control")
+                finally:
+                    _pin_demo_org(page, cfg)
+            s, b = operator.call("POST", f"/admin/review/{item['id']}/accept-document", {"section": "procedures"})
+            if s != 400:
+                problems.append(f"accept without a module returned {s}, expected 400")
+            area_docs_before = seat.call("GET", "/tracker/areas/5")[1] or {}
+            if doc_id in json.dumps(area_docs_before):
+                problems.append("module 5 lists the submission before acceptance")
+            s, b = operator.call("POST", f"/admin/review/{item['id']}/accept-document",
+                                 {"section": "procedures", "area": 5})
+            if s != 200:
+                problems.append(f"accept with a module returned {s}")
+            area = seat.call("GET", "/tracker/areas/5")[1] or {}
+            if doc_id not in json.dumps(area.get("documents") or area):
+                problems.append("the published submission is not on its module page (module 5)")
+    except RuntimeError as exc:
+        problems.append(str(exc))
+    finally:
+        _remove_gate_docs(operator, gid, prefix="Gate v1.9")
+        _safe_disable(cfg, operator)
+    ok = not problems
+    return ok, ("Category required with Policy, Procedure, Tracker and no module; a module or no category is refused; "
+                "the queue shows the category; Accept pre-fills the section and refuses without a module; the "
+                "published document is on its module page" if ok else "; ".join(problems[:6]))
+
+
+def drv_status_marks(page, cfg, line, res, errors):
+    """Line 80: on the client's Job management and a module page's Jobs
+    table, the operator's Workplan and Jobs board, every task status mark is
+    one of the marks with its word, the word agrees with the colour, an
+    overdue or blocked open task is red, no RAG lamp sits in a task row or
+    card, and every mark edge measures 3:1 and every word 4.5:1 against the
+    page."""
+    settle_ms = line.get("settle_ms", 600)
+    task_scopes = line.get("task_scopes", ["[data-testid='job-card']", "[data-testid='task-row']",
+                                           "[data-testid='board-card']",
+                                           "[data-testid='for-you-row']"])
+    problems = []
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+
+    def no_lamps(label):
+        for sc in task_scopes:
+            if page.locator(f"{sc} [data-testid='rag-mark']").count():
+                problems.append(f"{label}: a RAG lamp remains in {sc}")
+
+    # Client Job management, checked against the API's own reading.
+    if not _enter_view(page, "jobs", None, settle_ms, cfg, "client") or \
+            not _wait_for(page, "[data-testid='job-card'] [data-testid='status-mark']", 8000):
+        problems.append("Job management: no status marks on the cards")
+    else:
+        rows = _marks_on(page, "[data-testid='job-board']", "Job management", problems)
+        no_lamps("Job management")
+        api = _ApiSeat(cfg, "client").call("GET", "/tracker/jobs")[1] or {}
+        open_tasks = [t for g in api.get("groups") or [] if g.get("id") != "completed" for t in g.get("tasks") or []]
+        want_red = sum(1 for t in open_tasks if t.get("rag") == "red")
+        got_red = sum(1 for r in rows if r.get("kind") == "red")
+        if want_red != got_red:
+            problems.append(f"Job management: {got_red} red marks on the board, {want_red} open tasks overdue or blocked")
+        if page.locator("[data-testid='job-card']").count() != page.locator(
+                "[data-testid='job-card'] [data-testid='status-mark']").count():
+            problems.append("Job management: a card does not carry exactly one status mark")
+    # A module page's Jobs table (module 1, then any with tasks).
+    seen_table = False
+    for i in range(8):
+        if not _enter_area_page(page, cfg, settle_ms, i):
+            continue
+        if _wait_for(page, "[data-testid='task-row'] [data-testid='status-mark']", 3000):
+            _marks_on(page, "main", f"module {i + 1} page", problems)
+            no_lamps(f"module {i + 1} page")
+            seen_table = True
+            break
+    if not seen_table:
+        problems.append("no module page shows a task with a status mark")
+    # The operator's Workplan and Jobs board, on the demo.
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator"
+    for path, label, scope in (("/admin/workplan", "Workplan", "main"), ("/admin/jobs", "operator Jobs board", "main")):
+        page.goto(cfg["_target"].rstrip("/") + path)
+        if not _wait_for(page, f"{scope} [data-testid='status-mark']", 10000):
+            problems.append(f"{label}: no status marks")
+            continue
+        page.wait_for_timeout(settle_ms)
+        _marks_on(page, scope, label, problems)
+        no_lamps(label)
+    ok = not problems
+    return ok, ("one mark per task with its word on Job management, a module page, the Workplan and the operator's "
+                "board; red agrees with overdue or blocked; no RAG lamp in a task row; edges 3:1, words 4.5:1"
+                if ok else "; ".join(list(dict.fromkeys(problems))[:6]))
+
+
+def drv_header_both_marks(page, cfg, line, res, errors):
+    """Line 81: the client page header carries the MITMARK mark, right-
+    aligned, with "Delivered by MITMARK Intelligence" from 768px (4.5:1) and
+    the mark alone beneath, and never the client's logo or name; the menu
+    head carries the client's mark or name; the admin workspace has none of
+    it; View as client shows the client's header exactly."""
+    settle_ms = line.get("settle_ms", 500)
+    problems = []
+
+    def check_header(label):
+        hdr = page.locator("header:has([data-testid='header-mitmark'])")
+        if hdr.count() != 1:
+            problems.append(f"{label}: the page header does not carry the MITMARK mark once")
+            return
+        mark = hdr.first.locator("[data-testid='header-mitmark']")
+        img = mark.locator("img")
+        if img.count() != 1 or _img_width(img.first) <= 0:
+            problems.append(f"{label}: the MITMARK mark did not load")
+        hb, mb = hdr.first.bounding_box(), mark.first.bounding_box()
+        if hb and mb and (hb["x"] + hb["width"]) - (mb["x"] + mb["width"]) > 48:
+            problems.append(f"{label}: the MITMARK mark is not right-aligned")
+        words = mark.locator("[data-testid='header-mitmark-words']")
+        shown = words.count() == 1 and words.first.is_visible()
+        if res["width"] >= 768:
+            if not shown or _text(words.first) != FOOTER_TEXT:
+                problems.append(f"{label}: the words '{FOOTER_TEXT}' are not beside the mark")
+            else:
+                ratio = words.first.evaluate(_TEXT_RATIO_JS)
+                if ratio < 4.5:
+                    problems.append(f"{label}: the header words measure {ratio}:1")
+        elif shown:
+            problems.append(f"{label}: the words show below 768px")
+        if hdr.first.locator("[data-testid='client-logo-header'], [data-testid='client-name-fallback-header']").count():
+            problems.append(f"{label}: the client's logo or name is in the page header")
+        if page.locator("aside [data-testid='client-logo-sidebar'], aside [data-testid='client-name-fallback']").count() != 1:
+            problems.append(f"{label}: the menu head does not carry the client's mark once")
+
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the client account"
+    _enter_view(page, "tracker", None, settle_ms, cfg, "client")
+    _wait_for(page, "[data-testid='header-mitmark']", 8000)
+    page.wait_for_timeout(settle_ms)
+    check_header("client portal")
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        return False, "could not sign in as the operator"
+    page.goto(cfg["_target"].rstrip("/") + "/admin")
+    _wait_for(page, "[data-testid='org-switcher']", 8000)
+    page.wait_for_timeout(settle_ms)
+    if page.locator("[data-testid='header-mitmark'], [data-testid='client-footer'], [data-testid='mitmark-watermark']").count():
+        problems.append("the admin workspace carries the client header mark, footer or watermark")
+    if not _enter_view(page, "client-view", None, settle_ms, cfg, "admin"):
+        problems.append("View as client was not reachable")
+    else:
+        _wait_for(page, "[data-testid='header-mitmark']", 8000)
+        page.wait_for_timeout(settle_ms)
+        check_header("View as client (demo)")
+        _leave_client_view(page, settle_ms)
+    ok = not problems
+    return ok, ("header carries the MITMARK mark right-aligned, words from 768px at 4.5:1 or better, no client logo "
+                "in the header and one in the menu head; none on the admin side; View as client the same"
+                if ok else "; ".join(problems[:6]))
+
+
+_TEXT_RATIO_JS = r"""
+(el) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1; canvas.height = 1;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const rgba = (col) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = col; ctx.fillRect(0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
+  const over = (t, b) => [0, 1, 2].map((i) => t[i] * t[3] + b[i] * (1 - t[3])).concat([1]);
+  const stack = [];
+  for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+    const c = rgba(getComputedStyle(n).backgroundColor);
+    if (c[3] > 0) stack.push(c);
+    if (c[3] >= 1) break;
+  }
+  let bg = [255, 255, 255, 1];
+  for (let i = stack.length - 1; i >= 0; i--) bg = over(stack[i], bg);
+  const fg = over(rgba(getComputedStyle(el).color), bg);
+  const lum = (rgb) => { const c = rgb.slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const x = lum(fg), y = lum(bg);
+  return Math.round(((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)) * 100) / 100;
+}
+"""
+
+
+def drv_quick_start(page, cfg, line, res, errors):
+    """Line 82: the client quick start exists, is one page, names the six
+    menu items, is role-only (no codename, no address, no link, no
+    restricted name), and check_restricted.py passes on the folder,
+    including the built bundle."""
+    if not _api_only_once(line, res):
+        return True, "file level; run once, at the first resolution"
+    import subprocess
+    problems = []
+    path = cfg["root"] / QUICK_START
+    if not path.is_file():
+        return False, f"{QUICK_START} does not exist"
+    text = path.read_text(encoding="utf-8")
+    words = len(re.findall(r"\b\w+\b", text))
+    if words > QUICK_START_MAX_WORDS:
+        problems.append(f"{words} words, more than one page ({QUICK_START_MAX_WORDS})")
+    hit = QUICK_START_FORBIDDEN.search(text)
+    if hit:
+        problems.append(f"carries '{hit.group(0)}'")
+    for label in CLIENT_MENU_LABELS:
+        if label not in text:
+            problems.append(f"does not name the menu item '{label}'")
+    if "your MITMARK contract lead" not in text:
+        problems.append("does not name the contact by role ('your MITMARK contract lead')")
+    for name in (load_restricted_names(cfg) or []):
+        if name and name.lower() in text.lower():
+            problems.append("carries a restricted name")
+            break
+    bundle = cfg["root"] / "06_EXECUTION/build/maximus-src/netlify/functions"
+    web = cfg["root"] / "06_EXECUTION/build/maximus-src/apps/web/dist"
+    if not web.is_dir():
+        problems.append("the built web bundle is not present to scan")
+    run = subprocess.run([sys.executable, str(cfg["root"] / "06_EXECUTION/gate/check_restricted.py")],
+                         cwd=str(cfg["root"]), capture_output=True, text=True)
+    tail = (run.stdout or "").strip().splitlines()[-1:] or [""]
+    if run.returncode != 0 or not tail[0].endswith(" 0 hits"):
+        problems.append(f"check_restricted.py: exit {run.returncode}, '{tail[0]}'")
+    ok = not problems
+    return ok, (f"{QUICK_START}: {words} words, six menu items, contact by role, no codename, address, link or "
+                f"restricted name; check_restricted.py '{tail[0]}' (bundle {'present' if bundle.exists() or web.is_dir() else 'absent'})"
+                if ok else "; ".join(problems[:6]))
+
+
+def drv_client_org_quiet(page, cfg, line, res, errors):
+    """Line 83: the gate wrote nothing to the client organisation. Its audit
+    log carries no entry made since this run began. Checked by a read, at
+    the last resolution, after every other line."""
+    if res["name"] != line.get("applies_to", [res["name"]])[-1]:
+        return True, "checked once, at the last resolution, after every other line"
+    try:
+        operator = _ApiSeat(cfg, "admin")
+        entries = _audit_entries(operator, f"/admin/audit?accountId={CLIENT_ORG_ID}")
+    except RuntimeError as exc:
+        return False, str(exc)
+    since = [e for e in entries if str(e.get("createdAt", "")) >= RUN_STARTED_AT]
+    if since:
+        return False, f"{len(since)} entries since {RUN_STARTED_AT}Z: " + ", ".join(
+            f"{e.get('createdAt')} {e.get('action')}" for e in since[:5])
+    return True, f"no audit entry on the client organisation since the run began ({RUN_STARTED_AT}Z); {len(entries)} in all"
+
+
 DRIVERS = {
     "sign_in_lands_on_portal": drv_sign_in_lands_on_portal,
     "views_render": drv_views_render,
@@ -6110,6 +6706,13 @@ DRIVERS = {
     "footer_watermark": drv_footer_watermark,
     "watermark_contrast": drv_watermark_contrast,
     "client_org_ready": drv_client_org_ready,
+    # v1.9 (FRAGO 09)
+    "decision_notes": drv_decision_notes,
+    "upload_category": drv_upload_category,
+    "status_marks": drv_status_marks,
+    "header_both_marks": drv_header_both_marks,
+    "quick_start": drv_quick_start,
+    "client_org_quiet": drv_client_org_quiet,
 }
 
 

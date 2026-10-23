@@ -1,6 +1,6 @@
 {
-  "iteration": "v1.8",
-  "written": "2026-10-14",
+  "iteration": "v1.9",
+  "written": "2026-10-21, FRAGO 09",
   "lines": [
     {
       "id": 1,
@@ -436,14 +436,14 @@
       "line": "Job management is a three-column board, and confirm is the client's only write on it.",
       "drive": "playwright",
       "check": "jobs_page",
-      "pass": "[data-testid='jobs'] is present with one h1 reading 'Job management'. [data-testid='waiting-on-you'] carries the heading 'Waiting on you' and for-you rows or its empty or confirmed state. [data-testid='job-board'] holds exactly three [data-testid='job-column'] whose [data-testid='job-column-name'] read Not started, In progress, Completed, in that order. Every job-card carries a module name and a RAG label; any job-blocked card is in In progress. No task-table or task-cards, no Guide (quick-questions-intro or a textarea) on the page. Inside the page container every button is confirm-task, inputs are only text or checkbox, and nothing is draggable or contenteditable. Selects are allowed: they are view filters.",
+      "pass": "[data-testid='jobs'] is present with one h1 reading 'Job management'. [data-testid='waiting-on-you'] carries the heading 'Waiting on you' and for-you rows or its empty or confirmed state. [data-testid='job-board'] holds exactly three [data-testid='job-column'] whose [data-testid='job-column-name'] read Not started, In progress, Completed, in that order. Every job-card carries a module name and exactly one status-mark with its status-word; any card whose mark reads Blocked is in In progress. No task-table or task-cards, no Guide (quick-questions-intro or a textarea) on the page. Inside the page container every button is confirm-task, inputs are only text or checkbox, and nothing is draggable or contenteditable. Selects are allowed: they are view filters.",
       "page_selector": "[data-testid='jobs']",
       "strip_selector": "[data-testid='waiting-on-you']",
       "board_selector": "[data-testid='job-board']",
       "column_selector": "[data-testid='job-column']",
       "column_name_selector": "[data-testid='job-column-name']",
       "card_selector": "[data-testid='job-card']",
-      "blocked_selector": "[data-testid='job-blocked']",
+      "blocked_selector": "[data-testid='status-mark'][data-word='Blocked']",
       "confirm_testid": "confirm-task",
       "title": "Job management",
       "strip_heading": "Waiting on you",
@@ -465,7 +465,8 @@
         "390x844"
       ],
       "role": "client",
-      "changed_v1_3": "Rewritten for FRAGO 03 section 3.5: grouped task tables become a card board, the Guide leaves the page, and the only write control is confirm."
+      "changed_v1_3": "Rewritten for FRAGO 03 section 3.5: grouped task tables become a card board, the Guide leaves the page, and the only write control is confirm.",
+      "changed_v1_9": "FRAGO 09 3.3: the RAG label and the separate Blocked badge give way to one status mark with its word."
     },
     {
       "id": 22,
@@ -1090,26 +1091,28 @@
       "line": "A client upload is an offer: it waits in the review queue, is not published or counted until accepted, a return carries its reason to the client, and a new version supersedes the old with history kept.",
       "drive": "api",
       "check": "client_upload_queue",
-      "pass": "The gate client POSTs /api/tracker/documents: 201 'Submitted, awaiting MITMARK review'; it is in no section, does not download, and module 3's tiles and documents are unchanged; the operator's queue holds it with workingDaysWaiting and overdue = (workingDaysWaiting >= 5); return-document with a reason reaches the client's submissions and publishes nothing; accept-document under trackers publishes it there; a submission naming it in supersedes, once accepted, replaces it for the client while the earlier record carries supersededBy.",
+      "pass": "The gate client POSTs /api/tracker/documents with a category and no module: 201 'Submitted, awaiting MITMARK review'; it is in no section, does not download, and module 3's tiles and documents are unchanged; the operator's queue holds it with workingDaysWaiting and overdue = (workingDaysWaiting >= 5); return-document with a reason reaches the client's submissions and publishes nothing; accept-document under trackers with module 3 publishes it there; a submission naming it in supersedes, once accepted, replaces it for the client while the earlier record carries supersededBy.",
       "applies_to": [
         "1920x1080",
         "1366x768",
         "390x844"
       ],
-      "added": "v1.7"
+      "added": "v1.7",
+      "changed_v1_9": "FRAGO 09 3.2: the client sends a category, never a module; acceptance names the module."
     },
     {
       "id": 60,
       "line": "In the browser the operator downloads from Documents in a new tab, the client has the upload form, and client view disables it and says why.",
       "drive": "playwright",
       "check": "documents_pages",
-      "pass": "On /admin/documents (gate organisation selected) admin-doc-download links to /api/admin/documents/<id>/download?org=<gate org> with target _blank; on /documents the client sees client-upload-form with title, area and note fields and client-upload-submit; in client view client-upload-readonly reads 'Read only in client view. The client uploads documents from her own sign-in.' and the submit is disabled.",
+      "pass": "On /admin/documents (gate organisation selected) admin-doc-download links to /api/admin/documents/<id>/download?org=<gate org> with target _blank; on /documents the client sees client-upload-form with title, category and note fields and client-upload-submit; in client view client-upload-readonly reads 'Read only in client view. The client uploads documents from her own sign-in.' and the submit is disabled.",
       "applies_to": [
         "1920x1080",
         "1366x768",
         "390x844"
       ],
-      "added": "v1.7"
+      "added": "v1.7",
+      "changed_v1_9": "FRAGO 09 3.2: the form's module field is now Category."
     },
     {
       "id": 61,
@@ -1218,13 +1221,14 @@
       "line": "In the browser a client submission on the review queue offers a section, Accept, and Return that needs a reason.",
       "drive": "playwright",
       "check": "review_queue_page",
-      "pass": "With a gate client submission pending, the review-item data-type='document_submission' on /admin (gate organisation) carries accept-section, accept-document, return-reason and return-document, Return is disabled before a reason, and data-overdue is stated. The submission is returned afterwards.",
+      "pass": "With a gate client submission pending, the review-item data-type='document_submission' on /admin (gate organisation) carries accept-section, accept-document, return-reason and return-document, Return is disabled before a reason, and data-overdue is stated. The submission is returned afterwards. v1.9: the item also offers accept-module.",
       "applies_to": [
         "1920x1080",
         "1366x768",
         "390x844"
       ],
-      "added": "v1.7"
+      "added": "v1.7",
+      "changed_v1_9": "FRAGO 09 3.2: the module is set at acceptance."
     },
     {
       "id": 70,
@@ -1257,26 +1261,28 @@
       "line": "A logo is served only to its own organisation's sessions and client view; no logo reaches the demo or gate organisations.",
       "drive": "playwright",
       "check": "logo_isolation",
-      "pass": "With a neutral test logo set on the gate organisation: the gate client seat gets it from /api/branding/logo and its /auth/me branding.logoLight names it; the demo seat gets none, with or without a preview marker naming the gate organisation; client view of the gate organisation gets it and of the demo does not; the operator outside client view gets none. The client organisation's logo is set and reaches neither the demo nor the gate seat (compared by bytes, no client view of it opened). In the browser the gate seat shows client-logo-sidebar and client-logo-header, loaded, with alt text, unfiltered, served from /api/branding/logo; the demo seat shows no logo. The test logo is removed.",
+      "pass": "With a neutral test logo set on the gate organisation: the gate client seat gets it from /api/branding/logo and its /auth/me branding.logoLight names it; the demo seat gets none, with or without a preview marker naming the gate organisation; client view of the gate organisation gets it and of the demo does not; the operator outside client view gets none. The client organisation's logo is set and reaches neither the demo nor the gate seat (compared by bytes, no client view of it opened). In the browser the gate seat shows client-logo-sidebar (and no client-logo-header; the header carries header-mitmark), loaded, with alt text, unfiltered, served from /api/branding/logo; the demo seat shows no logo. The test logo is removed.",
       "applies_to": [
         "1920x1080",
         "1366x768",
         "390x844"
       ],
-      "added": "v1.8"
+      "added": "v1.8",
+      "changed_v1_9": "FRAGO 09 3.4: the client logo shows once, at the head of the menu."
     },
     {
       "id": 73,
-      "line": "With no logo the portal shows the name as text; the Organisations list shows a set logo and the switcher stays text.",
+      "line": "With no logo the menu head shows the name as text; the Organisations list shows a set logo and the switcher stays text.",
       "drive": "playwright",
       "check": "logo_fallback_text",
-      "pass": "The demo client's portal carries client-name-fallback (sidebar) and client-name-fallback-header with text and no client-logo-*; /admin/organisations shows org-logo-thumb, loaded, on the client organisation's row and org-logo-none on the demo's; org-switcher is a select with no image.",
+      "pass": "The demo client's portal carries client-name-fallback (sidebar) with text, no client-name-fallback-header and no client-logo-*; /admin/organisations shows org-logo-thumb, loaded, on the client organisation's row and org-logo-none on the demo's; org-switcher is a select with no image.",
       "applies_to": [
         "1920x1080",
         "1366x768",
         "390x844"
       ],
-      "added": "v1.8"
+      "added": "v1.8",
+      "changed_v1_9": "FRAGO 09 3.4: the header carries the MITMARK mark, not the name."
     },
     {
       "id": 74,
@@ -1322,6 +1328,88 @@
       "check": "logo_file_nowhere_else",
       "pass": "No file under the job folder outside .git, node_modules and material (the built web bundle and function bundle included, both present) is byte-identical to, or contains, material/restricted/client_logo.png. Compared by hash and bytes; nothing printed.",
       "added": "v1.8"
+    },
+    {
+      "id": 78,
+      "line": "A note given on Approve or Reject of a request or a task confirmation reaches the client on the right page; no note shows nothing; a test seat's note reaches no client; the audit never repeats a note.",
+      "drive": "playwright",
+      "check": "decision_notes",
+      "pass": "On the gate organisation: three requests (approve with a note, reject with a note, approve with none) and two client tasks confirmed by the client (accept with a note, reopen with a note); GET /api/clocks and /api/clocks/:id carry decisionNote.text exactly as given and null with none; GET /api/tracker/jobs carries mitmarkNote.text on each task; the test seat's request and confirmation, decided with notes, put neither note anywhere the client reads; no audit entry contains any note text and at least one says 'with a note to the client'. In the browser the gate seat's Requests and clocks shows decision-note-client 'MITMARK: {note}' with a decision-note-date, and a job-card shows its note. Run once, at the first resolution; tasks deleted and clocks closed afterwards.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.9",
+      "settle_ms": 600
+    },
+    {
+      "id": 79,
+      "line": "The client's upload asks for a Category, not a module; the operator sets the module at acceptance and nothing publishes without one.",
+      "drive": "playwright",
+      "check": "upload_category",
+      "pass": "At every width client-upload-form has one required upload-category select with Policy, Procedure, Tracker (values policy, procedure, tracker) and no area, module or upload-module field or 'Module' label. Once, on the gate organisation: a submission carrying area is refused 400, one with no category is refused 400, one with category procedure is stored with that category, area null, unpublished; the queue item's context carries the category; on the review queue its card shows submission-category naming Procedure, accept-section pre-filled 'procedures' and accept-module empty; accept-document without area is refused 400; with area 5 it publishes and module 5's page lists it.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.9",
+      "settle_ms": 500
+    },
+    {
+      "id": 80,
+      "line": "Every task status is one mark with its word: green tick done, grey circle not started, amber circle in progress, red for overdue or blocked; no RAG lamp beside it; marks 3:1 and words 4.5:1.",
+      "drive": "playwright",
+      "check": "status_marks",
+      "pass": "On the client's Job management, the first module page with tasks, the operator's Workplan and the operator's Jobs board, every visible status-mark has data-mark in done, not_started, in_progress, red, not_applicable, a status-mark-icon, and a status-word equal to data-word that agrees with the mark (done: Done; not_started: Not started[, due soon]; in_progress: In progress[, due soon]; red: Blocked, or Overdue, not started, or Overdue, in progress; not_applicable: Not applicable); the edge (status-mark-edge stroke) measures 3:1 or better and the word 4.5:1 or better against the composited page behind it; every job-card carries exactly one mark; the number of red marks on the client board equals the open tasks the API reads red; no rag-mark sits inside a job-card, task-row, board-card or for-you-row.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.9",
+      "settle_ms": 600
+    },
+    {
+      "id": 81,
+      "line": "The client header carries the MITMARK mark, with its words from 768px; the client's logo is at the head of the menu only; the admin workspace has none of it; View as client shows the same.",
+      "drive": "playwright",
+      "check": "header_both_marks",
+      "pass": "For the client seat and in View as client of the demo: exactly one header carries header-mitmark, its image loaded and its right edge within 48px of the header's; from 768px header-mitmark-words reads 'Delivered by MITMARK Intelligence', visible, at 4.5:1 or better; below 768px the words are not shown; the header holds no client-logo-header or client-name-fallback-header; the menu (aside) holds exactly one client-logo-sidebar or client-name-fallback. The admin workspace carries no header-mitmark, client-footer or mitmark-watermark.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.9",
+      "settle_ms": 500
+    },
+    {
+      "id": 82,
+      "line": "The client quick start exists, is one page and role-only, and the folder and the built bundle carry no restricted name.",
+      "drive": "playwright",
+      "check": "quick_start",
+      "pass": "07_HANDOVER/T27_CLIENT_QUICK_START.md exists, is at most 650 words, names the six client menu items and 'your MITMARK contract lead', and carries no codename, address, link, '@' or restricted name; check_restricted.py, run from the job root over the folder including the built bundle, exits 0 with 0 hits. Run once.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.9"
+    },
+    {
+      "id": 83,
+      "line": "The gate writes nothing to the client organisation: its audit log has no entry made during the run.",
+      "drive": "playwright",
+      "check": "client_org_quiet",
+      "pass": "After every other line, at the last resolution, GET /api/admin/audit?accountId=org-f2b4afdf0d returns no entry with createdAt at or after the moment the run began.",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.9"
     }
   ]
 }

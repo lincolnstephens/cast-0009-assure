@@ -602,6 +602,51 @@ A faint MITMARK mark also sits at the bottom right of her pages, at about 6 per 
 3. Sunray rotates the session secret. Every signed-in session ends, yours included; sign in again.
 4. After Sunray confirms Block 5 consent, reset her password in **Users** and give it to her yourself, in person or by phone, never in the same message as the address.
 
+## 5n. Your four points from 15 October (v1.9)
+
+### A note to the client when you decide
+
+On the **Review queue**, a data request, a reported concern and a client confirmation now each have a box, **Note to the client (optional)**, beneath the item:
+- Write up to 300 characters. **Approve** and **Reject** (for a confirmation, **Accept** and **Reopen**) both send it.
+- She sees it as "MITMARK: your note", with the date:
+  - for a request, on **Requests and clocks** beside the request;
+  - for a confirmation, on the task's card in **Job management**.
+- Leave it blank and nothing changes from before: she sees no note.
+- A note on a test seat's item goes nowhere near her.
+- The audit log records that you gave a note, not what it said.
+- Document uploads keep their own **Return** reason, as before.
+
+### Her uploads: she picks a Category, you pick the module
+
+- Her upload form now asks for a **Category**: Policy, Procedure or Tracker. It no longer asks for a module. That matches how Compliance Documents is laid out.
+- On the Review queue the card shows her category and title.
+- **Accept** fills in the section from her category (Policy to Policies, Procedure to Procedures, Tracker to Trackers). You can change it.
+- Accept also asks you for the **module**, 1 to 8. Nothing is published without one, because each module page lists its own documents.
+- Anything she sent before v1.9 that already names a module keeps it, and the card shows that module.
+
+### One mark per task
+
+Wherever a task's status shows (her Job management, the module pages, your Workplan and your Jobs board):
+- **Done** is a green tick.
+- **Not started** is a grey circle.
+- **In progress** is an amber circle.
+- **Overdue** or **Blocked** is a red mark, with the word, and the state still named after it ("Overdue, in progress").
+- "Due soon" is words only, after the state ("In progress, due soon"). It is never a colour of its own.
+
+The separate coloured dot beside the status has gone. The words are always there, so colour never carries the meaning alone. Each mark has a thin dark edge, so it shows clearly on her light pages. A task marked not applicable shows a grey circle with the words "Not applicable".
+
+### Both marks on her pages
+
+- **Her logo** shows once, at the top of her menu. It is no longer repeated in the page header.
+- **The MITMARK mark** sits at the right of her page header. On a laptop or larger it has the words "Delivered by MITMARK Intelligence" beside it; on a phone, the mark alone.
+- The footer and the faint watermark are as in 5m.
+- With no logo set, the top of the menu shows her organisation's name, as before.
+- Your admin workspace is unchanged. **View as client** shows her header exactly as she sees it.
+
+### Sending her the portal
+
+`07_HANDOVER/T27_CLIENT_QUICK_START.md` is a one-page quick start for her. Fill in the sign-in address and your own name at the top, then send it with her sign-in. Send the one-time password separately, never in the same message as the address.
+
 ## 6. Importing the v0.1 export
 
 If you have a record file from the earlier single-page version, **Record** has an import.
