@@ -4,10 +4,12 @@ import {
   TASK_STATUS_LABEL,
   areaName,
   jobGroupOf,
+  taskRagFor,
   taskStatusSchema,
 } from "@maximus/shared";
 import type { JobGroup, Task, TaskStatus } from "@maximus/shared";
 import { formatDateGB } from "../lib/format";
+import { StatusMark } from "./tracker/StatusMark";
 
 const GROUPS: JobGroup[] = ["not_started", "in_progress", "completed"];
 
@@ -120,6 +122,7 @@ function BoardCard({ task, onStatus }: { task: Task; onStatus: (task: Task, stat
     <li
       data-testid="board-card"
       data-task-id={task.id}
+      data-blocked={blocked ? "true" : undefined}
       draggable="true"
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", task.id);
@@ -135,11 +138,11 @@ function BoardCard({ task, onStatus }: { task: Task; onStatus: (task: Task, stat
         {task.dueAt ? formatDateGB(task.dueAt) : "no date"}
         {task.closedAt ? `, done ${formatDateGB(task.closedAt.slice(0, 10))}` : ""}
       </p>
-      {blocked && (
-        <p className="mt-2 inline-block rounded border border-status-red px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-status-red">
-          Blocked
-        </p>
-      )}
+      {/* v1.9 (FRAGO 09 3.3): the card carries the same one mark as the
+          client's board; a blocked card says Blocked in the mark itself. */}
+      <div className="mt-2">
+        <StatusMark status={task.status} rag={taskRagFor(task.status, task.dueAt, new Date().toISOString().slice(0, 10))} />
+      </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <label className="text-[12px]">
           <span className="sr-only">Status of {task.title}</span>

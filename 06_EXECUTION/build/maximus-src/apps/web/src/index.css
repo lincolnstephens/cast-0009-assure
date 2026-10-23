@@ -27,6 +27,9 @@
   --sev-critical: #d63a3a;
   --c1: #26b23e;
   --c2: #3987e5;
+  /* v1.9 (FRAGO 09 3.3). The ink of a status mark's tick and bar: the
+     theme's dark, which reads on the green and red marks in both themes. */
+  --mark-ink: var(--surface-base);
   --sans: "Inter", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
 }
@@ -49,6 +52,7 @@
   --radius: 8px;
   --c1: #1e8a2e;
   --c2: #2a78d6;
+  --mark-ink: var(--text);
 }
 
 /* Expose the house tokens to Tailwind so utilities (bg-hud-bg, text-client-muted, ...)

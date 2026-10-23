@@ -3,7 +3,7 @@ import type { ForYouTask, JobsResponse } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { formatDateGB } from "../../lib/format";
 import { ForYouPanel } from "../../components/tracker/ForYouPanel";
-import { RagMark } from "../../components/tracker/RagMark";
+import { StatusMark } from "../../components/tracker/StatusMark";
 
 type JobTask = JobsResponse["groups"][number]["tasks"][number];
 
@@ -180,6 +180,7 @@ function JobCard({ task }: { task: JobTask }) {
   return (
     <li
       data-testid="job-card"
+      data-blocked={task.blocked ? "true" : undefined}
       className="rounded border border-client-line bg-client-surface p-3 shadow-sm"
     >
       <p className="text-[13px] font-medium leading-snug text-client-text">{task.title}</p>
@@ -188,15 +189,20 @@ function JobCard({ task }: { task: JobTask }) {
         <span className="font-mono text-[12px] text-client-muted">
           {task.dueAt ? formatDateGB(task.dueAt) : "no date"}
         </span>
-        <RagMark rag={task.rag} label={task.ragLabel} />
+        {/* v1.9 (FRAGO 09 3.3): one mark with its words. A blocked task says
+            Blocked in the mark itself, so the separate badge has gone. */}
+        <StatusMark status={task.status} rag={task.rag} />
       </div>
-      {task.blocked && (
-        <p
-          data-testid="job-blocked"
-          className="mt-2 inline-block rounded border border-status-red px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-status-red"
-        >
-          Blocked
-        </p>
+      {/* v1.9 (FRAGO 09 3.1): MITMARK's note on her confirmation, when one was given. */}
+      {task.mitmarkNote && (
+        <div className="mt-2 border-t border-client-line pt-2 text-[12px]">
+          <p data-testid="decision-note-client" className="text-client-text">
+            MITMARK: {task.mitmarkNote.text}
+          </p>
+          <span data-testid="decision-note-date" className="text-client-muted">
+            {formatDateGB(task.mitmarkNote.at.slice(0, 10))}
+          </span>
+        </div>
       )}
     </li>
   );

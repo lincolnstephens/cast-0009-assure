@@ -1,6 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import type { ComplianceDocument, DocumentsResponse } from "@maximus/shared";
-import { AREAS, areaName } from "@maximus/shared";
+import { SUBMISSION_CATEGORY_LABEL, areaName, type SubmissionCategory } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { apiHref } from "../../lib/preview";
 import { formatDateGB } from "../../lib/format";
@@ -12,6 +12,8 @@ interface Submission {
   id: string;
   title: string;
   area: number | null;
+  /** v1.9 (FRAGO 09 3.2). The client's Category; absent on submissions made before v1.9. */
+  category?: SubmissionCategory | null;
   kind: "file" | "link" | "policy";
   note: string;
   state: "submitted" | "returned" | "accepted";
@@ -293,8 +295,10 @@ function PolicyItemList({
 
 /**
  * v1.7. "Upload a document" and the client's own submissions. A file up to the
- * cap, or a link; a title, its module and one line of what it is; optionally
- * the published document it is a new version of.
+ * cap, or a link; a title, its category and one line of what it is;
+ * optionally the published document it is a new version of. v1.9 (FRAGO 09
+ * 3.2): the client chooses a Category (Policy, Procedure, Tracker), the way
+ * this page is structured; MITMARK sets the module when it accepts.
  */
 function UploadPanel({ data, onSubmitted }: { data: ClientDocumentsResponse; onSubmitted: () => Promise<void> }) {
   const previewing = usePreviewing();
@@ -312,7 +316,7 @@ function UploadPanel({ data, onSubmitted }: { data: ClientDocumentsResponse; onS
     setDone(false);
     const body: Record<string, unknown> = {
       title: String(form.get("title") ?? "").trim(),
-      area: Number(form.get("area")),
+      category: String(form.get("category") ?? ""),
       note: String(form.get("note") ?? "").trim(),
       kind,
       url: "",
@@ -374,14 +378,14 @@ function UploadPanel({ data, onSubmitted }: { data: ClientDocumentsResponse; onS
               <input name="title" required maxLength={300} className={input} />
             </label>
             <label className="block text-[13px]">
-              <span className="mb-1 block text-[11px] uppercase tracking-wider text-client-muted">Module</span>
-              <select name="area" required defaultValue="" className={input}>
+              <span className="mb-1 block text-[11px] uppercase tracking-wider text-client-muted">Category</span>
+              <select name="category" data-testid="upload-category" required defaultValue="" className={input}>
                 <option value="" disabled>
-                  Choose a module
+                  Choose a category
                 </option>
-                {AREAS.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.id}. {areaName(a.id)}
+                {(Object.keys(SUBMISSION_CATEGORY_LABEL) as SubmissionCategory[]).map((c) => (
+                  <option key={c} value={c}>
+                    {SUBMISSION_CATEGORY_LABEL[c]}
                   </option>
                 ))}
               </select>
@@ -469,9 +473,9 @@ function UploadPanel({ data, onSubmitted }: { data: ClientDocumentsResponse; onS
               <li key={sub.id} data-testid="client-submission" data-state={sub.state} className="px-4 py-3 text-[13px]">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-medium text-client-text">{sub.title}</span>
-                  {sub.area && (
+                  {(sub.area || sub.category) && (
                     <span className="font-mono text-[11px] uppercase tracking-wider text-client-muted">
-                      {areaName(sub.area)}
+                      {sub.area ? areaName(sub.area) : SUBMISSION_CATEGORY_LABEL[sub.category!]}
                     </span>
                   )}
                 </div>

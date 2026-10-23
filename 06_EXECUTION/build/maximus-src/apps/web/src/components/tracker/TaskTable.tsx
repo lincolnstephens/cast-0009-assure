@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { AreaPage } from "@maximus/shared";
 import { TASK_COLUMNS } from "@maximus/shared";
 import { formatDateGB } from "../../lib/format";
-import { RagMark } from "./RagMark";
+import { StatusMark } from "./StatusMark";
 
 type AreaTask = AreaPage["tasks"][number];
 
@@ -150,10 +150,8 @@ function TaskRow({
           {task.closedAt ? formatDateGB(task.closedAt) : "Not yet"}
         </Td>
         <Td>
-          <div className="flex flex-wrap items-center gap-2">
-            <RagMark rag={task.rag} label={task.ragLabel} />
-            <span>{task.statusLabel}</span>
-          </div>
+          {/* v1.9 (FRAGO 09 3.3): one mark with its words; the RAG lamp has gone. */}
+          <StatusMark status={task.status} rag={task.rag} />
         </Td>
       </tr>
       {expanded && (
@@ -192,9 +190,8 @@ function TaskCard({
         </Field>
         <div className="mt-1.5">
           <p className="font-mono text-[10px] uppercase tracking-wider text-client-muted">Status</p>
-          <div className="mt-0.5 flex flex-wrap items-center gap-2">
-            <RagMark rag={task.rag} label={task.ragLabel} />
-            <span className="text-[13px] text-client-text">{task.statusLabel}</span>
+          <div className="mt-0.5">
+            <StatusMark status={task.status} rag={task.rag} />
           </div>
         </div>
       </button>

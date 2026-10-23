@@ -2,7 +2,7 @@ import type { RagStatus } from "@maximus/shared";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { StatusLamp } from "../../components/StatusLamp";
 import { api, ApiError } from "../../lib/api";
-import { formatCountdown, formatLondon } from "../../lib/format";
+import { formatCountdown, formatDateGB, formatLondon } from "../../lib/format";
 import { PREVIEW_SUBMIT_MESSAGE } from "../../lib/preview";
 import { usePreviewing } from "../../lib/usePreviewing";
 
@@ -16,6 +16,13 @@ interface ClockItem {
   outcome: string | null;
   status: RagStatus | null;
   latestNote: string | null;
+  /** v1.9 (FRAGO 09 3.1). MITMARK's note on its decision, or null when none was given. */
+  decisionNote: DecisionNote | null;
+}
+
+interface DecisionNote {
+  text: string;
+  at: string;
 }
 
 interface ClockDetail {
@@ -28,7 +35,26 @@ interface ClockDetail {
   closedAt: string | null;
   outcome: string | null;
   status: RagStatus | null;
+  decisionNote: DecisionNote | null;
   events: { id: string; event: string; note: string | null; createdAt: string; actorName: string | null }[];
+}
+
+/**
+ * v1.9 (FRAGO 09 3.1). MITMARK's note on the request, as the client reads it,
+ * with the date it was given. Nothing renders when no note was given.
+ */
+function DecisionNoteLine({ note, className = "" }: { note: DecisionNote | null; className?: string }) {
+  if (!note) return null;
+  return (
+    <div className={`text-sm ${className}`}>
+      <p data-testid="decision-note-client" className="text-client-text">
+        MITMARK: {note.text}
+      </p>
+      <span data-testid="decision-note-date" className="text-[12px] text-client-muted">
+        {formatDateGB(note.at.slice(0, 10))}
+      </span>
+    </div>
+  );
 }
 
 const kindLabel = (kind: string) =>
@@ -123,6 +149,7 @@ export function ClocksPage() {
                       </div>
                       {clock.status && <StatusLamp status={clock.status} />}
                     </div>
+                    <DecisionNoteLine note={clock.decisionNote} className="mt-2" />
                     <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
                       <div className="text-sm text-client-muted">
                         <div>Started {formatLondon(clock.startsAt)}</div>
@@ -176,6 +203,7 @@ export function ClocksPage() {
                     {clock.outcome && (
                       <p className="mt-1 text-sm text-client-muted">{clock.outcome}</p>
                     )}
+                    <DecisionNoteLine note={clock.decisionNote} className="mt-1" />
                   </button>
                 </li>
               ))}
@@ -226,6 +254,7 @@ function ClockDrawer({
         </div>
 
         {clock.summary && <p className="mt-4 text-sm">{clock.summary}</p>}
+        <DecisionNoteLine note={clock.decisionNote} className="mt-3" />
 
         <dl className="mt-4 space-y-1 text-sm">
           <div className="flex justify-between">

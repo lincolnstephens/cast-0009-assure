@@ -4,7 +4,7 @@ import { api, ApiError } from "../../lib/api";
 import { formatDateGB } from "../../lib/format";
 import { PREVIEW_CONFIRM_MESSAGE } from "../../lib/preview";
 import { usePreviewing } from "../../lib/usePreviewing";
-import { RagMark } from "./RagMark";
+import { StatusMark } from "./StatusMark";
 
 /**
  * Tasks whose owner is a client role, soonest due first. At v1.3 it sits at
@@ -84,7 +84,7 @@ function ForYouRow({ task }: { task: ForYouTask }) {
             Due {task.dueAt ? formatDateGB(task.dueAt) : "no date - always on"}
           </p>
           <div className="mt-1.5">
-            <RagMark rag={task.rag} label={task.ragLabel} />
+            <StatusMark status={task.status} rag={task.rag} />
           </div>
         </div>
 

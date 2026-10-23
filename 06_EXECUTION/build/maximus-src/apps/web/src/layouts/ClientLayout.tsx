@@ -1,9 +1,10 @@
-import type { ClientBranding } from "@maximus/shared";
+import { type ClientBranding, DEFAULT_BRANDING } from "@maximus/shared";
 import type { CSSProperties } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { ClientLogo } from "../components/ClientLogo";
 import { ClientPoweredBy, MitmarkWatermark } from "../components/ClientPoweredBy";
 import { ClientViewBanner } from "../components/ClientViewBanner";
+import { MitmarkLogo } from "../components/MitmarkLogo";
 import { useAuth } from "../store/auth";
 
 // `view` is the identifier the gate drives the product by. The label is what
@@ -30,7 +31,7 @@ const navItems = [
 ];
 
 export function ClientLayout() {
-  const { user, officerName, branding, logout } = useAuth();
+  const { officerName, branding, logout } = useAuth();
   const navigate = useNavigate();
   const theme = branding ?? null;
 
@@ -85,11 +86,12 @@ export function ClientLayout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col bg-client-bg">
+        {/* v1.9 (FRAGO 09 3.4): both marks, each once. The client's logo sits
+            at the head of the menu only; the page header carries the MITMARK
+            mark, right-aligned, with its words from 768px and the mark alone
+            beneath. The officer's block moves to the left. */}
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-client-line bg-client-surface px-4 py-3 sm:px-8 sm:py-4">
-          <div className="min-w-0 truncate text-sm font-medium text-client-text">
-            {theme ? <ClientLogo branding={theme} place="header" /> : (user?.clientAccountName ?? "")}
-          </div>
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <div
               aria-hidden
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-client-line bg-client-surface text-xs font-semibold text-client-text"
@@ -109,6 +111,15 @@ export function ClientLayout() {
             >
               Change password
             </Link>
+          </div>
+          <div data-testid="header-mitmark" className="ml-auto flex shrink-0 items-center gap-2">
+            <MitmarkLogo className="h-5 w-auto" alt="MITMARK Intelligence" />
+            <span
+              data-testid="header-mitmark-words"
+              className="hidden text-sm text-client-text md:inline"
+            >
+              {DEFAULT_BRANDING.poweredByText}
+            </span>
           </div>
         </header>
         {/* v1.8 (FRAGO 08 3.3): from 640px the right padding is a gutter the

@@ -1,4 +1,12 @@
-import { DOCUMENT_SECTIONS, areaName, type ReviewItemType } from "@maximus/shared";
+import {
+  AREAS,
+  DOCUMENT_SECTIONS,
+  SUBMISSION_CATEGORY_LABEL,
+  SUBMISSION_CATEGORY_SECTION,
+  areaName,
+  type ReviewItemType,
+  type SubmissionCategory,
+} from "@maximus/shared";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../../lib/api";
 import { formatLondon } from "../../lib/format";
@@ -192,7 +200,7 @@ function ReviewCard({
           {item.test && (
             <p className="mt-1 text-[12px] text-hud-muted">Test seat: accepting changes nothing in the workplan.</p>
           )}
-          <ApproveRejectActions itemId={item.id} onDone={onDone} />
+          <ApproveRejectActions itemId={item.id} onDone={onDone} withNote />
         </>
       )}
 
@@ -204,7 +212,7 @@ function ReviewCard({
             {String(ctx.intakeType ?? "")} from {String(ctx.source ?? "")}
           </p>
           <p className="mt-1 text-[13px] text-hud-muted">{String(ctx.summary ?? "")}</p>
-          <ApproveRejectActions itemId={item.id} onDone={onDone} />
+          <ApproveRejectActions itemId={item.id} onDone={onDone} withNote />
         </>
       )}
     </div>
@@ -260,23 +268,33 @@ function AnswerForm({ itemId, onDone }: { itemId: string; onDone: () => Promise<
   );
 }
 
+/**
+ * v1.9 (FRAGO 09 3.1). On a data request, a concern or a client confirmation
+ * (`withNote`), one optional note to the client sits beneath the item and is
+ * read by both buttons. The client sees it as "MITMARK: {note}". Left blank,
+ * nothing is sent and nothing changes from before.
+ */
 function ApproveRejectActions({
   itemId,
   onDone,
+  withNote = false,
 }: {
   itemId: string;
   onDone: () => Promise<void>;
+  withNote?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState("");
 
   async function act(action: "approve" | "reject") {
     setBusy(true);
     setError(null);
     try {
+      const trimmed = note.trim();
       await api(`/admin/review/${itemId}/${action}`, {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify(withNote && trimmed ? { note: trimmed } : {}),
       });
       await onDone();
     } catch (err) {
@@ -287,6 +305,22 @@ function ApproveRejectActions({
 
   return (
     <div className="mt-3">
+      {withNote && (
+        <label className="mb-2 block">
+          <span className="mb-1 block text-[11px] uppercase tracking-wider text-hud-muted">
+            Note to the client (optional)
+          </span>
+          <textarea
+            data-testid="decision-note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={300}
+            rows={2}
+            placeholder="Why you approved or rejected it, in a line or two. The client sees this."
+            className="w-full rounded border border-hud-line bg-hud-bg px-3 py-2 text-[13px] outline-none placeholder:text-hud-muted/70 focus:border-hud-accent"
+          />
+        </label>
+      )}
       {error && (
         <p className="mb-2 border-l-2 border-status-red pl-3 text-[13px] text-status-red" role="alert">
           {error}
@@ -333,12 +367,23 @@ function DocumentSubmission({
 }) {
   const ctx = (item.context ?? {}) as Record<string, unknown>;
   const earlierSection = SECTION_IDS.find((x) => x === ctx.supersedesSection);
-  const [section, setSection] = useState<SectionId>(earlierSection ?? "procedures");
+  // v1.9 (FRAGO 09 3.2): the client's Category pre-fills the section; the operator may change it.
+  const category =
+    typeof ctx.category === "string" && ctx.category in SUBMISSION_CATEGORY_LABEL
+      ? (ctx.category as SubmissionCategory)
+      : null;
+  const [section, setSection] = useState<SectionId>(
+    category ? SUBMISSION_CATEGORY_SECTION[category] : (earlierSection ?? "procedures"),
+  );
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const area = typeof ctx.area === "number" ? ctx.area : null;
+  // The module is the operator's to set, and required: the module pages list
+  // published documents by it. A pre-v1.9 submission arrives with the
+  // client's module already chosen.
+  const [module, setModule] = useState<string>(area ? String(area) : "");
   const sizeBytes = typeof ctx.sizeBytes === "number" ? ctx.sizeBytes : 0;
   const isLink = ctx.kind === "link";
   const documentId = typeof ctx.documentId === "string" ? ctx.documentId : null;
@@ -359,7 +404,13 @@ function DocumentSubmission({
     <>
       <p className="mt-2 text-sm font-medium">{String(ctx.title ?? "")}</p>
       <p className="mt-1 text-[13px] text-hud-muted">
-        {area ? `Module ${area}, ${areaName(area)}` : "No module given"}
+        <span data-testid="submission-category">
+          {category
+            ? `Category: ${SUBMISSION_CATEGORY_LABEL[category]}`
+            : area
+              ? `Module: ${area}. ${areaName(area)}`
+              : "No category given"}
+        </span>
         {ctx.submittedBy ? ` · sent by ${String(ctx.submittedBy)}` : ""}
       </p>
       {ctx.note ? <p className="mt-1 text-[13px]">{String(ctx.note)}</p> : null}
@@ -408,11 +459,29 @@ function DocumentSubmission({
             ))}
           </select>
         </label>
+        <label className="text-[13px]">
+          <span className="mb-1 block text-[11px] uppercase tracking-wider text-hud-muted">Module</span>
+          <select
+            data-testid="accept-module"
+            value={module}
+            required
+            onChange={(e) => setModule(e.target.value)}
+            className="max-w-[260px] rounded border border-hud-line bg-hud-bg px-2 py-1.5 text-[13px]"
+          >
+            <option value="">Choose the module</option>
+            {AREAS.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.id}. {areaName(a.id)}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
           data-testid="accept-document"
-          disabled={busy}
-          onClick={() => void act("accept-document", { section })}
+          disabled={busy || module === ""}
+          title={module === "" ? "Choose the module before publishing." : undefined}
+          onClick={() => void act("accept-document", { section, area: Number(module) })}
           className="rounded bg-hud-accent px-4 py-1.5 text-[13px] font-medium text-white hover:bg-hud-accent/90 disabled:opacity-50"
         >
           {busy ? "Working…" : "Accept and publish"}

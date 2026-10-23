@@ -8,11 +8,13 @@ import {
   phaseName,
   ownerTypeSchema,
   recurrenceSchema,
+  taskRagFor,
   taskStatusSchema,
 } from "@maximus/shared";
 import type { OwnerType, Recurrence, Task, TaskInput, TaskStatus } from "@maximus/shared";
 import { useLocation } from "react-router-dom";
 import { AdminJobBoard } from "../../components/AdminJobBoard";
+import { StatusMark } from "../../components/tracker/StatusMark";
 import { api, ApiError } from "../../lib/api";
 import { formatDateGB } from "../../lib/format";
 import { useAdmin } from "../../store/admin";
@@ -52,6 +54,8 @@ export function AdminWorkplanPage() {
   const { selectedAccountId } = useAdmin();
   // /admin/jobs is Job management: the same tasks as a draggable board (FRAGO 07 3.2).
   const isBoard = useLocation().pathname.replace(/\/$/, "").endsWith("/jobs");
+  // v1.9 (FRAGO 09 3.3): the date the marks are read against, as the server's taskRag reads it.
+  const asAt = new Date().toISOString().slice(0, 10);
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [clientRoles, setClientRoles] = useState<string[]>([]);
   const [areaFilter, setAreaFilter] = useState("");
@@ -290,7 +294,8 @@ export function AdminWorkplanPage() {
                     {t.closedAt ? formatDateGB(t.closedAt.slice(0, 10)) : " - "}
                   </td>
                   <td className="px-3 py-2">
-                    <div>{TASK_STATUS_LABEL[t.status]}</div>
+                    {/* v1.9 (FRAGO 09 3.3): the status as one mark with its words. */}
+                    <StatusMark status={t.status} rag={taskRagFor(t.status, t.dueAt, asAt)} />
                     {t.clientConfirmedAt && (
                       <div className="mt-1 text-[12px] text-status-amber">
                         Client confirmed on {formatDateGB(t.clientConfirmedAt.slice(0, 10))}, waiting
