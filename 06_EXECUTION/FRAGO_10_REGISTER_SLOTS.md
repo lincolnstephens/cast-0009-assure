@@ -51,3 +51,11 @@ Issued 23 Oct 09:50. Live and gated by 1500 BST. Report on deploy.
 ## 6. Not in this order
 
 The decision note and category work beyond FRAGO 09; structured registers (T23); PDF extraction; the Anthropic key; SESSION_SECRET (Sunray; the client is already signed in, so rotation now signs the client out and must be timed with the operator).
+
+## 7. Amendment 1, 23 Oct 10:20 (DC-75): building from a clone without material/restricted
+
+The build runs on Sunray's home PC from a fresh clone of `lincolnstephens/cast-0009-assure`. The restricted folder cannot be moved there privately, so the build and the gate run without it, as follows.
+
+- **Restricted names.** `check_restricted.py` and the gate already take the names from `ASSURE_RESTRICTED_NAMES` before the file. The build reads that variable into its shell from `%USERPROFILE%\assure_restricted_names.txt` (one line, comma-separated, placed by Sunray outside the repo), never prints it, never writes it under the job folder, and deletes the file with the password file at the end. If the file is absent, stop and report: the restricted check is not optional.
+- **Line 77 (logo file nowhere else).** When `material/restricted/client_logo.png` is absent, the reference bytes are the client organisation's stored logo, read once through the manager route the gate already uses (`/admin/organisations/{CLIENT_ORG_ID}/logo`). The check then runs as written: those bytes must appear in no file under the job folder outside `material/`, and not in the built bundle. The bytes are held in memory only. An unreadable endpoint is a fail, not a pass.
+- **Everything else in FRAGO 09 and 10 stands.** Commits are pushed to origin master after each one; the mini PC pulls later.
