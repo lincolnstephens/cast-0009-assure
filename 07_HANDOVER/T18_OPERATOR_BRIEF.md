@@ -643,6 +643,20 @@ The separate coloured dot beside the status has gone. The words are always there
 - With no logo set, the top of the menu shows her organisation's name, as before.
 - Your admin workspace is unchanged. **View as client** shows her header exactly as she sees it.
 
+### More than one file for the same register (FRAGO 10)
+
+The seven named registers on Compliance Documents (the record of processing activities, the employee access tracker and the rest) each have one slot. When you file a new version of a register under its own title:
+- The slot shows the most recently updated one.
+- Each earlier one stays beneath it, titled "(earlier version)", as earlier policies do.
+- The module page opens the newest from the register's tile and lists the earlier version beside it.
+- Nothing published is dropped. To take an old version off her view, set it to not published in **Documents**.
+
+Until v1.9 the slot showed the first file and hid every later one. That is why her registers filed on 21 October did not show behind the 29 September templates.
+
+### The test seat
+
+A document the test seat uploads is published to no one, even after you accept it. To publish a real document, file it from Documents or accept the client's own upload.
+
 ### Sending her the portal
 
 `07_HANDOVER/T27_CLIENT_QUICK_START.md` is a one-page quick start for her. Fill in the sign-in address and your own name at the top, then send it with her sign-in. Send the one-time password separately, never in the same message as the address.
