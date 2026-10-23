@@ -762,3 +762,107 @@ Only three settings changed (`clientName`, `lead`, `moduleStatus`) and two brand
   - confirm Block 5 consent, after which the Information Officer's password is reset in Users and reaches her through the operator;
   - the Anthropic key, when there is one (DC-19).
 - **After the meeting:** the Statement's numbers (retainer, contract dates).
+
+
+# v1.9, the operator's four points and the register slots
+
+**Live:** https://assure.tessera-monitor.com. https://tessera-assure.netlify.app serves the same deploy.
+**Production deploy:** `6adb323e240c965c3ec449fe`, 2026-10-23, published 10:09 UTC (11:09 BST). Two drafts came before it: `6adb2c3d94724f712ff86031`, which is not a v1.9 test (below), and `6adb2c5c2314f735d35fe1bc`, the same build as production.
+**Gate:** PASS, 247 of 247, against the production address on run 1 at 1920x1080, 1366x768 and 390x844: the static checks plus 83 live definition-of-done lines (line 17 stays retired). One gate-only fix pass came before production, on a draft subset. Unit and integration tests: 321 of 321.
+**Spend:** no new money committed.
+- What it used: build-session time, local compute, and three deploys on the existing Netlify plan (two drafts, one production).
+- No new dependency. The Python Playwright package and its Chromium were installed on the home PC for the gate; they are the gate's existing harness, not a product dependency.
+- No environment variable or secret was changed on Netlify, and no real person's password was reset. The gate's @gate.invalid users were given one-time passwords as since v1.5 and are all disabled at the end of the run.
+
+**Built under:** `06_EXECUTION/FRAGO_09_BETA_DELIVERY.md` (21 Oct, DC-72, DC-73), resumed by `06_EXECUTION/FRAGO_10_REGISTER_SLOTS.md` (23 Oct, DC-74) and its amendment 1 (DC-75). Built on Sunray's home PC from a clone of `lincolnstephens/cast-0009-assure`, without `material/restricted/`. Due live and gated by 1500 BST 23 Oct; live at 11:09 and gated by about 11:58 BST.
+
+**The stalled work.** The 21 Oct build stopped with its changes uncommitted; they were committed on 23 Oct as three "work in progress" commits (3a8a8e3, d5c54e0, fa273a5). Most of their size is line-ending churn: ignoring it, 29 files changed. Every FRAGO 09 item was checked against that code before it was trusted: all five were present, the typecheck was clean and 314 of 314 tests passed. The register-slot fix (FRAGO 10 3.1) and line 77's fallback (FRAGO 10 section 7) were not in it and were written in this run.
+
+**Inputs without the restricted folder (DC-76).** By Sunray's decision of 10:25, no files were hand-placed. The demo manager's password was read from the existing file in Sunray's OneDrive app-builds folder. The restricted names were derived from the live product by manager reads: the client organisation's name, and the Information Officer's first name from the oldest non-test client user's email. Both were held in memory and passed only to the child process of each check or gate run, by a wrapper in the session's scratch folder, which signed in and out each time. `check_restricted.py`: 3 terms, 0 hits, before every commit and over the folder with the built bundle in it. The first derivation took the oldest client user from the users audit alone, which dates only the two 22 Oct users. It was caught and corrected before any commit, by dating every client user from both audit logs.
+
+## What v1.9 adds
+
+**A note to the client on a decision (FRAGO 09 3.1).**
+- On the review queue, a data request, a concern and a client confirmation each carry **Note to the client (optional)**, up to 300 characters, read by both buttons.
+- Stored on the review item and on the record the client reads it from: the request's clock, or the confirmed task (`confirmationNote`). Never only in the audit.
+- The client sees "MITMARK: {note}" with its date on Requests and clocks beside the request, and on the task's card in Job management. No note, nothing shown.
+- A test seat's note stays on its test item and its own test clock; it never reaches a real task or a client.
+- The audit says "with a note to the client" and never repeats the note. Before v1.9, Reject wrote the note into the audit text and stored it nowhere else; that is closed.
+- Export requests, alerts and document submissions are unchanged; a submission keeps its Return reason.
+
+**Category on the client's upload, the module at acceptance (3.2).**
+- The client's form asks for a **Category** (Policy, Procedure, Tracker), required, and no module. A client body that carries a module or a section is refused with 400, not quietly stripped.
+- The submission is stored unpublished, with no module, under its category.
+- **Accept** pre-fills the section from the category, changeable, and requires the module, 1 to 8. The server refuses to publish without one ("Choose the module before publishing."). The audit names the section and the module.
+- The queue card shows the client's category, or, for a submission made before v1.9, its module.
+
+**One mark per task (3.3).**
+- One rule in `packages/shared/src/statusMark.ts`, used by the client's Job management, Waiting on you, the module pages' Jobs tables, the operator's Workplan and Jobs board.
+- Green tick done, grey circle not started, amber circle in progress, red with its word for overdue or blocked. "Due soon" is words after the state ("In progress, due soon"). Not applicable keeps a grey circle with its own words.
+- The separate RAG lamp has left every task row and card; a RAG mark now marks only a module's score. The Blocked badge on the cards has gone: the mark says it.
+- Every mark carries an edge in the page's text token, which is what reads at 3:1 against the light portal (the house green and amber alone do not). Words are in the text token. House tokens only; one new alias, `--mark-ink`, for the tick and the bar.
+
+**Both marks on the client portal (3.4).**
+- The client's logo appears once, at the head of the menu. It has left the page header.
+- The MitmarkLogo mark sits right-aligned in the client header, with "Delivered by MITMARK Intelligence" beside it from 768px and the mark alone below.
+- Footer and watermark as v1.8. With no logo the menu head shows the name. The admin workspace is unchanged; View as client shows the client's header.
+
+**Register slots (FRAGO 10 3.1).**
+- `trackersSectionItems` took the first published title match for each of the seven named registers and dropped every later one. That is what hid the operator's 21 Oct registers behind the 29 Sep templates (DC-74 closed it in the data).
+- Now the slot takes the most recently updated match (`updatedAt`, then `asAt`), and each earlier match follows it titled "(earlier version)". A document fills one register at most. Nothing live is dropped.
+- The module pages read the same section, so they too hid the later matches. Now the register's tile opens the newest and the earlier version is listed beside it (DC-77 item 3).
+
+**Hand-over (3.5, FRAGO 10 3.3).** T18 section 5n, with the register-slot and test-seat paragraphs; T27, the client quick start, checked complete and role-only.
+
+**Tests.** Unit and integration tests 321 of 321: the status-mark rule (4), decision notes (6), the upload Category (3), and the register slots (7) are new at v1.9.
+
+## Calls the order left to the build (DC-76, DC-77)
+
+1. **Inputs** from the product and an existing file, as above (DC-76).
+2. **Register order:** `updatedAt`, then `asAt`, newest first. A document fills one register at most, the first it matches.
+3. **Module pages and earlier versions.** FRAGO 10 says module pages were unchanged because they already list every published document. For registers they did not: they read the same Trackers section and hid the later matches too. They now show the newest on the register's tile and list the earlier version beside it.
+4. **Line 76 against a run-start read.** The 14 Oct figures (19 tasks, 11 documents) are no longer true: the operator filed two registers on 21 Oct and accepted two test-seat uploads on 22 Oct, so there are now 15 documents. The line now compares tasks and documents, by count and by a content hash, with a read taken when the run begins.
+5. **Line 83 by actor.** The client is live. An entry made during the run counts against the gate when its actor is the demo manager, an @gate.invalid user or no one. Entries by the organisation's own people or other MITMARK staff are reported, not failed, and the tasks and documents must hash as they did at the start. None of the client organisation's people wrote during the run.
+6. **Line 84**, new: register slots at the API level on the gate organisation, two "Data request log" links filed a second apart, both removed afterwards. It runs before line 83.
+7. **Not applicable** keeps a grey circle with its own words. The order's four marks are unchanged.
+8. **Draft subsets** ran the gate from a scratch runner over a filtered copy of the definition of done. The full gate ran the real file and wrote `gate/GATE_RESULT.md`.
+
+## Deviations
+
+- **No placed files, so nothing deleted from `%USERPROFILE%`.** The brief's step 0b was replaced by Sunray's decision (DC-76). The OneDrive password file was left in place, as Sunray directed.
+- **Draft 1 is not a v1.9 test.** With `--filter @maximus/web`, the Netlify CLI resolved `--functions=netlify/functions` against `apps/web`, found nothing, and reused the cached v1.8 function. Draft 2 and production were deployed with absolute paths and `--skip-functions-cache`. The v1.8 report's deploy command has the same weakness and should not be copied.
+- **Module pages changed for registers** (call 3).
+- **Lines 76 and 83 restated** (calls 4 and 5).
+- **Netlify.** T05's standing prohibition of 7 Sep still reads as written in the template. Every version since v1.0 has deployed to Netlify under Sunray's orders, and this run used only the Netlify CLI for the deploys the brief orders. No Netlify connector was used.
+
+## What the gate caught
+
+| Run | Target | Result |
+|---|---|---|
+| Subset | Draft `6adb2c3d94724f712ff86031` | Not run: the draft carries the cached v1.8 function |
+| Subset | Draft `6adb2c5c2314f735d35fe1bc`, lines 1, 11, 12, 15, 21, 59 to 61, 69 and 72 to 84 | 71 of 72. Line 79 at 1920: "no upload form" |
+| Fix pass 1 (gate only) | | Below |
+| Subset | Draft `6adb2c5c2314f735d35fe1bc`, lines 1 and 78 to 83 | 33 of 33 |
+| 1 | Production `6adb323e240c965c3ec449fe` | **247 of 247** |
+
+**The subset's failure.** Line 78 drives the browser as the gate's test seat and disables that seat at its end. The client nav stayed on screen, so the gate's role check took the page for the client's and did not sign in again, and Documents could not load without a live session. The role check now asks the server who is signed in and signs in afresh unless it is the account the role is driven as. Because line 79's API half runs only at the first width, it had not run at all; after the fix it passed in full. No product change was needed.
+
+## The client organisation, read only
+
+- **Before the run** (10:30 BST): 110 audit entries, the newest `18eb82ca-0520-47ad-8bde-1671fec45b66` at 08:35:39 UTC.
+- **After the run** (12:02 BST): 110 entries, the same newest entry. The gate's own line 83 agrees: no entry since the run began, and tasks and documents unchanged by hash. Every gate user is disabled.
+- **Entries since 23 Oct 08:34 UTC:** three, all before this run and all DC-74's (Seagull's data fix under Sunray's manager account): `client_view.open` at 08:34:10, and two `document.update` at 08:35:38 and 08:35:39 (the 29 Sep templates set to not published).
+- **Its state at the run:** 19 tasks and 15 documents; name, display name and Statement name equal (restricted match, not printed); Information Officer the role; lead with title; modules 1 to 8 Live; no fee; show illustrative off; logo PNG, 37,934 bytes.
+
+## What waits on whom
+
+- **The operator:**
+  - look at v1.9 in View as client: the marks, the header, her registers;
+  - send T27 with the sign-ins she has not yet sent;
+  - set to not published any earlier register version she does not want the client to see (her 29 Sep templates already are);
+  - the Statement's numbers after the meeting.
+- **Sunray:**
+  - the OneDrive copy of the demo manager's password (`Personal App Builds\assure_gate_admin.txt`): delete it, including from the OneDrive recycle bin, and consider changing the password, since the file has been in a synced folder;
+  - `SESSION_SECRET` rotation, now timed with the operator because the client is signed in (FRAGO 10 section 6);
+  - the Anthropic key (DC-19);
+  - the mini PC: pull master to pick up v1.9 and these registers.
