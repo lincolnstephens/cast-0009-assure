@@ -283,19 +283,44 @@ function unfiledTrackerItem(doc: OrgDoc, t: (typeof TRACKER_DOCUMENTS)[number]):
   };
 }
 
-function trackersSectionItems(doc: OrgDoc): ComplianceDocument[] {
+/** Newest first: `updatedAt`, then `asAt` (FRAGO 10 3.1). */
+function newestFirst(a: DocumentRecord, b: DocumentRecord): number {
+  if (a.updatedAt !== b.updatedAt) return a.updatedAt < b.updatedAt ? 1 : -1;
+  if (a.asAt !== b.asAt) return a.asAt < b.asAt ? 1 : -1;
+  return 0;
+}
+
+/**
+ * v1.9 (FRAGO 10 3.1). When more than one live document matches a named
+ * register, the slot takes the most recently updated, and every earlier match
+ * follows it with " (earlier version)" appended, as the Policies section does
+ * for superseded policies. Until v1.8 the slot took the first match and
+ * dropped the rest, which hid the operator's 21 Oct registers behind the
+ * 29 Sep templates. Nothing live is dropped. Each document fills one register
+ * at most, the first it matches.
+ */
+export function trackersSectionItems(doc: OrgDoc): ComplianceDocument[] {
   const filed = doc.documents.filter((d) => d.section === "trackers" && isLiveDocument(d));
   const matches = (d: DocumentRecord, t: (typeof TRACKER_DOCUMENTS)[number]) =>
     [t.title, ...(t.aliases ?? [])].some((name) => d.title.trim().toLowerCase() === name.trim().toLowerCase());
 
-  const items: ComplianceDocument[] = TRACKER_DOCUMENTS.map((t) => {
-    const found = filed.find((d) => matches(d, t));
-    return found ? toClientDocument(found) : unfiledTrackerItem(doc, t);
-  });
+  const claimed = new Set<string>();
+  const items: ComplianceDocument[] = [];
+  for (const t of TRACKER_DOCUMENTS) {
+    const found = filed.filter((d) => !claimed.has(d.id) && matches(d, t)).sort(newestFirst);
+    if (found.length === 0) {
+      items.push(unfiledTrackerItem(doc, t));
+      continue;
+    }
+    for (const d of found) claimed.add(d.id);
+    const [newest, ...earlier] = found;
+    items.push(toClientDocument(newest));
+    for (const old of earlier) items.push({ ...toClientDocument(old), title: `${old.title} (earlier version)` });
+  }
 
-  // A filed register that does not match one of the named six still appears
-  // - the operator may publish a register beyond the standard list.
-  const extra = filed.filter((d) => !TRACKER_DOCUMENTS.some((t) => matches(d, t)));
+  // A filed register that does not match one of the named registers still
+  // appears - the operator may publish a register beyond the standard list.
+  const extra = filed.filter((d) => !claimed.has(d.id));
   items.push(...extra.map(toClientDocument));
   return items;
 }
