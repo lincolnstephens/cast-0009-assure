@@ -24,6 +24,11 @@ function byCreatedDesc(a: ClockEventRecord, b: ClockEventRecord): number {
   return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0;
 }
 
+/** v1.9 (FRAGO 09 3.1). MITMARK's note on the request's decision, or null when none was given. */
+function decisionNoteOf(clock: ClockRecord): { text: string; at: string } | null {
+  return clock.decisionNote && clock.decisionNoteAt ? { text: clock.decisionNote, at: clock.decisionNoteAt } : null;
+}
+
 function latestNoteFor(events: ClockEventRecord[], clockId: string): string | null {
   const forClock = events.filter((e) => e.clockId === clockId).sort(byCreatedDesc);
   return forClock[0]?.note ?? null;
@@ -55,6 +60,7 @@ clockRoutes.get("/", async (c) => {
           ? null
           : clockStatus(new Date(clock.startedAt), new Date(clock.dueAt), now),
         latestNote: latestNoteFor(doc.clockEvents, clock.id),
+        decisionNote: decisionNoteOf(clock),
       };
     });
 
@@ -87,6 +93,7 @@ clockRoutes.get("/:id", async (c) => {
     status: found.clock.closedAt
       ? null
       : clockStatus(new Date(found.clock.startedAt), new Date(found.clock.dueAt), new Date()),
+    decisionNote: decisionNoteOf(found.clock),
     events: events.map((e) => ({
       id: e.id,
       event: clockEventLabel(e, found.clock),

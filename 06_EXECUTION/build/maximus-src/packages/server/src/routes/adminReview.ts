@@ -59,7 +59,10 @@ adminReviewRoutes.post("/review/:id/answer", async (c) => {
 });
 
 adminReviewRoutes.post("/review/:id/approve", async (c) => {
-  reviewDecisionSchema.safeParse(await c.req.json().catch(() => ({})));
+  // v1.9 (FRAGO 09 3.1): Approve now reads the optional note to the client.
+  const parsed = reviewDecisionSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: "Keep the note to the client to 300 characters." }, 400);
+  const note = parsed.data.note;
 
   const id = c.req.param("id");
   const user = c.get("user");
@@ -76,7 +79,14 @@ adminReviewRoutes.post("/review/:id/approve", async (c) => {
       return c.json({ ok: true, exportId });
     }
     if (item.type === "alert" || item.type === "intake") {
-      await approveReviewItem(orgId, id, user.id, user.displayName, item.type);
+      await approveReviewItem(
+        orgId,
+        id,
+        user.id,
+        user.displayName,
+        item.type,
+        item.type === "intake" ? note : undefined,
+      );
       return c.json({ ok: true });
     }
     if (item.type === "task_confirmation") {
@@ -92,7 +102,7 @@ adminReviewRoutes.post("/review/:id/approve", async (c) => {
           reviewer: name,
           outcome: "Confirmed by the client and accepted by MITMARK.",
         });
-      });
+      }, note);
       return c.json({ ok: true });
     }
     if (item.type === "document_submission") {
@@ -107,7 +117,7 @@ adminReviewRoutes.post("/review/:id/approve", async (c) => {
 
 adminReviewRoutes.post("/review/:id/reject", async (c) => {
   const parsed = reviewDecisionSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!parsed.success) return c.json({ error: "Invalid request." }, 400);
+  if (!parsed.success) return c.json({ error: "Keep the note to the client to 300 characters." }, 400);
 
   const id = c.req.param("id");
   const user = c.get("user");
@@ -125,10 +135,17 @@ adminReviewRoutes.post("/review/:id/reject", async (c) => {
     }
     if (item?.type === "task_confirmation") {
       // Reopening clears the client's claim and leaves the task where it was.
-      await decideTaskConfirmation(orgId, id, user.id, user.displayName, false, () => {});
+      await decideTaskConfirmation(orgId, id, user.id, user.displayName, false, () => {}, parsed.data.note);
       return c.json({ ok: true });
     }
-    await rejectReviewItem(orgId, id, user.id, user.displayName, parsed.data.note);
+    // Export requests and alerts carry no note to the client (FRAGO 09 3.1).
+    await rejectReviewItem(
+      orgId,
+      id,
+      user.id,
+      user.displayName,
+      item?.type === "intake" ? parsed.data.note : undefined,
+    );
     return c.json({ ok: true });
   } catch (err) {
     if (err instanceof ReviewError) return c.json({ error: err.message }, err.status as 400);
@@ -138,8 +155,16 @@ adminReviewRoutes.post("/review/:id/reject", async (c) => {
 
 /** v1.7 (FRAGO 07 3.1). Accept a client's document: choose its section; only now is it published. */
 adminReviewRoutes.post("/review/:id/accept-document", async (c) => {
-  const parsed = acceptSubmissionSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json({ error: "Choose the section it belongs in." }, 400);
+  const body = await c.req.json().catch(() => null);
+  const parsed = acceptSubmissionSchema.safeParse(body);
+  if (!parsed.success) {
+    // v1.9 (FRAGO 09 3.2): the module pages depend on it, so nothing publishes without one.
+    const area = (body as { area?: unknown } | null)?.area;
+    if (area === undefined || area === null || area === "") {
+      return c.json({ error: "Choose the module before publishing." }, 400);
+    }
+    return c.json({ error: "Choose the section it belongs in." }, 400);
+  }
   const id = c.req.param("id");
   const user = c.get("user");
   const orgId = await findReviewItemOrgId(id);

@@ -808,7 +808,11 @@ export type DocumentInput = z.infer<typeof documentInputSchema>;
  */
 export const clientDocumentSubmitSchema = z.object({
   title: z.string().trim().min(1).max(300),
-  area: z.coerce.number().int().min(1).max(8),
+  /**
+   * v1.9 (FRAGO 09 3.2). The client chooses a Category, never a module; the
+   * operator sets the module when accepting.
+   */
+  category: z.enum(["policy", "procedure", "tracker"]),
   /** One line of what it is. */
   note: z.string().trim().min(1).max(300),
   kind: z.enum(["file", "link"]),
@@ -824,8 +828,14 @@ export type ClientDocumentSubmit = z.infer<typeof clientDocumentSubmitSchema>;
 /** v1.7. The operator's decision on a client submission. */
 export const acceptSubmissionSchema = z.object({
   section: documentSectionSchema,
-  area: z.coerce.number().int().min(1).max(8).optional(),
+  /** v1.9 (FRAGO 09 3.2). Required: nothing publishes without its module. */
+  area: z.coerce.number().int().min(1).max(8),
 });
+
+/** v1.9 (FRAGO 09 3.2). The client's Category, and the section it pre-fills at acceptance. */
+export const SUBMISSION_CATEGORY_LABEL = { policy: "Policy", procedure: "Procedure", tracker: "Tracker" } as const;
+export const SUBMISSION_CATEGORY_SECTION = { policy: "policies", procedure: "procedures", tracker: "trackers" } as const;
+export type SubmissionCategory = keyof typeof SUBMISSION_CATEGORY_LABEL;
 export const returnSubmissionSchema = z.object({
   reason: z.string().trim().min(1).max(300),
 });
@@ -885,6 +895,8 @@ export const jobsResponseSchema = z.object({
           areaName: z.string(),
           blocked: z.boolean(),
           forYou: z.boolean(),
+          /** v1.9 (FRAGO 09 3.1). MITMARK's note on the client's confirmation, if one was given. */
+          mitmarkNote: z.object({ text: z.string(), at: z.string() }).nullable(),
         }),
       ),
     }),

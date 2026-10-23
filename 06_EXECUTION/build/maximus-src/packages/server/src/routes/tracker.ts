@@ -10,6 +10,7 @@ import {
   TASK_STATUS_LABEL,
   areaName,
   clientDocumentSubmitSchema,
+  SUBMISSION_CATEGORY_LABEL,
   jobGroupOf,
   taskConfirmSchema,
   type AreaId,
@@ -338,6 +339,9 @@ function jobTaskOf(t: TaskRecord, asAt: string) {
     // that gets it unblocked.
     blocked: t.status === "blocked",
     forYou: t.ownerType === "client",
+    // v1.9 (FRAGO 09 3.1): MITMARK's note on the client's confirmation, as the client reads it.
+    mitmarkNote:
+      t.confirmationNote && t.confirmationNoteAt ? { text: t.confirmationNote, at: t.confirmationNoteAt } : null,
   };
 }
 
@@ -424,9 +428,15 @@ trackerRoutes.post("/documents", async (c) => {
   const user = c.get("user");
   if (!user.clientAccountId) return c.json({ error: "No organisation" }, 403);
   const orgId = user.clientAccountId;
-  const parsed = clientDocumentSubmitSchema.safeParse(await c.req.json().catch(() => null));
+  const body = await c.req.json().catch(() => null);
+  // v1.9 (FRAGO 09 3.2): the client never sets a document's module or section.
+  // A body that tries is refused outright rather than silently stripped.
+  if (body && typeof body === "object" && ("area" in body || "section" in body)) {
+    return c.json({ error: "The module is set by MITMARK when the document is accepted." }, 400);
+  }
+  const parsed = clientDocumentSubmitSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "Give the document a title, its module and one line of what it is." }, 400);
+    return c.json({ error: "Give the document a title, its category and one line of what it is." }, 400);
   }
   const input = parsed.data;
   const doc = await readOrg(orgId);
@@ -445,10 +455,12 @@ trackerRoutes.post("/documents", async (c) => {
   const record: DocumentRecord = {
     id,
     orgId,
-    // The operator chooses the section on acceptance. Until then it is held
-    // under procedures, unpublished, and appears in no section at all.
+    // The operator chooses the section and the module on acceptance. Until
+    // then it is held under procedures, unpublished, with no module, and
+    // appears in no section at all.
     section: "procedures",
-    area: input.area,
+    area: null,
+    category: input.category,
     title: input.title,
     version: "",
     asAt: now.slice(0, 10),
@@ -516,7 +528,7 @@ trackerRoutes.post("/documents", async (c) => {
       orgId,
       type: "document_submission",
       refId: id,
-      summary: `${test ? "TEST SEAT. " : ""}Client submitted "${input.title}" for module ${input.area} (${areaName(input.area)})${input.supersedes ? " as a new version" : ""}.`,
+      summary: `${test ? "TEST SEAT. " : ""}Client submitted "${input.title}" as a ${SUBMISSION_CATEGORY_LABEL[input.category]}${input.supersedes ? " (a new version)" : ""}.`,
       state: "pending",
       decidedBy: null,
       decidedAt: null,

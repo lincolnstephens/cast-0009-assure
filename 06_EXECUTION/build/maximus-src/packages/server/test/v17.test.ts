@@ -99,7 +99,8 @@ async function submit(cookie: string, over: Record<string, unknown> = {}, header
     headers,
     json: {
       title: "Visitor log retention note",
-      area: 3,
+      // v1.9 (FRAGO 09 3.2): the client chooses a Category; MITMARK sets the module.
+      category: "procedure",
       note: "How long the visitor book is kept.",
       kind: "file",
       fileBase64: await docx("Visitor book", ["The visitor book is kept for two years and then shredded."]),
@@ -142,7 +143,7 @@ describe("client upload (FRAGO 07 3.1)", () => {
     await submit(client, { title: "Second one" });
     const [first, second] = await pendingItems("document_submission");
 
-    const acc = await call(`/api/admin/review/${first.id}/accept-document`, admin, { method: "POST", json: { section: "trackers" } });
+    const acc = await call(`/api/admin/review/${first.id}/accept-document`, admin, { method: "POST", json: { section: "trackers", area: 3 } });
     expect(acc.status).toBe(200);
     const ret = await call(`/api/admin/review/${second.id}/return-document`, admin, { method: "POST", json: { reason: "Please send the signed copy." } });
     expect(ret.status).toBe(200);
@@ -159,7 +160,7 @@ describe("client upload (FRAGO 07 3.1)", () => {
   it("a new version supersedes the earlier one on acceptance, and history is kept", async () => {
     await submit(client);
     const [first] = await pendingItems("document_submission");
-    await call(`/api/admin/review/${first.id}/accept-document`, admin, { method: "POST", json: { section: "procedures" } });
+    await call(`/api/admin/review/${first.id}/accept-document`, admin, { method: "POST", json: { section: "procedures", area: 3 } });
     const earlierId = first.context.documentId;
 
     await submit(client, { title: "Visitor log retention note v2", supersedes: earlierId });
@@ -170,7 +171,7 @@ describe("client upload (FRAGO 07 3.1)", () => {
     expect(ids).toContain(earlierId);
     expect(ids).not.toContain(second.context.documentId);
 
-    await call(`/api/admin/review/${second.id}/accept-document`, admin, { method: "POST", json: { section: "procedures" } });
+    await call(`/api/admin/review/${second.id}/accept-document`, admin, { method: "POST", json: { section: "procedures", area: 3 } });
     docs = (await (await call("/api/tracker/documents", client)).json()) as any;
     ids = docs.sections.flatMap((s: any) => s.items).map((d: any) => d.id);
     expect(ids).toContain(second.context.documentId);
@@ -289,7 +290,7 @@ describe("test seat (FRAGO 07 3.3)", () => {
     await submit(seat);
     const [item] = await pendingItems("document_submission");
     expect(item.test).toBe(true);
-    await call(`/api/admin/review/${item.id}/accept-document`, admin, { method: "POST", json: { section: "procedures" } });
+    await call(`/api/admin/review/${item.id}/accept-document`, admin, { method: "POST", json: { section: "procedures", area: 3 } });
     const docs = (await (await call("/api/tracker/documents", client)).json()) as any;
     expect(docs.sections.flatMap((s: any) => s.items).map((d: any) => d.id)).not.toContain(item.context.documentId);
     expect(docs.submissions).toHaveLength(0);

@@ -196,6 +196,13 @@ export interface ClockRecord {
   icoNotified: boolean | null;
   /** v1.7. Started by a test seat: never counted, never booked on the Record. */
   test?: boolean;
+  /**
+   * v1.9 (FRAGO 09 3.1). MITMARK's note to the client when the request was
+   * approved or rejected in the review queue, and when. Shown to the client
+   * as "MITMARK: {note}"; never repeated in the audit.
+   */
+  decisionNote?: string;
+  decisionNoteAt?: Iso;
 }
 
 export interface ClockEventRecord {
@@ -254,6 +261,8 @@ export interface ReviewItemRecord {
   createdAt: Iso;
   /** v1.7. Raised by a test seat; deciding it changes nothing real. */
   test?: boolean;
+  /** v1.9 (FRAGO 09 3.1). The note given with the decision, when there was one. */
+  decisionNote?: string;
 }
 
 export interface AuditRecord {
@@ -333,6 +342,12 @@ export interface TaskRecord {
    */
   clientConfirmedAt: Iso | null;
   clientConfirmedBy: string | null;
+  /**
+   * v1.9 (FRAGO 09 3.1). MITMARK's note on the client's confirmation, given
+   * when it was accepted or reopened, and when. The latest note stands.
+   */
+  confirmationNote?: string;
+  confirmationNoteAt?: Iso;
   createdBy: string;
   updatedBy: string;
   updatedAt: Iso;
@@ -391,6 +406,11 @@ export interface DocumentRecord {
   searchNote?: string;
   /** v1.7. Uploaded by a test seat. */
   test?: boolean;
+  /**
+   * v1.9 (FRAGO 09 3.2). The client's Category on a submission. The module
+   * (`area`) is left unset by the client and set by the operator on acceptance.
+   */
+  category?: 'policy' | 'procedure' | 'tracker';
 }
 
 export type SubmissionState = 'submitted' | 'returned' | 'accepted';

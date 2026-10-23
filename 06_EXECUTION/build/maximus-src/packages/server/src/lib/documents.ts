@@ -95,6 +95,8 @@ export function submissionsFor(doc: OrgDoc, viewerIsTest: boolean) {
         id: d.id,
         title: d.title,
         area: d.area,
+        // v1.9 (FRAGO 09 3.2): the client's own Category; the module appears once MITMARK has set it.
+        category: d.category ?? null,
         kind: d.kind,
         note: s.note,
         state: s.state,

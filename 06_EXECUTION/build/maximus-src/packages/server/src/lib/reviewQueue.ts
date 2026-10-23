@@ -169,6 +169,8 @@ function reviewContext(doc: OrgDoc, item: ReviewItemRecord): Record<string, unkn
     return {
       title: d?.title ?? item.summary,
       area: d?.area ?? null,
+      // v1.9 (FRAGO 09 3.2): the client's Category; null on a pre-v1.9 submission, which shows its module.
+      category: d?.category ?? null,
       note: d?.submission?.note ?? "",
       kind: d?.kind ?? "file",
       fileName: d?.fileName ?? "",
@@ -194,7 +196,7 @@ export async function acceptDocumentSubmission(
   reviewItemId: string,
   officerId: string,
   officerName: string,
-  input: { section: "policies" | "procedures" | "trackers"; area?: number },
+  input: { section: "policies" | "procedures" | "trackers"; area: number },
 ): Promise<{ documentId: string; superseded: string | null }> {
   const result = await mutateOrg(orgId, (doc) => {
     const item = doc.review.find(
@@ -204,8 +206,12 @@ export async function acceptDocumentSubmission(
     const d = doc.documents.find((x) => x.id === item.refId);
     if (!d || !d.submission) throw new ReviewError("The document this submission belongs to is gone.", 404);
     const now = new Date().toISOString();
+    // v1.9 (FRAGO 09 3.2): the operator sets the module; nothing publishes without one.
+    if (!Number.isInteger(input.area) || input.area < 1 || input.area > 8) {
+      throw new ReviewError("Choose the module before publishing.", 400);
+    }
     d.section = input.section;
-    if (input.area) d.area = input.area;
+    d.area = input.area;
     d.published = true;
     d.submission.state = "accepted";
     d.submission.decidedById = officerId;
@@ -234,7 +240,7 @@ export async function acceptDocumentSubmission(
     actorId: officerId,
     actorName: officerName,
     action: "document.accept",
-    detail: `Document ${result.documentId} ("${result.title}") accepted under ${input.section} and published${result.test ? " (test seat: shown to no client)" : ""}${result.superseded ? `; supersedes ${result.superseded}, which is kept` : ""}.`,
+    detail: `Document ${result.documentId} ("${result.title}") accepted under ${input.section}, module ${input.area}, and published${result.test ? " (test seat: shown to no client)" : ""}${result.superseded ? `; supersedes ${result.superseded}, which is kept` : ""}.`,
   });
   return { documentId: result.documentId, superseded: result.superseded };
 }
@@ -383,6 +389,37 @@ export async function approveExportRequest(
   return exportId;
 }
 
+/**
+ * v1.9 (FRAGO 09 3.1). Store MITMARK's note to the client with a decision, on
+ * the review item and on the record the client reads it from: the intake's
+ * clock, or the confirmed task. Only data requests, concerns and task
+ * confirmations carry one. A test seat's note stays on its review item (and
+ * on its own test clock); it never reaches the real task. Returns whether a
+ * note was stored, for the audit, which says so without repeating it.
+ */
+export function applyDecisionNote(doc: OrgDoc, item: ReviewItemRecord, note: string | undefined, now: string): boolean {
+  const text = note?.trim().slice(0, 300) ?? "";
+  if (!text) return false;
+  if (item.type !== "intake" && item.type !== "task_confirmation") return false;
+  item.decisionNote = text;
+  if (item.type === "intake") {
+    const clock = doc.clocks.find((c) => c.intakeId === item.refId);
+    if (clock) {
+      clock.decisionNote = text;
+      clock.decisionNoteAt = now;
+    }
+  } else if (!item.test) {
+    const task = doc.tasks.find((t) => t.id === item.refId);
+    if (task) {
+      task.confirmationNote = text;
+      task.confirmationNoteAt = now;
+    }
+  }
+  return true;
+}
+
+const NOTE_AUDIT = " with a note to the client";
+
 /** Approve an alert or intake review item - no entry, no side effect beyond the decision. */
 export async function approveReviewItem(
   orgId: string,
@@ -390,13 +427,16 @@ export async function approveReviewItem(
   officerId: string,
   officerName: string,
   type: "alert" | "intake",
+  note?: string,
 ): Promise<void> {
-  await mutateOrg(orgId, (doc) => {
+  const noted = await mutateOrg(orgId, (doc) => {
     const item = doc.review.find((r) => r.id === reviewItemId && r.state === "pending" && r.type === type);
     if (!item) throw new ReviewError("Review item not found or already decided.", 404);
+    const now = new Date().toISOString();
     item.state = "approved";
     item.decidedBy = officerId;
-    item.decidedAt = new Date().toISOString();
+    item.decidedAt = now;
+    return applyDecisionNote(doc, item, note, now);
   });
 
   await writeAudit({
@@ -404,7 +444,7 @@ export async function approveReviewItem(
     actorId: officerId,
     actorName: officerName,
     action: "review.approve",
-    detail: `type=${type}`,
+    detail: `type=${type}${noted ? NOTE_AUDIT : ""}`,
   });
 }
 
@@ -415,7 +455,7 @@ export async function rejectReviewItem(
   officerName: string,
   note?: string,
 ): Promise<void> {
-  const type = await mutateOrg(orgId, (doc) => {
+  const { type, noted } = await mutateOrg(orgId, (doc) => {
     const item = doc.review.find((r) => r.id === reviewItemId && r.state === "pending");
     if (!item) throw new ReviewError("Review item not found or already decided.", 404);
 
@@ -424,18 +464,20 @@ export async function rejectReviewItem(
       if (i !== -1) doc.exports.splice(i, 1);
     }
 
+    const now = new Date().toISOString();
     item.state = "rejected";
     item.decidedBy = officerId;
-    item.decidedAt = new Date().toISOString();
-    return item.type;
+    item.decidedAt = now;
+    return { type: item.type, noted: applyDecisionNote(doc, item, note, now) };
   });
 
+  // v1.9 (FRAGO 09 3.1): the audit says a note was given; it never repeats it.
   await writeAudit({
     orgId,
     actorId: officerId,
     actorName: officerName,
     action: "review.reject",
-    detail: `type=${type}${note ? ` note=${note}` : ""}`,
+    detail: `type=${type}${noted ? NOTE_AUDIT : ""}`,
   });
 }
 
@@ -472,8 +514,9 @@ export async function decideTaskConfirmation(
   officerName: string,
   accept: boolean,
   closeTask: (doc: OrgDoc, task: TaskRecord, officerName: string) => void,
+  note?: string,
 ): Promise<void> {
-  await mutateOrg(orgId, (doc) => {
+  const noted = await mutateOrg(orgId, (doc) => {
     const item = doc.review.find(
       (r) => r.id === reviewItemId && r.state === "pending" && r.type === "task_confirmation",
     );
@@ -494,9 +537,11 @@ export async function decideTaskConfirmation(
       task.updatedAt = new Date().toISOString();
     }
 
+    const now = new Date().toISOString();
     item.state = accept ? "approved" : "rejected";
     item.decidedBy = officerId;
-    item.decidedAt = new Date().toISOString();
+    item.decidedAt = now;
+    return applyDecisionNote(doc, item, note, now);
   });
 
   await writeAudit({
@@ -504,6 +549,6 @@ export async function decideTaskConfirmation(
     actorId: officerId,
     actorName: officerName,
     action: accept ? "review.task_confirmation.accept" : "review.task_confirmation.reopen",
-    detail: `item=${reviewItemId}`,
+    detail: `item=${reviewItemId}${noted ? NOTE_AUDIT : ""}`,
   });
 }
