@@ -921,7 +921,20 @@ def _ensure_role(page, cfg, role, target):
     if role == "client" and page.locator("[data-testid='client-view-banner']").count() > 0:
         return _sign_in(page, cfg, role, target)
     if page.locator(probe).count() > 0:
-        return True
+        # v1.9: the nav alone can outlive its session. A line that drives the
+        # browser as another seat (the test seat, line 78) and disables it at
+        # its end leaves the client nav on screen with no live session behind
+        # it, so ask the server who is signed in and sign in afresh unless it
+        # is the account this role is driven as.
+        try:
+            want = (_credentials(cfg, role)[0] or "").lower()
+            who = page.evaluate(
+                "() => fetch('/api/auth/session', {credentials: 'same-origin'})"
+                ".then(r => r.json()).then(b => (b && b.user && b.user.email) || '').catch(() => '')")
+        except Exception:
+            who = ""
+        if want and str(who).lower() == want:
+            return True
     return _sign_in(page, cfg, role, target)
 
 
