@@ -5946,6 +5946,36 @@ def drv_watermark_contrast(page, cfg, line, res, errors):
                 f"footer lowest {footer_min}:1" if ok else "; ".join(problems[:6]))
 
 
+def _client_org_state(operator):
+    """The client organisation's tasks and documents, read only, as counts
+    and a hash of their stored form, plus its audit entry ids."""
+    import hashlib
+    s, wp = operator.call("GET", f"/admin/workplan?org={CLIENT_ORG_ID}")
+    s2, docs = operator.call("GET", f"/admin/documents?org={CLIENT_ORG_ID}")
+    if not _ok(s, wp) or not _ok(s2, docs):
+        raise RuntimeError(f"client organisation read returned {s}/{s2}")
+    tasks, documents = wp.get("tasks") or [], docs.get("documents") or []
+    blob = json.dumps([tasks, documents], sort_keys=True).encode("utf-8")
+    audit = _audit_entries(operator, f"/admin/audit?accountId={CLIENT_ORG_ID}")
+    return {"tasks": len(tasks), "documents": len(documents),
+            "hash": hashlib.sha256(blob).hexdigest(), "audit_ids": {e["id"] for e in audit}}
+
+
+def _client_org_baseline(cfg):
+    """v1.9 (FRAGO 10 3.4). The client organisation as it stood when the run
+    began, read once. Its counts have moved since v1.8 by the operator's own
+    work (filed registers, accepted uploads), so lines 76 and 83 compare with
+    this rather than with the 14 Oct figures. A failed read is kept as None
+    and fails both lines; it never passes them."""
+    if "client_baseline" not in _GATE:
+        try:
+            _GATE["client_baseline"] = _client_org_state(_ApiSeat(cfg, "admin"))
+        except Exception as exc:
+            print(f"client organisation baseline unreadable: {type(exc).__name__}: {exc}")
+            _GATE["client_baseline"] = None
+    return _GATE["client_baseline"]
+
+
 def drv_client_org_ready(page, cfg, line, res, errors):
     """Line 76: the client organisation is configured as FRAGO 08 3.1, read
     only: the name is the client's trading name (proved by the restricted
@@ -5981,13 +6011,21 @@ def drv_client_org_ready(page, cfg, line, res, errors):
         problems.append("a retainer is entered")
     if st.get("showIllustrative"):
         problems.append("show illustrative is on")
+    # v1.9: unchanged since the run began, by count and by content, rather
+    # than the 14 Oct figures (19 and 11), which the operator's own work has
+    # since moved.
+    base = _client_org_baseline(cfg)
     row = _org_rows(operator).get(CLIENT_ORG_ID) or {}
-    if row.get("taskCount") != CLIENT_ORG_TASKS:
-        problems.append(f"{row.get('taskCount')} tasks, expected {CLIENT_ORG_TASKS}")
-    s, docs = operator.call("GET", f"/admin/documents?org={CLIENT_ORG_ID}")
-    n_docs = len((docs or {}).get("documents") or []) if _ok(s, docs) else None
-    if n_docs != CLIENT_ORG_DOCUMENTS:
-        problems.append(f"{n_docs} documents, expected {CLIENT_ORG_DOCUMENTS}")
+    if base is None:
+        problems.append("the client organisation's state at the start of the run was unreadable")
+    else:
+        now = _client_org_state(operator)
+        if row.get("taskCount") != base["tasks"] or now["tasks"] != base["tasks"]:
+            problems.append(f"{row.get('taskCount')} tasks, {base['tasks']} at the start of the run")
+        if now["documents"] != base["documents"]:
+            problems.append(f"{now['documents']} documents, {base['documents']} at the start of the run")
+        if now["hash"] != base["hash"]:
+            problems.append("tasks or documents changed since the run began")
     logo = br.get("logo") or {}
     if logo.get("contentType") != "image/png":
         problems.append("no PNG logo set")
@@ -6000,19 +6038,36 @@ def drv_client_org_ready(page, cfg, line, res, errors):
             problems.append("the logo set is not the restricted file")
     ok = not problems
     return ok, ("name set (restricted match, not printed); Information Officer role; lead with title; "
-                f"8 modules Live; no fee; {CLIENT_ORG_TASKS} tasks, {CLIENT_ORG_DOCUMENTS} documents; logo PNG"
+                f"8 modules Live; no fee; {base['tasks'] if base else '?'} tasks and "
+                f"{base['documents'] if base else '?'} documents, unchanged since the run began; logo PNG"
                 if ok else "; ".join(problems[:8]))
 
 
 def sdrv_logo_file_nowhere_else(cfg, line):
     """Line 77: the client's logo file exists only in material/restricted:
     no file under the job folder outside it, and nothing in the built
-    bundle, has the same bytes. Compared by hash; nothing is printed."""
+    bundle, has the same bytes. Compared by hash; nothing is printed.
+
+    v1.9 (FRAGO 10 section 7, DC-75): on a clone without material/restricted
+    the reference bytes are the client organisation's stored logo, read once
+    through the manager route, held in memory only. An unreadable route is a
+    fail, not a pass."""
     import hashlib
     src = cfg["root"] / RESTRICTED_LOGO
-    if not src.is_file():
-        return False, "the restricted logo file is not readable; an absent file is not a pass"
-    want = src.read_bytes()
+    if src.is_file():
+        want, source = src.read_bytes(), "the restricted file"
+    else:
+        target = cfg.get("_target") or cfg.get("target")
+        if not target:
+            return False, "the restricted logo file is absent and no target to read the stored logo from"
+        try:
+            operator = _ApiSeat(dict(cfg, _target=target), "admin")
+            s, raw, ctype = _raw_bytes(operator, f"/admin/organisations/{CLIENT_ORG_ID}/logo")
+        except Exception as exc:
+            return False, f"the restricted logo file is absent and the stored logo is unreadable ({type(exc).__name__})"
+        if s != 200 or not raw or len(raw) < 64:
+            return False, f"the restricted logo file is absent and the stored logo route returned {s}; an unreadable reference is not a pass"
+        want, source = raw, f"the stored logo ({ctype or 'unknown type'}, {len(raw)} bytes, read through the manager route)"
     digest, size = hashlib.sha256(want).digest(), len(want)
     skip = {".git", "node_modules", "material", "__pycache__", ".netlify", ".vite", "test-results", "playwright-report"}
     hits, scanned = [], 0
@@ -6036,7 +6091,8 @@ def sdrv_logo_file_nowhere_else(cfg, line):
             hits.append(f"bundle missing: {rel}")
     if hits:
         return False, f"{len(hits)} file(s) carry the client's logo: " + "; ".join(hits[:5])
-    return True, f"{scanned} files under the job folder (bundle included) checked; the logo is only in material/restricted"
+    return True, (f"{scanned} files under the job folder (bundle included) checked against {source}; "
+                  "the logo is in no file outside material/")
 
 
 STATIC_DRIVERS["logo_file_nowhere_else"] = sdrv_logo_file_nowhere_else
@@ -6613,13 +6669,95 @@ def drv_client_org_quiet(page, cfg, line, res, errors):
     try:
         operator = _ApiSeat(cfg, "admin")
         entries = _audit_entries(operator, f"/admin/audit?accountId={CLIENT_ORG_ID}")
+        s, ub = operator.call("GET", "/admin/users")
+        if not _ok(s, ub):
+            raise RuntimeError(f"GET /admin/users returned {s}")
+        now = _client_org_state(operator)
     except RuntimeError as exc:
         return False, str(exc)
-    since = [e for e in entries if str(e.get("createdAt", "")) >= RUN_STARTED_AT]
-    if since:
-        return False, f"{len(since)} entries since {RUN_STARTED_AT}Z: " + ", ".join(
-            f"{e.get('createdAt')} {e.get('action')}" for e in since[:5])
-    return True, f"no audit entry on the client organisation since the run began ({RUN_STARTED_AT}Z); {len(entries)} in all"
+    base = _client_org_baseline(cfg)
+    if base is None:
+        return False, "the client organisation's state at the start of the run was unreadable"
+    # v1.9: the client is live (FRAGO 10), so its own people may write while
+    # the gate runs. An entry is the gate's when its actor is the demo manager
+    # the gate signs in as, any @gate.invalid user, or no one; any of those
+    # fails the line. Others are reported, not counted against the gate.
+    gate_ids = {operator.user["id"]} | {u["id"] for u in ub.get("users") or []
+                                        if str(u.get("email", "")).endswith("@gate.invalid")}
+    new = [e for e in entries if e["id"] not in base["audit_ids"]
+           or str(e.get("createdAt", "")) >= RUN_STARTED_AT]
+    gates = [e for e in new if not e.get("actorId") or e.get("actorId") in gate_ids]
+    others = [e for e in new if e not in gates]
+    if gates:
+        return False, f"{len(gates)} entries by the gate since {RUN_STARTED_AT}Z: " + ", ".join(
+            f"{e.get('createdAt')} {e.get('action')}" for e in gates[:5])
+    if now["hash"] != base["hash"] and not others:
+        return False, "tasks or documents changed during the run with no audit entry to account for it"
+    note = (f"; {len(others)} entries by the organisation's own people or MITMARK staff during the run: "
+            + ", ".join(f"{e.get('createdAt')} {e.get('action')}" for e in others[:5])) if others else ""
+    return True, (f"no audit entry by the gate on the client organisation since the run began ({RUN_STARTED_AT}Z); "
+                  f"{len(entries)} in all; tasks and documents {'unchanged by hash' if now['hash'] == base['hash'] else 'changed by the entries below'}{note}")
+
+
+REGISTER_SLOT_TITLE = "Data request log"
+
+
+def drv_register_slots(page, cfg, line, res, errors):
+    """Line 84 (FRAGO 10 3.1): a named register with two live matches shows
+    the newer in its slot and the earlier beneath it as "(earlier version)",
+    in the client's Compliance Documents and on the register's module page.
+    API level, on the gate organisation, once; both documents are removed
+    afterwards."""
+    import time
+    if not _api_only_once(line, res):
+        return True, "not repeated (API)"
+    problems, made = [], []
+    try:
+        operator = _ApiSeat(cfg, "admin")
+        seat, gid = _gate_client_seat(cfg, operator)
+    except RuntimeError as exc:
+        return False, str(exc)
+    try:
+        for n in (1, 2):
+            s, body = operator.call("POST", f"/admin/documents?org={gid}", {
+                "section": "trackers", "area": 6, "title": REGISTER_SLOT_TITLE, "kind": "link",
+                "url": f"https://example.org/gate-v19-register-{n}", "published": True,
+            })
+            if s not in (200, 201) or not (body or {}).get("id"):
+                raise RuntimeError(f"filing register {n} returned {s}")
+            made.append(body["id"])
+            time.sleep(1.1)  # a strictly later updatedAt for the second
+        older, newer = made
+        s, docs = seat.call("GET", "/tracker/documents")
+        if not _ok(s, docs):
+            raise RuntimeError(f"client GET /tracker/documents returned {s}")
+        items = next((x.get("items") or [] for x in docs.get("sections") or [] if x.get("id") == "trackers"), [])
+        ids = [i.get("id") for i in items]
+        if newer not in ids or older not in ids:
+            problems.append(f"the Trackers section lists {sum(i in ids for i in made)} of the 2 live matches")
+        else:
+            a, b = items[ids.index(newer)], items[ids.index(older)]
+            first = next((i for i in items if str(i.get("title", "")).startswith(REGISTER_SLOT_TITLE)), {})
+            if first.get("id") != newer or a.get("title") != REGISTER_SLOT_TITLE:
+                problems.append("the register's slot does not hold the newer document")
+            if ids.index(older) != ids.index(newer) + 1 or b.get("title") != f"{REGISTER_SLOT_TITLE} (earlier version)":
+                problems.append(f"the earlier document is not directly beneath it as an earlier version ({b.get('title')!r})")
+        if any(str(i.get("id", "")).startswith("tracker-unfiled:dsar") for i in items):
+            problems.append("the register still reads not yet filed")
+        s, area = seat.call("GET", "/tracker/areas/6")
+        blob = json.dumps(area or {})
+        if not _ok(s, area) or newer not in blob or older not in blob:
+            problems.append("module 6 does not list both live documents")
+    except RuntimeError as exc:
+        problems.append(str(exc))
+    finally:
+        for did in made:
+            operator.call("DELETE", f"/admin/documents/{did}?org={gid}")
+        _safe_disable(cfg, operator)
+    ok = not problems
+    return ok, (f"two live '{REGISTER_SLOT_TITLE}' documents on the gate organisation: the newer fills the slot, the "
+                "earlier sits beneath it as an earlier version; module 6 lists both; both removed afterwards"
+                if ok else "; ".join(problems[:6]))
 
 
 DRIVERS = {
@@ -6713,6 +6851,8 @@ DRIVERS = {
     "header_both_marks": drv_header_both_marks,
     "quick_start": drv_quick_start,
     "client_org_quiet": drv_client_org_quiet,
+    # v1.9, FRAGO 10.
+    "register_slots": drv_register_slots,
 }
 
 
@@ -6764,6 +6904,10 @@ def main():
 
     print(f"G7 GATE - {cfg['codename']} - {cfg['iteration']} - {target}")
 
+    # v1.9: known before the static lines, so line 77 can read the stored
+    # logo when material/restricted is absent (FRAGO 10 section 7).
+    cfg["_target"] = target
+    _client_org_baseline(cfg)
     run_static(cfg)
     driven_state = run_driven(cfg, target)
 

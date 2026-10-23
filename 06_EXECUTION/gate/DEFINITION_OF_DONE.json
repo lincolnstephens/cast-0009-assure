@@ -1,6 +1,6 @@
 {
   "iteration": "v1.9",
-  "written": "2026-10-21, FRAGO 09",
+  "written": "2026-10-21, FRAGO 09; FRAGO 10, 23 Oct (line 84; lines 76, 77 and 83 restated)",
   "lines": [
     {
       "id": 1,
@@ -1315,7 +1315,7 @@
       "line": "The client organisation is configured for first use as FRAGO 08 3.1, with its tasks and documents unchanged.",
       "drive": "api",
       "check": "client_org_ready",
-      "pass": "Read only, never a client view: GET /api/admin/settings?org=org-f2b4afdf0d gives a name that matches the restricted list (never printed), equal to the display name and the Statement name; ioName 'Information Officer'; lead a name followed by ', Chief Information Security Officer, MITMARK Intelligence'; module status 1 to 8 all Live; no retainer; show illustrative off; 19 tasks and 11 documents; a PNG logo, served to the operator, byte-identical to the restricted file.",
+      "pass": "Read only, never a client view: GET /api/admin/settings?org=org-f2b4afdf0d gives a name that matches the restricted list (never printed), equal to the display name and the Statement name; ioName 'Information Officer'; lead a name followed by ', Chief Information Security Officer, MITMARK Intelligence'; module status 1 to 8 all Live; no retainer; show illustrative off; its tasks and documents; a PNG logo, served to the operator, byte-identical to the restricted file. v1.9 (FRAGO 10): the tasks and documents are compared, by count and by a hash of their stored form, with a read taken when the run began, not with the 14 Oct figures, which the operator's own work has since moved.",
       "applies_to": [
         "1920x1080"
       ],
@@ -1326,7 +1326,7 @@
       "line": "The client's logo file exists nowhere under the job folder but material/restricted, and not in the built bundle.",
       "drive": "static",
       "check": "logo_file_nowhere_else",
-      "pass": "No file under the job folder outside .git, node_modules and material (the built web bundle and function bundle included, both present) is byte-identical to, or contains, material/restricted/client_logo.png. Compared by hash and bytes; nothing printed.",
+      "pass": "No file under the job folder outside .git, node_modules and material (the built web bundle and function bundle included, both present) is byte-identical to, or contains, material/restricted/client_logo.png. Compared by hash and bytes; nothing printed. v1.9 (FRAGO 10 section 7): when material/restricted/client_logo.png is absent, the reference bytes are the client organisation's stored logo, read once through GET /api/admin/organisations/org-f2b4afdf0d/logo and held in memory; an unreadable route fails the line.",
       "added": "v1.8"
     },
     {
@@ -1399,17 +1399,31 @@
       "added": "v1.9"
     },
     {
-      "id": 83,
-      "line": "The gate writes nothing to the client organisation: its audit log has no entry made during the run.",
+      "id": 84,
+      "line": "A named register with two live matches shows the newer in its slot and the earlier beneath it as an earlier version; nothing live is dropped.",
       "drive": "playwright",
-      "check": "client_org_quiet",
-      "pass": "After every other line, at the last resolution, GET /api/admin/audit?accountId=org-f2b4afdf0d returns no entry with createdAt at or after the moment the run began.",
+      "check": "register_slots",
+      "pass": "On the gate organisation, two published 'Data request log' links filed a second apart: the client's GET /api/tracker/documents Trackers section holds the newer as the register's slot titled 'Data request log' and the older directly beneath it titled 'Data request log (earlier version)'; the register does not read not yet filed; GET /api/tracker/areas/6 lists both. Both documents are removed afterwards. API level, run once.",
       "applies_to": [
         "1920x1080",
         "1366x768",
         "390x844"
       ],
-      "added": "v1.9"
+      "added": "v1.9, FRAGO 10 3.1"
+    },
+    {
+      "id": 83,
+      "line": "The gate writes nothing to the client organisation: no audit entry made during the run is the gate's, and its tasks and documents are unchanged.",
+      "drive": "playwright",
+      "check": "client_org_quiet",
+      "pass": "After every other line, at the last resolution, GET /api/admin/audit?accountId=org-f2b4afdf0d has no entry made since the run began whose actor is the demo manager, an @gate.invalid user or no one; and its tasks and documents hash as they did when the run began. Entries by the organisation's own people or other MITMARK staff during the run are reported, not counted against the gate (the client is live, FRAGO 10).",
+      "applies_to": [
+        "1920x1080",
+        "1366x768",
+        "390x844"
+      ],
+      "added": "v1.9",
+      "changed": "v1.9, FRAGO 10"
     }
   ]
 }
