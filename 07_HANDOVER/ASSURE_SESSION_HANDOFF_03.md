@@ -30,7 +30,7 @@ Tessera Assure v1.9 is live at https://assure.tessera-monitor.com (deploy 6adb32
 - Higher commander: Rich Roberts, MITMARK CEO. No codenames in front of him. Never "£0": "no new money committed" and name what was spent.
 - The operator: Lurong Chen, Chief Information Security Officer, MITMARK Intelligence. Runs the first client's contract and will run the second. Five rounds of feedback so far (28 Sep deck, 29 Sep deck, 29 Sep email, 13 Oct document, 15 Oct document). Her three benefits (overview, repository, consolidated actions) remain the test.
 - The first client: live. Its Information Officer and two colleagues have sign-ins; one of the two has not yet signed in.
-- The second client: a prospect, a wealth manager, approached by MITMARK for an outsourced DPO service earlier in 2026 (account memory `azura-dpo`; MITMARK's relationship lead on it is Jad). Its name goes into `material/restricted/CLIENT.md` as a second entry and nowhere else in the folder. Its feedback arrives with Sunray in the new session.
+- The second client: a prospect, a wealth manager, approached by MITMARK for an outsourced DPO service earlier in 2026 (account memory file for the second client's pitch; MITMARK's relationship lead is the introducing partner). Its name goes into `material/restricted/CLIENT.md` as a second entry and nowhere else in the folder. Its feedback arrives with Sunray in the new session.
 
 ## 4. What exists, by version (this session)
 
@@ -96,7 +96,7 @@ Build, on order only:
 | Hand-over | `07_HANDOVER/T18_OPERATOR_BRIEF.md`, `T27_CLIENT_QUICK_START.md` |
 | Restricted | `material/restricted/` (mini PC only): `CLIENT.md`, `client_logo.png`, the zip, `operator_feedback_05_20261015.docx` |
 | Project docs (Cowork) | `CAST-0009_STATE.md`, `CAST-0009_HANDOFF_03.md` |
-| Memory | Project subtree areas/assure.md, areas/cast.md, people/lurong.md, people/rich-roberts.md, the officer's file; account-level areas/azura-dpo.md, people/jad.md, topics/writing-standard.md |
+| Memory | Project subtree areas/assure.md, areas/cast.md, people/lurong.md, people/rich-roberts.md, the officer's file; account-level files for the second client (the pitch area and the introducing partner), topics/writing-standard.md |
 
 ## 11. How to run a build from the new session
 
