@@ -36,3 +36,7 @@ usage: One page for the higher commander. What this is, what it becomes, what th
 ## What stays constant
 
 *Two sentences. The engine does not change between what they have seen and what the offer designs. Only the facts connected to it change, under the boundary the offer agrees first.*
+
+## Lines added by later orders
+
+- **Entity filings as records** (v1.10). Each jurisdiction's registrations and filings are tracked as records of the work, so a jurisdiction's status on the Global coverage tile moves from the work itself, not from a setting changed by hand. Designed, not built; a structured register of the kind set out in the sequels.

@@ -1,8 +1,8 @@
 ---
 document: OPERATOR_BRIEF
 job: CAST-0009 ASSURE
-product: Tessera Assure v1.8
-version: v1.8
+product: Tessera Assure v1.10
+version: v1.10
 status: FOR THE MITMARK OPERATOR
 authority: Seagull, written by the build session under T02 A6
 register_id: T18
@@ -661,6 +661,58 @@ A document the test seat uploads is published to no one, even after you accept i
 
 `07_HANDOVER/T27_CLIENT_QUICK_START.md` is a one-page quick start for her. Fill in the sign-in address and your own name at the top, then send it with her sign-in. Send the one-time password separately, never in the same message as the address.
 
+## 5o. A second client, and the Global coverage tile (v1.10)
+
+### The Jurisdictions setting
+
+**Settings** has a new section, **Jurisdictions**. It lists the countries and financial centres an organisation operates in, one row each:
+- **Id**: a short code of your choosing ("UK", "DIFC"). Each must be different.
+- **Jurisdiction**: its name ("United Kingdom").
+- **Hub**: the city where the client operates there ("London"). This is the label on the map.
+- **Regulator** and **Law**: as the client would recognise them.
+- **Filing duty**: what the jurisdiction asks of the client by way of registration or filing, as you understand it.
+- **Latitude** and **longitude** of the hub, in decimal degrees (London is 51.51 and -0.13). They place the marker.
+- **Status**: Not started, In progress, Done or Needs attention.
+
+Use **Add a jurisdiction**, change any field, **Remove** a row, then **Save jurisdictions**. The whole list saves at once. The audit log records that the list was saved and how many entries it has, never what they say. Only MITMARK changes the list; the client reads it.
+
+An organisation with no jurisdictions listed shows nothing new. The first client's organisation and the demo have none, so their pages are unchanged.
+
+### The Global coverage tile
+
+With jurisdictions listed, the client's **Compliance Tracker** shows a tile between Journey and Overall compliance status:
+- It is titled **Global coverage** with two or more jurisdictions, **Coverage** with one.
+- A world map has a marker on each hub, labelled with the hub's name. Each marker is the same mark as a task: grey circle not started, amber circle in progress, green tick done, red for needs attention. A key beneath the map names each mark.
+- Beneath the map, the same entries as a table: hub, jurisdiction, regulator, law and status, the status always in words.
+- Choosing a marker or a row opens a card with the name, hub, regulator, law and status, and the line "Filing duty (to be confirmed at mobilisation):" followed by the filing duty you entered.
+- On a phone the map is hidden and the table carries the tile.
+
+The status is MITMARK's work in that jurisdiction. Nothing on the tile says a filing or registration has been made. When you have done one, record it as work as usual and set that jurisdiction's status yourself; the tile does not move on its own (see the roadmap).
+
+**Module 1 (DPO registration)** shows the same table under Useful links, titled **Registrations and filings by jurisdiction**, read from the same list.
+
+### Creating a second organisation from a manifest
+
+A new client is a new organisation on the same site, not a new build. The second client's organisation was set up this way on 28 October:
+1. **Organisations**: create it with its trading name, the jurisdiction and the regulation line.
+2. **Seed** it from a manifest file with the seed command, dry run first. The dry run lists what it would create and set, and writes nothing. The manifest can now carry, as well as tasks:
+   - the **jurisdictions** list;
+   - **show illustrative** (off for a real client);
+   - the **Information Officer label**, a role ("Group Compliance Lead"), never a person;
+   - **module status** for modules 1 to 8;
+   - **rates**: the hourly rate, the day rate and the monthly retainer.
+3. **Settings**: the name on the Statement, and the contract lead with title.
+4. **Branding**: the client's accent colour, and its logo on the **Organisations** page. Check that the accent reads clearly on the light portal.
+5. **Users**: one client user, named by role. Its one-time password is shown once; it goes to the person who will sign in, never in the same message as the address.
+
+### Available, for a prospect
+
+For a client whose work has not started, every module is **Available**, not Live, and the Record is empty. The Statement then says plainly that no work has yet been recorded. It sets out the service, the retainer and day rate, and "what comes next" from the dated workplan. It shows no comparators until there is work to compare. The workplan's dates are indicative until the engagement starts; move them at mobilisation.
+
+### The restricted file
+
+The client's identity is held in one restricted file, kept on the build machine and never shared. It now has a second entry, for the second client. The pre-commit name check reads every entry, so a second client's name is caught exactly as the first one's is. The product holds each client's name and logo in that client's own organisation only. The address, the page title, the source and the build carry no client name.
+
 ## 6. Importing the v0.1 export
 
 If you have a record file from the earlier single-page version, **Record** has an import.
@@ -708,7 +760,7 @@ Do not edit its wording. It was written to be forwardable to a sceptical finance
 
 ## 10. A second client
 
-The product is multi-tenant. A second retained client is a second organisation, not a second build and not a second site. Ask Sunray to have one added; it is a configuration step, not development.
+The product is multi-tenant. A second client is a second organisation, not a second build and not a second site. It is a configuration step, not development; section 5o sets out how the second client's organisation was made.
 
 ## 11. What this version does not do
 
