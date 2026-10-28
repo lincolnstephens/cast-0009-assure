@@ -39,6 +39,8 @@ GENERIC = {
     "holdings",
     "limited",
     "ltd",
+    "partners",
+    "partner",
     "company",
     "properties",
     "property",
@@ -47,7 +49,7 @@ GENERIC = {
 }
 
 
-def restricted_terms(root: str) -> list[str]:
+def restricted_names(root: str) -> list[str]:
     """Names from the environment, else from the restricted file. Never printed."""
     env = os.environ.get("ASSURE_RESTRICTED_NAMES")
     raw: list[str] = []
@@ -59,13 +61,24 @@ def restricted_terms(root: str) -> list[str]:
             text = open(path, encoding="utf-8").read()
         except OSError:
             return []
-        m = re.search(r"^- Client:\s*(.+)$", text, re.M)
-        if m:
-            raw.append(m.group(1).strip())
-        m = re.search(r"^- Information Officer:\s*([^(.\n]+)", text, re.M)
-        if m:
-            raw.append(m.group(1).strip())
+        # FRAGO 11 3.1: every client entry, not the first. A Client line may
+        # carry a note in brackets after the name; only the name is taken.
+        for m in re.finditer(r"^- Client:\s*([^(\n]+)", text, re.M):
+            if m.group(1).strip():
+                raw.append(m.group(1).strip())
+        for m in re.finditer(r"^- Information Officer:\s*([^(.\n]+)", text, re.M):
+            if m.group(1).strip():
+                raw.append(m.group(1).strip())
+    return raw
 
+
+def names_count(root: str) -> int:
+    return len(restricted_names(root))
+
+
+def restricted_terms(root: str) -> list[str]:
+    """Each name, plus each distinctive word in it. Never printed."""
+    raw = restricted_names(root)
     terms: set[str] = set()
     for name in raw:
         terms.add(name)
@@ -107,7 +120,7 @@ def main() -> int:
                         hits += 1
                         break
 
-    print(f"{len(terms)} restricted terms checked across {scanned} files, {hits} hits")
+    print(f"{len(terms)} restricted terms from {names_count(root)} names checked across {scanned} files, {hits} hits")
     return 1 if hits else 0
 
 

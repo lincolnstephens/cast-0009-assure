@@ -234,13 +234,20 @@ def load_restricted_names(cfg):
     if not path.is_file():
         return None
 
+    # v1.10 (FRAGO 11 3.1): every Client line, each cut at any bracketed note,
+    # and each distinctive word of a client's name as a term of its own, as
+    # check_restricted.py does, so a short form of the name is caught too.
+    generic = {"estates", "estate", "group", "holdings", "limited", "ltd", "partners",
+               "partner", "company", "properties", "property", "services", "trust"}
     names = []
     for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        m = re.search(r"^-\s*Client:\s*(.+)$", raw)
+        m = re.search(r"^-\s*Client:\s*([^(]+)", raw)
         if m:
             val = m.group(1).strip()
             if val:
                 names.append(val)
+                names.extend(w for w in val.split()
+                             if len(w) > 3 and w.lower() not in generic and w not in names)
             continue
         m = re.search(r"^-\s*Information Officer:\s*(.+)$", raw)
         if m:
