@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import {
   entryInputSchema,
   orgSettingsSchema,
+  jurisdictionsSaveSchema,
   v01ImportSchema,
   type LineStatus,
 } from "@maximus/shared";
@@ -271,7 +272,8 @@ adminRecordRoutes.put("/settings", async (c) => {
   if (!parsed.success) return c.json({ error: "Check the settings." }, 400);
 
   const settings = await mutateOrg(orgId, (doc) => {
-    const { moduleStatus, ...rest } = parsed.data;
+    // v1.10: the jurisdictions list has its own save, which audits its count.
+    const { moduleStatus, jurisdictions: _jurisdictions, ...rest } = parsed.data;
     Object.assign(doc.settings, rest);
     // Module status merges by module, so saving one module never resets another.
     if (moduleStatus) doc.settings.moduleStatus = { ...doc.settings.moduleStatus, ...moduleStatus };
@@ -281,6 +283,34 @@ adminRecordRoutes.put("/settings", async (c) => {
 
   await writeAudit({ orgId, actorId: user.id, actorName: user.displayName, action: "settings.update", detail: "Operator settings updated." });
   return c.json({ settings });
+});
+
+/**
+ * v1.10 (FRAGO 11 3.3). The organisation's jurisdictions, for the Global
+ * coverage tile and module 1. The operator saves the whole list; the audit
+ * entry names the count, never the entries.
+ */
+adminRecordRoutes.put("/jurisdictions", async (c) => {
+  const orgId = orgIdOf(c);
+  const user = c.get("user");
+  const parsed = jurisdictionsSaveSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json({ error: issue?.message && issue.code === "custom" ? issue.message : "Check the jurisdictions: each needs an id, a name, a hub and a position." }, 400);
+  }
+  const jurisdictions = await mutateOrg(orgId, (doc) => {
+    doc.settings.jurisdictions = parsed.data.jurisdictions;
+    return doc.settings.jurisdictions;
+  });
+  const n = jurisdictions.length;
+  await writeAudit({
+    orgId,
+    actorId: user.id,
+    actorName: user.displayName,
+    action: "settings.jurisdictions",
+    detail: `Jurisdictions list saved: ${n} ${n === 1 ? "entry" : "entries"}.`,
+  });
+  return c.json({ jurisdictions });
 });
 
 /** The client portal's accent, set by the operator or left to the house tokens. */

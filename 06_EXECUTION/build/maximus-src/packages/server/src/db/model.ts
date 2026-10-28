@@ -1,3 +1,5 @@
+import type { CoverageEntry } from '@maximus/shared';
+
 /**
  * Tessera Assure persisted model.
  *
@@ -556,6 +558,12 @@ export interface OrgSettings {
    * none recorded.
    */
   retentionSchedule?: Record<string, { category: string; period: string }[]>;
+  /**
+   * v1.10 (FRAGO 11 3.3). The organisation's jurisdictions, for the Global
+   * coverage tile and module 1's registrations table. Absent or empty means
+   * neither appears. Changed only through PUT /admin/jurisdictions.
+   */
+  jurisdictions?: CoverageEntry[];
 }
 
 /** Everything belonging to one organisation. One blob, one tenant. */
@@ -641,6 +649,7 @@ export const DEFAULT_SETTINGS: OrgSettings = {
   journeyNote: '',
   moduleIntroductions: {},
   retentionSchedule: {},
+  jurisdictions: [],
 };
 
 export function emptyOrgDoc(id: string, name: string): OrgDoc {

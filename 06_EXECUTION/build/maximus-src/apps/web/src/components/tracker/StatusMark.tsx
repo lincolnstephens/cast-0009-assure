@@ -17,13 +17,72 @@ import { taskStatusMark, type Rag, type StatusMarkKind, type TaskStatus } from "
  * both themes. The words are in the text token: 4.5:1 and well above on both
  * the day portal and the night workspace. House tokens only.
  */
-const FILL: Record<StatusMarkKind, string> = {
+export const MARK_FILL: Record<StatusMarkKind, string> = {
   done: "var(--sev-protected)",
   not_started: "var(--text-3)",
   in_progress: "var(--sev-elevated)",
   red: "var(--sev-critical)",
   not_applicable: "var(--text-3)",
 };
+
+/**
+ * v1.10. The mark's shapes alone, centred on (cx, cy) with radius r, for use
+ * inside any SVG: the status mark here, and the markers on the Global
+ * coverage map, so both follow one rule. Drawn for r = 6.25 and scaled.
+ */
+export function MarkShapes({
+  mark,
+  cx,
+  cy,
+  r,
+  edgeTestId,
+}: {
+  mark: StatusMarkKind;
+  cx: number;
+  cy: number;
+  r: number;
+  edgeTestId?: string;
+}) {
+  const k = r / 6.25;
+  const at = (dx: number, dy: number) => `${cx + dx * k} ${cy + dy * k}`;
+  return (
+    <>
+      <circle
+        data-testid={edgeTestId}
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill={MARK_FILL[mark]}
+        stroke="var(--text)"
+        strokeWidth={1.5 * Math.max(1, k * 0.8)}
+      />
+      {mark === "done" && (
+        <path
+          d={`M${at(-3, 0.2)} L${at(-0.9, 2.3)} L${at(3, -2)}`}
+          fill="none"
+          stroke="var(--mark-ink)"
+          strokeWidth={1.6 * k}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+      {mark === "red" && (
+        <>
+          <line
+            x1={cx}
+            y1={cy - 3.4 * k}
+            x2={cx}
+            y2={cy + 0.8 * k}
+            stroke="var(--mark-ink)"
+            strokeWidth={1.6 * k}
+            strokeLinecap="round"
+          />
+          <circle cx={cx} cy={cy + 3.1 * k} r={0.9 * k} fill="var(--mark-ink)" />
+        </>
+      )}
+    </>
+  );
+}
 
 export function StatusMark({
   status,
@@ -51,31 +110,7 @@ export function StatusMark({
         viewBox="0 0 14 14"
         className="shrink-0"
       >
-        <circle
-          data-testid="status-mark-edge"
-          cx="7"
-          cy="7"
-          r="6.25"
-          fill={FILL[mark]}
-          stroke="var(--text)"
-          strokeWidth="1.5"
-        />
-        {mark === "done" && (
-          <path
-            d="M4 7.2 L6.1 9.3 L10 5"
-            fill="none"
-            stroke="var(--mark-ink)"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        )}
-        {mark === "red" && (
-          <>
-            <line x1="7" y1="3.6" x2="7" y2="7.8" stroke="var(--mark-ink)" strokeWidth="1.6" strokeLinecap="round" />
-            <circle cx="7" cy="10.1" r="0.9" fill="var(--mark-ink)" />
-          </>
-        )}
+        <MarkShapes mark={mark} cx={7} cy={7} r={6.25} edgeTestId="status-mark-edge" />
       </svg>
       <span data-testid="status-word">{word}</span>
     </span>

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { recurrenceSchema, taskStatusSchema } from "@maximus/shared";
+import { jurisdictionsSchema, lineStatusSchema, recurrenceSchema, taskStatusSchema } from "@maximus/shared";
 
 /**
  * The seed manifest (FRAGO 05 3.5, as amended 28 Sep: the command implements
@@ -90,7 +90,24 @@ export const seedManifestSchema = z.object({
           journeyPhase: z.number().int().min(1).max(5).nullable().optional(),
           journeyNote: z.string().trim().max(300).optional(),
           retentionSchedule: z.array(seedRetentionRowSchema).max(30).optional(),
+          // v1.10 (FRAGO 11 3.2). Settings a new organisation can take from
+          // its manifest rather than by hand. Absent keys leave the setting
+          // as the organisation already has it.
+          showIllustrative: z.boolean().optional(),
+          /** The Information Officer's label: a role, never a person. */
+          informationOfficerLabel: z.string().trim().min(1).max(200).optional(),
+          moduleStatus: z
+            .record(z.enum(["1", "2", "3", "4", "5", "6", "7", "8"]), lineStatusSchema)
+            .optional(),
+          rates: z
+            .object({
+              hourlyRate: z.number().min(0).max(10000).optional(),
+              dayRate: z.number().min(0).max(100000).optional(),
+              retainer: z.number().min(0).max(1000000).nullable().optional(),
+            })
+            .optional(),
         })
+        .passthrough()
         .default({}),
     })
     .default({ displayName: null, settings: {} }),
@@ -105,6 +122,8 @@ export const seedManifestSchema = z.object({
   clocks: z.array(seedClockSchema).max(50).default([]),
   documents: z.array(seedDocumentSchema).max(100).default([]),
   links: z.array(seedLinkSchema).max(50).default([]),
+  /** v1.10 (FRAGO 11 3.3). The organisation's jurisdictions, for the Global coverage tile. */
+  jurisdictions: jurisdictionsSchema.optional(),
   /** What the manifest deliberately leaves out, for the record. Not seeded. */
   notSeeded: z.array(z.unknown()).optional(),
 });

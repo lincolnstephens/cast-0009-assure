@@ -112,6 +112,8 @@ trackerRoutes.get("/home", async (c) => {
     forYouEmptyMessage: `Nothing needs your action. MITMARK is working ${openMitmarkCount} items.`,
     journey: journey(doc),
     upcoming: upcoming(doc, now),
+    // v1.10 (FRAGO 11 3.3): empty for an organisation that lists none, and then no tile.
+    coverage: doc.settings.jurisdictions ?? [],
   });
 });
 
@@ -226,6 +228,8 @@ trackerRoutes.get("/areas/:area", async (c) => {
     score: moduleScore(doc, area, now),
     milestones: milestones(doc, area, now),
     counters: counters(doc, area, now),
+    // v1.10: module 1 (DPO registration) carries the registrations table.
+    registrations: area === 1 ? (doc.settings.jurisdictions ?? []) : [],
   });
 });
 

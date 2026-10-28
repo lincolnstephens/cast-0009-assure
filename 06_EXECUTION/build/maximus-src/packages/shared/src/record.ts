@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { jurisdictionsSchema } from "./coverage.ts";
 
 /**
  * The ASSURE value layer's contracts: the Record, the operator's settings and
@@ -128,6 +129,12 @@ export const orgSettingsSchema = z.object({
         .max(30),
     )
     .default({}),
+  /**
+   * v1.10 (FRAGO 11 3.3). The organisation's jurisdictions, for the Global
+   * coverage tile. Saved only through PUT /admin/jurisdictions, which audits
+   * the count; the general settings save ignores it.
+   */
+  jurisdictions: jurisdictionsSchema.default([]),
 });
 export type OrgSettings = z.infer<typeof orgSettingsSchema>;
 

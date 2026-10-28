@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { AreaPage, CounterGroup, Milestone, ModuleTile } from "@maximus/shared";
+import { REGISTRATIONS_HEADING, type AreaPage, type CounterGroup, type Milestone, type ModuleTile } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { apiHref } from "../../lib/preview";
 import { formatDateGB } from "../../lib/format";
 import { PolicyPanel } from "../../components/PolicyPanel";
+import { RegistrationsTable } from "../../components/tracker/Coverage";
 import { ModuleNav } from "../../components/tracker/ModuleNav";
 import { RagMark } from "../../components/tracker/RagMark";
 import { TaskTable } from "../../components/tracker/TaskTable";
@@ -71,6 +72,9 @@ export function AreaPageView() {
       </p>
 
       <UsefulLinks tiles={data.tiles} onOpenPolicy={setOpenPolicyId} />
+
+      {/* v1.10 (FRAGO 11 3.3): module 1, from the organisation's jurisdictions. */}
+      <RegistrationsTable entries={data.registrations ?? []} heading={REGISTRATIONS_HEADING} />
 
       <section
         data-testid="module-progress-card"

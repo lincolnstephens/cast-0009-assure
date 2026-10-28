@@ -12,6 +12,7 @@ import type { Jurisdiction, LineStatus, OrgSettings as BaseOrgSettings } from "@
 import { api, ApiError } from "../../lib/api";
 import { useAdmin } from "../../store/admin";
 import { RetentionScheduleEditor } from "../../components/RetentionScheduleEditor";
+import { JurisdictionsEditor } from "../../components/JurisdictionsEditor";
 
 const STATUS_OPTS = lineStatusSchema.options;
 const JURISDICTION_OPTS = jurisdictionSchema.options;
@@ -598,6 +599,14 @@ export function AdminSettingsPage() {
           orgId={selectedAccountId}
           schedule={settings.retentionSchedule}
           onSaved={(next) => setSettings({ ...settings, retentionSchedule: next })}
+        />
+      )}
+
+      {settingsOrg && settingsOrg === selectedAccountId && (
+        <JurisdictionsEditor
+          orgId={settingsOrg}
+          jurisdictions={settings.jurisdictions}
+          onSaved={(next) => setSettings({ ...settings, jurisdictions: next })}
         />
       )}
 

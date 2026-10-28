@@ -220,6 +220,21 @@ export function moduleTiles(doc: OrgDoc, area: number): ModuleTile[] {
       filed: true,
     }),
   );
+  // v1.10 (FRAGO 11 3.2): module 3 says so when no schedule is recorded,
+  // rather than leaving the reader to infer one from elsewhere.
+  if (area === 3 && schedule.length === 0) {
+    tiles.push({
+      id: "retention:3:none",
+      kind: "retention",
+      title: "Retention schedule",
+      detail: "No schedule yet",
+      description: "MITMARK records the organisation's retention schedule here once it is agreed.",
+      opens: "card",
+      ref: null,
+      // Muted, not amber: nothing is missing that has been promised.
+      filed: true,
+    });
+  }
 
   // Registers: filed ones open, missing ones open their "Not yet filed" card.
   const trackers = items("trackers");

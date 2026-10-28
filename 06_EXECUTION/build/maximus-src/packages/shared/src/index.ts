@@ -15,3 +15,4 @@ export * from "./lines.ts";
 export * from "./requests.ts";
 export * from "./review.ts";
 export * from "./statusMark.ts";
+export * from "./coverage.ts";

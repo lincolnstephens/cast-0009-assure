@@ -65,7 +65,8 @@ async function main(): Promise<void> {
   const baseDir = path.dirname(path.resolve(manifestPath));
   console.log(
     `Manifest: ${manifest.tasks.length} task(s), ${manifest.documents.length} document(s), ${manifest.links.length} link(s), ` +
-      `${manifest.organisation.settings.retentionSchedule?.length ?? 0} retention row(s).`,
+      `${manifest.organisation.settings.retentionSchedule?.length ?? 0} retention row(s), ` +
+      `${manifest.jurisdictions?.length ?? 0} jurisdiction(s).`,
   );
 
   // Sign in. The cookie is held in memory for this run only.
@@ -113,8 +114,10 @@ async function main(): Promise<void> {
     before: { tasks: number; documents: number };
     after: { tasks: number; documents: number };
     wouldCreate: { tasks: number; documents: number };
+    wouldSet?: string[];
   };
   console.log(`Tasks before: ${result.before.tasks}. Documents before: ${result.before.documents}.`);
+  if (result.wouldSet?.length) console.log(`${dryRun ? "Would set" : "Set"}: ${result.wouldSet.join(", ")}.`);
 
   const present = manifest.documents.filter((d) => existsSync(path.join(baseDir, d.file)));
   const missing = manifest.documents.filter((d) => !existsSync(path.join(baseDir, d.file)));

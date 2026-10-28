@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { coverageEntrySchema } from "./coverage.ts";
 
 /**
  * The Compliance Tracker.
@@ -600,6 +601,8 @@ export const trackerHomeSchema = z.object({
   forYouEmptyMessage: z.string(),
   journey: journeySchema,
   upcoming: z.array(upcomingItemSchema),
+  /** v1.10 (FRAGO 11 3.3). The organisation's jurisdictions; empty means no tile. */
+  coverage: z.array(coverageEntrySchema).default([]),
 });
 export type TrackerHome = z.infer<typeof trackerHomeSchema>;
 
@@ -668,6 +671,8 @@ export const areaPageSchema = z.object({
   milestones: z.array(milestoneSchema),
   /** v1.6: modules 5 to 8 only; empty elsewhere. */
   counters: z.array(counterGroupSchema),
+  /** v1.10 (FRAGO 11 3.3): module 1 only, the organisation's jurisdictions; empty elsewhere. */
+  registrations: z.array(coverageEntrySchema).default([]),
 });
 export type AreaPage = z.infer<typeof areaPageSchema>;
 

@@ -252,6 +252,35 @@ function applyAdditions(doc: OrgDoc, m: SeedManifest, actor: string, now: string
   return { links: links.length, retentionRows: schedule?.length ?? 0 };
 }
 
+/**
+ * v1.10 (FRAGO 11 3.2). The settings a manifest carries beyond the journey:
+ * the illustrative switch, the Information Officer's label, module status,
+ * rates and fee, and the jurisdictions list. settingsFromManifest names what
+ * a seed would set, for the dry run and the audit, never the values;
+ * applySettings sets them on `doc`.
+ */
+function settingsFromManifest(m: SeedManifest): string[] {
+  const s = m.organisation.settings;
+  const set: string[] = [];
+  if (s.showIllustrative !== undefined) set.push("show illustrative");
+  if (s.informationOfficerLabel !== undefined) set.push("Information Officer label");
+  if (s.moduleStatus !== undefined) set.push("module status");
+  if (s.rates !== undefined) set.push("rates");
+  if (m.jurisdictions !== undefined) set.push(`jurisdictions (${m.jurisdictions.length})`);
+  return set;
+}
+
+function applySettings(doc: OrgDoc, m: SeedManifest): void {
+  const s = m.organisation.settings;
+  if (s.showIllustrative !== undefined) doc.settings.showIllustrative = s.showIllustrative;
+  if (s.informationOfficerLabel !== undefined) doc.settings.ioName = s.informationOfficerLabel;
+  if (s.moduleStatus !== undefined) doc.settings.moduleStatus = { ...doc.settings.moduleStatus, ...s.moduleStatus };
+  if (s.rates?.hourlyRate !== undefined) doc.settings.ioRate = s.rates.hourlyRate;
+  if (s.rates?.dayRate !== undefined) doc.settings.dayRate = s.rates.dayRate;
+  if (s.rates && s.rates.retainer !== undefined) doc.settings.retainer = s.rates.retainer ?? "";
+  if (m.jurisdictions !== undefined) doc.settings.jurisdictions = m.jurisdictions.map((j) => ({ ...j }));
+}
+
 function taskFromManifest(
   orgId: string,
   t: SeedManifest["tasks"][number],
@@ -373,8 +402,9 @@ adminOrganisationRoutes.post("/organisations/:id/seed", async (c) => {
   }
 
   const wouldCreate = { tasks: tasksCreatedBy(manifest), documents: manifest.documents.length };
+  const wouldSet = settingsFromManifest(manifest);
   if (dryRun) {
-    return c.json({ dryRun: true, before, after: before, wouldCreate, created: { tasks: 0 } });
+    return c.json({ dryRun: true, before, after: before, wouldCreate, wouldSet, created: { tasks: 0 } });
   }
 
   const now = new Date().toISOString();
@@ -395,6 +425,7 @@ adminOrganisationRoutes.post("/organisations/:id/seed", async (c) => {
     if (o.settings.journeyPhase !== undefined) doc.settings.journeyPhase = o.settings.journeyPhase ?? null;
     if (o.settings.journeyNote !== undefined) doc.settings.journeyNote = o.settings.journeyNote;
     applyAdditions(doc, manifest, actor.displayName, now);
+    applySettings(doc, manifest);
     doc.settings.seededAt = now;
     return { tasks: doc.tasks.length, documents: doc.documents.length };
   });
@@ -404,8 +435,8 @@ adminOrganisationRoutes.post("/organisations/:id/seed", async (c) => {
     actorId: actor.id,
     actorName: actor.displayName,
     action: "organisation.seed",
-    detail: `Seeded ${wouldCreate.tasks} task(s)${replace ? ", replacing the workplan" : ""}; tasks ${before.tasks} before, ${after.tasks} after.`,
+    detail: `Seeded ${wouldCreate.tasks} task(s)${replace ? ", replacing the workplan" : ""}; tasks ${before.tasks} before, ${after.tasks} after.${wouldSet.length ? ` Settings: ${wouldSet.join(", ")}.` : ""}`,
   });
 
-  return c.json({ dryRun: false, before, after, wouldCreate, created: { tasks: wouldCreate.tasks } });
+  return c.json({ dryRun: false, before, after, wouldCreate, wouldSet, created: { tasks: wouldCreate.tasks } });
 });

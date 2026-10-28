@@ -2,13 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import type { TrackerHome } from "@maximus/shared";
 import { api, ApiError } from "../../lib/api";
 import { formatDateGB, formatLondon } from "../../lib/format";
+import { CoverageTile } from "../../components/tracker/Coverage";
 import { JourneyPath } from "../../components/tracker/JourneyPath";
 import { OverallCompliance } from "../../components/tracker/OverallCompliance";
 import { Upcoming } from "../../components/tracker/Upcoming";
 
 /**
  * The Compliance Tracker home page, in three sections only (FRAGO 03 section
- * 3.2): Journey, Overall compliance status, Upcoming. Every element derives
+ * 3.2): Journey, Overall compliance status, Upcoming; and, from v1.10, the
+ * Global coverage tile between the first two where jurisdictions are listed. Every element derives
  * from `TrackerHome` as the API sends it. The client's own tasks are on Job
  * management. When the operator has not applied a workplan yet, the page is a
  * single waiting card and nothing else.
@@ -84,6 +86,9 @@ export function TrackerPage() {
       </header>
 
       <JourneyPath journey={data.journey} />
+
+      {/* v1.10 (FRAGO 11 3.3): only where the organisation lists jurisdictions. */}
+      <CoverageTile entries={data.coverage ?? []} />
 
       <OverallCompliance overall={data.overall} areas={data.areas} />
 

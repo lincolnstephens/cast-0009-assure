@@ -204,6 +204,7 @@ export function migrateOrg(doc: OrgDoc): OrgDoc {
   s.journeyNote ??= '';
   s.moduleIntroductions ??= {};
   s.retentionSchedule ??= {};
+  s.jurisdictions ??= [];
   doc.settings = s;
   doc.figures ??= [];
 
