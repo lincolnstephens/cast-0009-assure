@@ -866,3 +866,120 @@ Only three settings changed (`clientName`, `lead`, `moduleStatus`) and two brand
   - `SESSION_SECRET` rotation, now timed with the operator because the client is signed in (FRAGO 10 section 6);
   - the Anthropic key (DC-19);
   - the mini PC: pull master to pick up v1.9 and these registers.
+
+
+# v1.10, the second client's organisation and the Global coverage tile
+
+**Live:** https://assure.tessera-monitor.com. https://tessera-assure.netlify.app serves the same deploy.
+**Production deploy:** `6ae1de7d258acf6734eff856`, 2026-10-28, published 11:37 UTC. Four drafts came before it: `6ae1cc64ae7f0aa5fa8cce37`, `6ae1ccec83e20962459719b4`, `6ae1cefba3d68ae7116e0540` and `6ae1d0c15d3ec654cdc60a5b`, the last the same build as production.
+**Gate:** **PASS, 266 of 266**, against https://assure.tessera-monitor.com on run 1, at 1920x1080, 1366x768 and 390x844. Line 17 stays retired; lines 85 to 93 are new.
+**Spend:** no new money committed.
+- What it used: build-session time, local compute, and five deploys on the existing Netlify plan (four drafts, one production).
+- No new dependency. The world outline is a public-domain data file (Natural Earth), vendored as one SVG path; nothing is fetched at run time.
+- No environment variable or secret was changed on Netlify, and no real person's password was reset. The gate's @gate.invalid users were given one-time passwords as since v1.5 and are all disabled at the end of the run.
+
+**Built under:** `06_EXECUTION/FRAGO_11_SECOND_CLIENT.md` (28 Oct, DC-79, DC-80). Built on the mini PC in the job folder, with `material/restricted/` present. Due live and gated by 1700 GMT Thursday 29 October.
+
+**Inputs.** The demo manager's password was read from the existing file in Sunray's OneDrive app-builds folder (as DC-76), into each child process only, never printed or written under the job folder. The second client's trading name, logo and manifest were read from `material/restricted/second_client/` at run time and went to the product's store only.
+
+## What v1.10 adds
+
+**The restricted check, every client (FRAGO 11 3.1).**
+- `check_restricted.py` and the gate's `load_restricted_names` read every `- Client:` and `- Information Officer:` line, each cut at any bracketed note, and take each distinctive word of a name as a term of its own. "partners" joins the generic words.
+- The pass line reports the count: 3 names, 5 terms. 0 hits before every commit, over the folder with both bundles built in it.
+- `ASSURE_RESTRICTED_NAMES` remains the override for a machine without the restricted folder.
+
+**The second client's organisation (3.2).** Created through the API under the demo manager, then checked by reads (line 87). What it holds, in counts:
+- name, display name and Statement name: the trading name from the restricted file (not printed);
+- jurisdiction UK and the manifest's regulation line;
+- Information Officer label "Group Compliance Lead"; contract lead the operator with her title, as on the first client;
+- logo: the navy 1x file, 15,659 bytes; accent #1F2A44;
+- modules 1 to 8 Available; show illustrative off; rates 45 an hour, 850 a day, retainer 5,000 a month;
+- 27 tasks, journey phase 1, 8 jurisdictions; 0 documents, 0 Record entries, 0 clocks, no retention schedule;
+- one client user, displayed "Group Compliance Lead", not a test seat, waiting for its first sign-in. Its one-time password went to Sunray in the build's chat report only.
+
+**The seed (3.2).** `seed-organisation` now takes `jurisdictions`, `showIllustrative`, `informationOfficerLabel`, `moduleStatus` and `rates` from the manifest, and its dry run names what it would set. Dry run: 27 tasks, 0 documents, 8 jurisdictions, nothing written. Then the real run: 27 tasks after.
+
+**The Global coverage tile (3.3).**
+- A per-organisation `jurisdictions` list in settings (id, name, hub, regulator, law, filing duty, latitude, longitude, status), saved only through `PUT /admin/jurisdictions`. The audit entry reads "Jurisdictions list saved: N entries." and never repeats an entry.
+- **Settings, Jurisdictions:** add, change, remove, save, operator only.
+- **The tile** sits on the Compliance Tracker between Journey and Overall compliance status. It is titled "Global coverage" (with one entry, "Coverage") and is drawn only where the list has entries. It shows:
+  - a world map with one marker per jurisdiction, in the v1.9 status marks with their edge, each labelled with its hub, and a key naming the four marks;
+  - beneath the map, the same entries as a table;
+  - a card for a chosen marker or row: name, hub, regulator, law, status in words, and "Filing duty (to be confirmed at mobilisation): ...".
+- Below 640px the map is hidden and the table stacks each row with its labels; nothing scrolls sideways.
+- **Module 1** carries the same table under Useful links, titled "Registrations and filings by jurisdiction".
+- **Statuses:** Not started (grey circle), In progress (amber circle), Done (green tick), Needs attention (red). All eight are Not started for the second client.
+
+**Also changed.**
+- The Statement, with nothing on the Record, says "No work has yet been recorded", gives the retainer and the day rate, and keeps "what comes next". It leaves out counts and comparators of nothing.
+- Module 3 says "No schedule yet" where no retention schedule is recorded.
+- View as client takes the previewed organisation's branding for every manager (DC-81 item 10).
+
+**Hand-over (3.4).** T18 section 5o; one line in T26; T27 unchanged.
+
+**Tests.** Unit and integration tests 332 of 332. The 11 new tests, in `v110.test.ts`, cover the jurisdictions save and its audit, the client reads, module 3, and the seed's new keys.
+
+## Calls the order left to the build (DC-81)
+
+1. **Terms.** A Client line is cut at its bracket, and each distinctive word of a name is a term.
+2. **Pushing.** The machine's active GitHub account is refused by the repository. Each push uses the owner's account, already signed in to gh here, for that command only.
+3. **One save for the list,** with a count-only audit; the general settings save ignores it.
+4. **The seed** applies the five keys. `contractLeadRole` and `ratesNote` are prose and are not applied. The manifest's description line may run to 2000 characters, because the supplied one ran past 500.
+5. **The map:** Natural Earth 1:110m land v5.1.2, 84N to 60S, 47 KB. Markers are laid out in pixels and moved apart only where two would overlap (Dubai and Abu Dhabi), with a fine line to the true place.
+6. **Needs attention takes the red mark,** so tasks and jurisdictions follow one rule.
+7. **Phone table:** stacked rows keep all five fields.
+8. **The Statement with an empty Record,** on every organisation. The first client's has no Record entries, so its wording changes too. The old text read "0 items ... all were met".
+9. **Module 3's "No schedule yet"** tile, on every organisation without a schedule.
+10. **View as client branding.** The demo manager's account carries the demo organisation, and `/auth/me` preferred it, so View as client under that account showed the demo's name and accent for any client. Now the preview wins. The named managers carry no organisation and were not affected (checked by a read). Found by line 93.
+11. **The client user's address** is a role address on a reserved domain. No mailbox exists, and the product sends no mail.
+12. **The 1x logo:** the menu head draws it at most 56px high, and the file is 158px high.
+13. **The gate views the second organisation as the manager** and never signs in as its client user, whose one-time password is Sunray's. The second organisation's audit therefore carries the gate's client_view.open entries under the manager's id. Line 92 allows those and nothing else.
+
+## Deviations
+
+- **The Statement and module 3 change on every organisation,** not only the second (calls 8 and 9). Both are truthful, and the first client's organisation was not written to.
+- **View as client** changed for one account (call 10). FRAGO 09 3.4's "View as client shows the client's header exactly" was not true under the demo manager before this.
+- **The contrast "measure every accent use" is driven in View as client,** not as the client user, so as to leave the one-time password unused (call 13). It measures the same pages with the same branding.
+- **Netlify.** T05's standing prohibition of 7 Sep still reads as written in the template. Every version since v1.0 has deployed to Netlify under Sunray's orders, and this run used only the Netlify CLI for the deploys the order requires.
+
+## What the gate caught
+
+| Run | Target | Result |
+|---|---|---|
+| Subset, lines 83 and 85 to 93 | Draft `6ae1cefba3d68ae7116e0540` | 31 of 34. Line 93 at every width: the portal accent in View as client was not the client's |
+| Fix pass 1 (product) | | `/auth/me` gives a manager the previewed organisation's branding (call 10) |
+| Subset, lines 81, 83, 92, 93 | Draft `6ae1d0c15d3ec654cdc60a5b` | 24 of 24 |
+| Full | Draft `6ae1d0c15d3ec654cdc60a5b` | 266 of 266 |
+| Full | Production `6ae1de7d258acf6734eff856` | **266 of 266** |
+
+One fix pass used, on the product, before production.
+
+## The client organisations
+
+**The first client (org-f2b4afdf0d), read only.**
+- **Before the build** (10:12 UTC): 114 audit entries, the newest `fce3270b` at 27 Oct 13:51:47 UTC.
+- **After the run:** 114 audit entries at the end of the gate, the newest still `fce3270b`. Nothing was written by the build or the gate.
+- **Entries since 23 Oct 08:35 UTC:** six. None is the build's or the gate's.
+  - 23 Oct, 08:35:38 and 08:35:39: two `document.update`, DC-74's under Sunray's manager account.
+  - 23 Oct 12:20: one `client_view.open` by the operator.
+  - 26 Oct 10:53: one `document.download` by a client user.
+  - 27 Oct 13:51:17 and 13:51:47: two `chat.message` by the same client user.
+- 19 tasks; documents unchanged by hash through the run (line 83).
+
+**The second client (org-fb773095ba).**
+- No entries existed before 28 Oct: the organisation was created at 10:22 UTC.
+- Its configuration entries, all under the demo manager's id: `organisation.create`, `organisation.seed`, `settings.update`, `branding.update`, `branding.logo.set` and `user.create`.
+- Since then, only the manager's `client_view.open` entries, from the checks and the gate's views (line 92). At run end: 40 entries, all under the manager's id, six of configuration and 34 `client_view.open`.
+
+## What waits on whom
+
+- **Sunray:**
+  - sign in once as the client user with its one-time password and set a password before the walk on Thursday evening;
+  - walk the portal at 1366 and on a phone;
+  - delete the OneDrive copy of the demo manager's password (`Personal App Builds\assure_gate_admin.txt`), including from the recycle bin;
+  - make the repository private (DC-79);
+  - `SESSION_SECRET` and the Anthropic key, as before.
+- **Rich and the operator:** the Statement of Work wording, the SLAs and the 22 deliverables (not in this order). After mobilisation, the operator confirms each jurisdiction's filing duty (task F02) and moves the dates.
+- **After Friday:** who at the prospect gets a sign-in, decided by Sunray with Rich.
+- **GitHub:** the active account on this machine cannot push to the repository. Sunray may want the owner's account made the active one.
