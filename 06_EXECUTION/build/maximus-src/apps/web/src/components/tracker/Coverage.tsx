@@ -146,7 +146,7 @@ export function CoverageTable({
               <span className={label}>Law </span>
               {e.law || "Not recorded"}
             </td>
-            <td className={cell}>
+            <td className={`${cell} whitespace-nowrap`}>
               <CoverageMark status={e.status} />
             </td>
           </tr>

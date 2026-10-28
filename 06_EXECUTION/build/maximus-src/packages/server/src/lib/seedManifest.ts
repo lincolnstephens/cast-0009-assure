@@ -79,7 +79,8 @@ export const seedRetentionRowSchema = z.object({
 });
 
 export const seedManifestSchema = z.object({
-  manifest: z.string().max(500).optional(),
+  /** The manifest's own description, for the record. Not seeded. v1.10: up to 2000 characters. */
+  manifest: z.string().max(2000).optional(),
   organisation: z
     .object({
       displayName: z.string().trim().max(200).nullable().default(null),

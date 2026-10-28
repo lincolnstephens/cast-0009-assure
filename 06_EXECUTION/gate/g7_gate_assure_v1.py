@@ -97,7 +97,7 @@ import sys
 CONFIG = {
     # Identity of the run, for the report header.
     "codename": "ASSURE",
-    "iteration": "v1.9",
+    "iteration": "v1.10",
 
     # What is gated. Either a deployed URL or a path to a local artefact.
     # Passed on the command line; these are the defaults.
@@ -6780,6 +6780,666 @@ def drv_register_slots(page, cfg, line, res, errors):
                 if ok else "; ".join(problems[:6]))
 
 
+# =============================================================================
+# v1.10 (FRAGO 11). The restricted check for every client, the second
+# client's organisation, and the Global coverage tile.
+#
+# The second client's organisation is found by its name matching the
+# restricted list (never printed), excluding the first client's. It is read
+# by the API and viewed through View as client as the manager; the gate never
+# signs in as its client seat, whose one-time password is Sunray's, and it
+# changes no task, document or setting there (line 92). The first client's
+# organisation is read only: its jurisdictions are read through the manager's
+# settings route, never by a client view (DC-70 item 7).
+# =============================================================================
+
+SECOND_LOGOS = ("material/restricted/second_client/client_logo.png",
+                "material/restricted/second_client/client_logo_2x.png",
+                "material/restricted/second_client/client_logo_white.png")
+SECOND_LOGO_UPLOADED = SECOND_LOGOS[0]
+SECOND_IO_LABEL = "Group Compliance Lead"
+SECOND_ACCENT = "#1F2A44"
+SECOND_TASKS = 27
+SECOND_JURISDICTIONS = 8
+COVERAGE_TITLE_MANY = "Global coverage"
+FILING_QUALIFIER = "Filing duty (to be confirmed at mobilisation):"
+REGISTRATIONS_TITLE = "Registrations and filings by jurisdiction"
+COVERAGE_WORDS = {"not_started": "Not started", "in_progress": "In progress", "done": "Done",
+                  "attention": "Needs attention"}
+COVERAGE_MARKS = {"not_started": "not_started", "in_progress": "in_progress", "done": "done", "attention": "red"}
+# Words that would claim a filing or registration made. The card's duty line
+# is the one place a duty is described, under its qualifier, and is excluded.
+CLAIM_WORDS = re.compile(r"\b(filed|submitted|has been (made|filed|registered|notified)|registration (made|complete)|"
+                         r"registered with|completed)\b", re.I)
+
+
+def sdrv_restricted_every_client(cfg, line):
+    """Line 85: the check reads every Client and Information Officer line of
+    the restricted file, not the first, and passes over the folder with the
+    bundle built. Counts only; no name printed."""
+    import importlib.util
+    import subprocess
+    path = cfg["root"] / cfg["restricted_names_file"]
+    if not path.is_file():
+        return False, "material/restricted/CLIENT.md is absent; this line needs the restricted file"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    want = len(re.findall(r"^- Client:", text, re.M)) + len(re.findall(r"^- Information Officer:", text, re.M))
+    spec = importlib.util.spec_from_file_location("_gate_cr_v110", str(cfg["root"] / CHECK_RESTRICTED_SCRIPT))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    env = {k: v for k, v in os.environ.items() if k != cfg["restricted_names_env"]}
+    names = mod.restricted_names(str(cfg["root"])) if not os.environ.get(cfg["restricted_names_env"]) else None
+    gate_names = load_restricted_names(dict(cfg)) if not os.environ.get(cfg["restricted_names_env"]) else None
+    problems = []
+    if names is None:
+        problems.append("ASSURE_RESTRICTED_NAMES is set; unset it so the file is read")
+    elif len(names) != want:
+        problems.append(f"check_restricted.py reads {len(names)} names; the file has {want} entries")
+    clients = len(re.findall(r"^- Client:", text, re.M))
+    if gate_names is not None and names is not None and not set(names) <= set(gate_names):
+        problems.append("the gate's own list does not carry every name the check reads")
+    for rel in BUNDLE_PATHS:
+        if not (cfg["root"] / rel).exists():
+            problems.append(f"bundle missing: {rel}")
+    run = subprocess.run([sys.executable, str(cfg["root"] / CHECK_RESTRICTED_SCRIPT), str(cfg["root"])],
+                         cwd=str(cfg["root"]), capture_output=True, text=True, env=env)
+    tail = ((run.stdout or "").strip().splitlines() or [""])[-1]
+    if run.returncode != 0 or not tail.endswith(" 0 hits"):
+        problems.append(f"check_restricted.py exit {run.returncode}: '{tail}'")
+    ok = not problems
+    return ok, (f"{want} entries in the restricted file ({clients} clients), all read; '{tail}'"
+                if ok else "; ".join(problems[:5]))
+
+
+def sdrv_second_logo_nowhere_else(cfg, line):
+    """Line 86: none of the second client's three logo files is byte-
+    identical to, or contained in, any file under the job folder outside
+    material/, the built bundles included. Hash and bytes; nothing printed."""
+    import hashlib
+    refs = []
+    for rel in SECOND_LOGOS:
+        p = cfg["root"] / rel
+        if not p.is_file():
+            return False, f"{rel.split('/')[-1]} is absent from the restricted folder; an absent reference is not a pass"
+        b = p.read_bytes()
+        refs.append((b, hashlib.sha256(b).digest(), len(b)))
+    for rel in BUNDLE_PATHS:
+        if not (cfg["root"] / rel).exists():
+            return False, f"bundle missing: {rel}"
+    skip = {".git", "node_modules", "material", "__pycache__", ".netlify", ".vite", "test-results", "playwright-report"}
+    smallest = min(r[2] for r in refs)
+    hits, scanned = [], 0
+    for dirpath, dirnames, filenames in os.walk(cfg["root"]):
+        dirnames[:] = [d for d in dirnames if d not in skip]
+        for fn in filenames:
+            p = pathlib.Path(dirpath) / fn
+            try:
+                size = p.stat().st_size
+            except OSError:
+                continue
+            scanned += 1
+            if size < smallest:
+                continue
+            data = p.read_bytes()
+            for want, digest, n in refs:
+                if (size == n and hashlib.sha256(data).digest() == digest) or (size > n and want in data):
+                    hits.append(str(p.relative_to(cfg["root"])).replace("\\", "/"))
+                    break
+    if hits:
+        return False, f"{len(hits)} file(s) carry the second client's logo: " + "; ".join(hits[:5])
+    return True, f"{scanned} files under the job folder (bundles included) checked against 3 logo files; none outside material/"
+
+
+STATIC_DRIVERS["restricted_every_client"] = sdrv_restricted_every_client
+STATIC_DRIVERS["second_logo_nowhere_else"] = sdrv_second_logo_nowhere_else
+
+
+def _second_org_id(cfg, operator=None):
+    """The second client's organisation: the one organisation, other than
+    the first client's, whose name matches the restricted list."""
+    if _GATE.get("second_org"):
+        return _GATE["second_org"]
+    operator = operator or _ApiSeat(cfg, "admin")
+    terms = _restricted_terms_runtime(cfg) or []
+    if not terms:
+        raise RuntimeError("the restricted list is unreadable")
+    s, body = operator.call("GET", "/admin/organisations")
+    if not _ok(s, body):
+        raise RuntimeError(f"GET /admin/organisations returned {s}")
+    found = [o["id"] for o in body.get("organisations") or []
+             if o.get("id") != CLIENT_ORG_ID and _restricted_hit_count(o.get("name") or "", terms)]
+    if len(found) != 1:
+        raise RuntimeError(f"{len(found)} organisations other than the first client's match the restricted list; expected 1")
+    _GATE["second_org"] = found[0]
+    return found[0]
+
+
+def _second_org_state(cfg, operator):
+    """Its tasks, documents and settings (with branding) as one hash, and its
+    audit entry ids."""
+    import hashlib
+    oid = _second_org_id(cfg, operator)
+    s1, wp = operator.call("GET", f"/admin/workplan?org={oid}")
+    s2, docs = operator.call("GET", f"/admin/documents?org={oid}")
+    s3, st = operator.call("GET", f"/admin/settings?org={oid}")
+    if not (_ok(s1, wp) and _ok(s2, docs) and _ok(s3, st)):
+        raise RuntimeError(f"second organisation read returned {s1}/{s2}/{s3}")
+    blob = json.dumps([wp.get("tasks") or [], docs.get("documents") or [], st], sort_keys=True).encode("utf-8")
+    audit = _audit_entries(operator, f"/admin/audit?accountId={oid}")
+    return {"hash": hashlib.sha256(blob).hexdigest(), "audit_ids": {e["id"] for e in audit},
+            "tasks": len(wp.get("tasks") or []), "documents": len(docs.get("documents") or [])}
+
+
+def _second_org_baseline(cfg):
+    if "second_baseline" not in _GATE:
+        try:
+            _GATE["second_baseline"] = _second_org_state(cfg, _ApiSeat(cfg, "admin"))
+        except Exception as exc:
+            print(f"second organisation baseline unreadable: {type(exc).__name__}: {exc}")
+            _GATE["second_baseline"] = None
+    return _GATE["second_baseline"]
+
+
+def drv_second_org_ready(page, cfg, line, res, errors):
+    """Line 87: the second organisation as FRAGO 11 3.2, by reads only."""
+    import hashlib
+    if not _api_only_once(line, res):
+        return True, "not repeated (API)"
+    problems = []
+    operator = _ApiSeat(cfg, "admin")
+    try:
+        oid = _second_org_id(cfg, operator)
+    except RuntimeError as exc:
+        return False, str(exc)
+    s, body = operator.call("GET", f"/admin/settings?org={oid}")
+    if not _ok(s, body):
+        return False, f"GET /admin/settings for the second organisation returned {s}"
+    st, br, name = body.get("settings") or {}, body.get("branding") or {}, body.get("name") or ""
+    if not (name == br.get("displayName") == st.get("clientName")):
+        problems.append("name, display name and statement name differ")
+    if st.get("ioName") != SECOND_IO_LABEL:
+        problems.append("the Information Officer label is not the role")
+    lead = st.get("lead") or ""
+    if not lead.endswith(", " + CLIENT_LEAD_TITLE):
+        problems.append("the contract lead is not the operator with her title")
+    ms = st.get("moduleStatus") or {}
+    if sorted(ms) != [str(i) for i in range(1, 9)] or set(ms.values()) != {"Available"}:
+        problems.append(f"module status {ms}")
+    if st.get("showIllustrative") is not False:
+        problems.append("show illustrative is not off")
+    if (st.get("ioRate"), st.get("dayRate"), st.get("retainer")) != (45, 850, 5000):
+        problems.append(f"rates {st.get('ioRate')}/{st.get('dayRate')}/{st.get('retainer')}, not 45/850/5000")
+    if st.get("journeyPhase") != 1:
+        problems.append(f"journey phase {st.get('journeyPhase')}")
+    js = st.get("jurisdictions") or []
+    if len(js) != SECOND_JURISDICTIONS:
+        problems.append(f"{len(js)} jurisdictions")
+    if any((st.get("retentionSchedule") or {}).values()):
+        problems.append("a retention schedule is recorded")
+    if (br.get("accent") or "").upper() != SECOND_ACCENT:
+        problems.append("the accent is not set")
+    state = _second_org_state(cfg, operator)
+    if state["tasks"] != SECOND_TASKS:
+        problems.append(f"{state['tasks']} tasks")
+    if state["documents"] != 0:
+        problems.append(f"{state['documents']} documents")
+    s, rec = operator.call("GET", f"/admin/record?org={oid}")
+    if _ok(s, rec) and (rec.get("entries") or []):
+        problems.append(f"{len(rec.get('entries'))} Record entries")
+    logo = br.get("logo") or {}
+    s, raw, _ = _raw_bytes(operator, f"/admin/organisations/{oid}/logo")
+    src = cfg["root"] / SECOND_LOGO_UPLOADED
+    if logo.get("contentType") != "image/png" or s != 200:
+        problems.append("no PNG logo served")
+    elif not src.is_file() or hashlib.sha256(raw).digest() != hashlib.sha256(src.read_bytes()).digest():
+        problems.append("the logo is not the restricted navy file")
+    users = [u for u in _admin_users(operator) if u.get("orgId") == oid or u.get("clientAccountId") == oid]
+    live = [u for u in users if u.get("status") != "disabled"]
+    if len(live) != 1 or live[0].get("role") != "client" or live[0].get("testSeat") \
+            or live[0].get("displayName") != SECOND_IO_LABEL:
+        problems.append(f"{len(live)} active users; expected one client user named by role, not a test seat")
+    mgr = operator.user["id"]
+    seat_ids = {u["id"] for u in users}
+    others = [e for e in _audit_entries(operator, f"/admin/audit?accountId={oid}")
+              if e.get("actorId") != mgr and e.get("actorId") not in seat_ids]
+    if others:
+        problems.append(f"{len(others)} audit entries by someone other than the manager or its own seat")
+    ok = not problems
+    return ok, ("name set (restricted match, not printed) in all three places; role label; lead with title; 8 modules "
+                f"Available; illustrative off; 45/850/5000; phase 1; {SECOND_JURISDICTIONS} jurisdictions; accent set; "
+                f"{SECOND_TASKS} tasks, 0 documents, no Record; navy logo PNG; one client user by role; "
+                "audit by the manager only" if ok else "; ".join(problems[:8]))
+
+
+def _view_org_as_client(page, cfg, org_id, settle_ms):
+    """Open View as client of a named organisation, as the manager. The
+    switcher moves to it on purpose and is pinned back to the demo after."""
+    if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+        raise RuntimeError("could not sign in as the operator")
+    page.goto(cfg["_target"].rstrip("/") + "/admin")
+    sw = page.locator("[data-testid='org-switcher']")
+    if not _wait_for(page, "[data-testid='org-switcher']", 8000):
+        raise RuntimeError("no organisation switcher")
+    sw.first.select_option(value=org_id)
+    page.wait_for_timeout(settle_ms)
+    if sw.first.input_value() != org_id:
+        raise RuntimeError("could not choose the organisation in the switcher")
+    if not _enter_view(page, "client-view", None, settle_ms, cfg, "admin"):
+        raise RuntimeError("View as client was not reachable")
+    _wait_for(page, "[data-testid='client-view-banner']", 8000)
+    page.wait_for_timeout(settle_ms)
+
+
+def _back_to_demo(page, cfg, settle_ms):
+    _leave_client_view(page, settle_ms)
+    try:
+        page.goto(cfg["_target"].rstrip("/") + "/admin")
+        _pin_demo_org(page, cfg)
+    except Exception:
+        _sign_in(page, cfg, "admin", cfg["_target"])
+
+
+_COVERAGE_CONTRAST_JS = r"""
+() => {
+  const canvas = document.createElement('canvas'); canvas.width = 1; canvas.height = 1;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const rgba = (col) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = col; ctx.fillRect(0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
+  const lum = (rgb) => { const c = rgb.slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const svg = document.querySelector("[data-testid='coverage-map-svg']");
+  const out = { edges: [], labels: [] };
+  if (!svg || !svg.getBoundingClientRect().width) return out;
+  const sea = rgba(getComputedStyle(svg).backgroundColor);
+  const land = rgba(getComputedStyle(document.querySelector("[data-testid='coverage-land']")).fill);
+  for (const e of document.querySelectorAll("[data-testid='coverage-marker-edge']")) {
+    const s = rgba(getComputedStyle(e).stroke);
+    out.edges.push(Math.min(ratio(s, sea), ratio(s, land)));
+  }
+  for (const t of document.querySelectorAll("[data-testid='coverage-marker-label']")) {
+    const f = rgba(getComputedStyle(t).fill), h = rgba(getComputedStyle(t).stroke);
+    out.labels.push(Math.min(ratio(f, h), ratio(f, sea)));
+  }
+  return out;
+}
+"""
+
+
+def drv_coverage_tile(page, cfg, line, res, errors):
+    """Line 88: the Global coverage tile on the second organisation's
+    tracker, in View as client, at each width."""
+    settle_ms = line.get("settle_ms", 600)
+    problems = []
+    try:
+        operator = _ApiSeat(cfg, "admin")
+        oid = _second_org_id(cfg, operator)
+        s, st = operator.call("GET", f"/admin/settings?org={oid}")
+        entries = (st.get("settings") or {}).get("jurisdictions") or []
+        _view_org_as_client(page, cfg, oid, settle_ms)
+    except RuntimeError as exc:
+        return False, str(exc)
+    try:
+        page.goto(cfg["_target"].rstrip("/") + "/tracker")
+        if not _wait_for(page, "[data-testid='coverage-tile']", 10000):
+            return False, "no coverage tile on the second organisation's tracker"
+        page.wait_for_timeout(settle_ms)
+        order = [s_.get_attribute("data-testid") for s_ in page.locator(
+            "[data-testid='tracker-journey'], [data-testid='coverage-tile'], [data-testid='tracker-overall']").all()]
+        tile = page.locator("[data-testid='coverage-tile']").first
+        title = _text(tile.locator("h2").first)
+        if title != COVERAGE_TITLE_MANY:
+            problems.append(f"title '{title}'")
+        if order != ["tracker-journey", "coverage-tile", "tracker-overall"]:
+            problems.append(f"tile not between Journey and Overall compliance status ({order})")
+        hubs = {e["id"]: e["hub"] for e in entries}
+        status = {e["id"]: e["status"] for e in entries}
+        mapv = page.locator("[data-testid='coverage-map']").first
+        if res["width"] < 640:
+            if mapv.is_visible():
+                problems.append("the map shows below 640px")
+        else:
+            if not mapv.is_visible():
+                problems.append("the map is hidden")
+            markers = page.locator("[data-testid='coverage-marker']")
+            labels = page.locator("[data-testid='coverage-marker-label']")
+            if markers.count() != len(entries) or labels.count() != len(entries):
+                problems.append(f"{markers.count()} markers and {labels.count()} labels for {len(entries)} entries")
+            for i in range(markers.count()):
+                m = markers.nth(i)
+                mid = m.get_attribute("data-id")
+                if _text(m.locator("[data-testid='coverage-marker-label']")) != hubs.get(mid):
+                    problems.append(f"marker {mid} is not labelled with its hub")
+                if m.get_attribute("data-word") != COVERAGE_WORDS.get(status.get(mid)):
+                    problems.append(f"marker {mid} word disagrees with its status")
+            c = page.evaluate(_COVERAGE_CONTRAST_JS)
+            if not c["edges"] or min(c["edges"]) < 3:
+                problems.append(f"marker edges {min(c['edges'] or [0]):.2f}:1")
+            if not c["labels"] or min(c["labels"]) < 4.5:
+                problems.append(f"labels {min(c['labels'] or [0]):.2f}:1")
+            for i in range(markers.count()):
+                markers.nth(i).click()
+                page.wait_for_timeout(150)
+                card = page.locator("[data-testid='coverage-card']")
+                if card.count() != 1 or card.first.get_attribute("data-id") != markers.nth(i).get_attribute("data-id"):
+                    problems.append(f"marker {i + 1} does not open its card")
+                    break
+                markers.nth(i).click()
+                page.wait_for_timeout(100)
+        rows = page.locator("[data-testid='coverage-table'] [data-testid='coverage-row']")
+        if rows.count() != len(entries) or rows.count() != SECOND_JURISDICTIONS:
+            problems.append(f"{rows.count()} rows in the table")
+        for i in range(rows.count()):
+            r = rows.nth(i)
+            rid = r.get_attribute("data-id")
+            word = _text(r.locator("[data-testid='coverage-word']").first)
+            mark = r.locator("[data-testid='coverage-mark']").first
+            if word != COVERAGE_WORDS.get(status.get(rid)) or word != mark.get_attribute("data-word"):
+                problems.append(f"row {rid} status word '{word}'")
+            ratio = r.locator("[data-testid='coverage-word']").first.evaluate(_TEXT_RATIO_JS)
+            if ratio < 4.5:
+                problems.append(f"row {rid} word {ratio}:1")
+            r.locator("[data-testid='coverage-row-open']").first.click()
+            page.wait_for_timeout(150)
+            card = page.locator("[data-testid='coverage-card']")
+            if card.count() != 1:
+                problems.append(f"row {rid} opens no card")
+                continue
+            duty = _text(card.first.locator("[data-testid='coverage-card-duty']"))
+            if not duty.startswith(FILING_QUALIFIER):
+                problems.append(f"row {rid} card lacks the qualifier")
+            if _text(card.first.locator("[data-testid='coverage-word']")) != COVERAGE_WORDS.get(status.get(rid)):
+                problems.append(f"row {rid} card status without its word")
+            outside = _text(card.first).replace(duty, "")
+            if CLAIM_WORDS.search(outside):
+                problems.append(f"row {rid} card claims a filing")
+            card.first.locator("[data-testid='coverage-card-close']").click()
+            page.wait_for_timeout(100)
+        body = _text(tile)
+        if CLAIM_WORDS.search(body):
+            problems.append("the tile claims a filing or registration")
+        sw = page.evaluate("document.documentElement.scrollWidth")
+        if sw > res["width"] + 1:
+            problems.append(f"horizontal scroll ({sw}px)")
+    finally:
+        _back_to_demo(page, cfg, settle_ms)
+    ok = not problems
+    return ok, (f"'{COVERAGE_TITLE_MANY}' between Journey and Overall; "
+                + ("map hidden; " if res["width"] < 640 else "map with 8 labelled markers, each opening its card, edges 3:1, labels 4.5:1; ")
+                + "8 rows with mark and word at 4.5:1, each card with the qualifier; no filing claimed; no horizontal scroll"
+                if ok else "; ".join(problems[:8]))
+
+
+def drv_coverage_absent(page, cfg, line, res, errors):
+    """Line 89: no tile where no jurisdictions are listed: the demo's tracker
+    (client seat, browser and API), the gate organisation (API), and the
+    first client's organisation, read through the manager's settings route
+    only (an empty list draws nothing)."""
+    settle_ms = line.get("settle_ms", 500)
+    problems = []
+    operator = _ApiSeat(cfg, "admin")
+    s, c1 = operator.call("GET", f"/admin/settings?org={CLIENT_ORG_ID}")
+    if not _ok(s, c1) or ((c1.get("settings") or {}).get("jurisdictions") or []):
+        problems.append("the first client's organisation lists jurisdictions, or was unreadable")
+    if not _ensure_role(page, cfg, "client", cfg["_target"]):
+        return False, "could not sign in as the demo client"
+    page.goto(cfg["_target"].rstrip("/") + "/tracker")
+    _wait_for(page, "[data-testid='tracker-header']", 10000)
+    page.wait_for_timeout(settle_ms)
+    if page.locator("[data-testid='coverage-tile']").count():
+        problems.append("a coverage tile on the demo's tracker")
+    if _api_only_once(line, res):
+        seat = _ApiSeat(cfg, "client")
+        s, h = seat.call("GET", "/tracker/home")
+        if not _ok(s, h) or h.get("coverage"):
+            problems.append("the demo's tracker home carries coverage")
+        try:
+            gseat, gid = _gate_client_seat(cfg, operator)
+            s, h = gseat.call("GET", "/tracker/home")
+            if not _ok(s, h) or h.get("coverage"):
+                problems.append("the gate organisation's tracker home carries coverage")
+        finally:
+            _safe_disable(cfg, operator)
+    ok = not problems
+    return ok, ("no tile on the demo; empty coverage for the demo and the gate organisation; the first client's "
+                "list empty by a settings read" if ok else "; ".join(problems[:5]))
+
+
+GATE_JURISDICTION = {"id": "GT", "name": "Gate test jurisdiction", "hub": "Gate hub", "regulator": "Gate regulator",
+                     "law": "Gate law", "filingDuty": "Gate duty", "lat": "10", "lon": "20"}
+
+
+def drv_jurisdictions_roundtrip(page, cfg, line, res, errors):
+    """Line 90: Settings, Jurisdictions, on the gate organisation, in the
+    browser: add one, change it, remove it; each save stored as shown and
+    audited once with its count and no entry text. The list is left as found."""
+    if not _api_only_once(line, res):
+        return True, "runs once, at the first resolution"
+    settle_ms = line.get("settle_ms", 700)
+    problems = []
+    operator = _ApiSeat(cfg, "admin")
+    org, _ = _gate_org(operator)
+    gid = org["id"]
+
+    def stored():
+        s, b = operator.call("GET", f"/admin/settings?org={gid}")
+        return (b.get("settings") or {}).get("jurisdictions") or []
+
+    def audits():
+        return [e for e in _audit_entries(operator, f"/admin/audit?accountId={gid}")
+                if e.get("action") == "settings.jurisdictions"]
+
+    start, a0 = stored(), len(audits())
+    try:
+        if not _ensure_role(page, cfg, "admin", cfg["_target"]):
+            return False, "could not sign in as the operator"
+        page.goto(cfg["_target"].rstrip("/") + "/admin")
+        sw = page.locator("[data-testid='org-switcher']")
+        _wait_for(page, "[data-testid='org-switcher']", 8000)
+        sw.first.select_option(value=gid)
+        page.wait_for_timeout(settle_ms)
+        page.goto(cfg["_target"].rstrip("/") + "/admin/settings")
+        if sw.count():
+            _wait_for(page, "[data-testid='org-switcher']", 8000)
+            if sw.first.input_value() != gid:
+                sw.first.select_option(value=gid)
+                page.wait_for_timeout(settle_ms)
+        if not _wait_for(page, "[data-testid='jurisdictions-editor']", 10000):
+            return False, "no Jurisdictions editor in Settings"
+        ed = page.locator("[data-testid='jurisdictions-editor']").first
+
+        def save(step, want_len):
+            ed.locator("[data-testid='jurisdictions-save']").click()
+            page.wait_for_timeout(settle_ms * 2)
+            now = stored()
+            if len(now) != want_len:
+                problems.append(f"{step}: {len(now)} stored, expected {want_len}")
+            return now
+
+        ed.locator("[data-testid='jurisdictions-add']").click()
+        row = ed.locator("[data-testid='jurisdiction-row']").last
+        for k, v in GATE_JURISDICTION.items():
+            row.locator(f"[data-testid='jurisdiction-{k}']").fill(v)
+        now = save("add", len(start) + 1)
+        if not any(j.get("id") == "GT" and j.get("hub") == "Gate hub" for j in now):
+            problems.append("add: the entry is not stored as typed")
+        row = ed.locator("[data-testid='jurisdiction-row']").last
+        row.locator("[data-testid='jurisdiction-status']").select_option("attention")
+        row.locator("[data-testid='jurisdiction-hub']").fill("Gate hub two")
+        now = save("change", len(start) + 1)
+        if not any(j.get("id") == "GT" and j.get("status") == "attention" and j.get("hub") == "Gate hub two" for j in now):
+            problems.append("change: not stored")
+        ed.locator("[data-testid='jurisdiction-row']").last.locator("[data-testid='jurisdiction-remove']").click()
+        now = save("remove", len(start))
+        if any(j.get("id") == "GT" for j in now):
+            problems.append("remove: still stored")
+        new = audits()[: max(0, len(audits()) - a0)]
+        if len(new) != 3:
+            problems.append(f"{len(new)} audit entries for three saves")
+        for e in new:
+            d = e.get("detail") or ""
+            if not re.fullmatch(r"Jurisdictions list saved: \d+ (entry|entries)\.", d) or "Gate" in d:
+                problems.append(f"audit detail '{d}'")
+    finally:
+        if stored() != start:
+            operator.call("PUT", f"/admin/jurisdictions?org={gid}", {"jurisdictions": start})
+        try:
+            page.goto(cfg["_target"].rstrip("/") + "/admin")
+            _pin_demo_org(page, cfg)
+        except Exception:
+            _sign_in(page, cfg, "admin", cfg["_target"])
+    ok = not problems
+    return ok, ("on the gate organisation: added, changed and removed in Settings, each stored as typed and audited "
+                "once with its count and no entry text; list left as found" if ok else "; ".join(problems[:6]))
+
+
+def drv_second_org_pages(page, cfg, line, res, errors):
+    """Line 91: module 1 of the second organisation carries the registrations
+    table from the same list; module 2 does not; module 3 says no schedule
+    yet; the Statement says plainly no work has been recorded and gives the
+    fee. View as client, at each width."""
+    settle_ms = line.get("settle_ms", 600)
+    problems = []
+    try:
+        oid = _second_org_id(cfg)
+        _view_org_as_client(page, cfg, oid, settle_ms)
+    except RuntimeError as exc:
+        return False, str(exc)
+    try:
+        base = cfg["_target"].rstrip("/")
+        page.goto(base + "/tracker/areas/1")
+        if not _wait_for(page, "[data-testid='module-registrations']", 10000):
+            problems.append("module 1 has no registrations table")
+        else:
+            sec = page.locator("[data-testid='module-registrations']").first
+            if _text(sec.locator("h2").first) != REGISTRATIONS_TITLE:
+                problems.append("module 1 table heading")
+            rows = sec.locator("[data-testid='coverage-row']")
+            if rows.count() != SECOND_JURISDICTIONS:
+                problems.append(f"module 1 table has {rows.count()} rows")
+            elif True:
+                rows.first.locator("[data-testid='coverage-row-open']").click()
+                page.wait_for_timeout(200)
+                duty = sec.locator("[data-testid='coverage-card-duty']")
+                if duty.count() != 1 or not _text(duty.first).startswith(FILING_QUALIFIER):
+                    problems.append("module 1 card lacks the qualifier")
+            if page.evaluate("document.documentElement.scrollWidth") > res["width"] + 1:
+                problems.append("module 1 scrolls sideways")
+        page.goto(base + "/tracker/areas/2")
+        _wait_for(page, "[data-testid='module-links']", 10000)
+        if page.locator("[data-testid='module-registrations']").count():
+            problems.append("module 2 carries the registrations table")
+        page.goto(base + "/tracker/areas/3")
+        _wait_for(page, "[data-testid='module-links']", 10000)
+        page.wait_for_timeout(300)
+        if "No schedule yet" not in _text(page.locator("[data-testid='module-links']").first):
+            problems.append("module 3 does not say No schedule yet")
+        page.goto(base + "/value/statement")
+        if not _wait_for(page, "[data-testid='statement-nothing-yet']", 10000):
+            problems.append("the Statement does not say no work has been recorded")
+        else:
+            fee = _text(page.locator("[data-testid='statement-fee']").first)
+            if "£5,000 a month" not in fee:
+                problems.append("the Statement does not give the fee")
+            if page.locator("[data-testid='statement-next'] tr").count() < 2:
+                problems.append("the Statement has no 'what comes next'")
+    finally:
+        _back_to_demo(page, cfg, settle_ms)
+    ok = not problems
+    return ok, ("module 1: 8-row registrations table with the qualifier on its card; none on module 2; module 3 "
+                "'No schedule yet'; Statement: no work recorded, the fee, what comes next" if ok else "; ".join(problems[:6]))
+
+
+def drv_second_org_quiet(page, cfg, line, res, errors):
+    """Line 92: the gate changed no task, document or setting on the second
+    organisation, and wrote no audit entry there except the manager's own
+    client-view opens."""
+    if res["name"] != line.get("applies_to", [res["name"]])[-1]:
+        return True, "checked once, at the last resolution, after the lines that view it"
+    base = _second_org_baseline(cfg)
+    if base is None:
+        return False, "the second organisation's state at the start of the run was unreadable"
+    operator = _ApiSeat(cfg, "admin")
+    now = _second_org_state(cfg, operator)
+    oid = _second_org_id(cfg, operator)
+    new = [e for e in _audit_entries(operator, f"/admin/audit?accountId={oid}") if e["id"] not in base["audit_ids"]]
+    bad = [e for e in new if e.get("action") != "client_view.open" or e.get("actorId") != operator.user["id"]]
+    problems = []
+    if now["hash"] != base["hash"]:
+        problems.append("its tasks, documents or settings changed during the run")
+    if bad:
+        problems.append(f"{len(bad)} audit entries other than the manager's client-view opens: "
+                        + ", ".join(f"{e.get('createdAt')} {e.get('action')}" for e in bad[:4]))
+    ok = not problems
+    return ok, (f"tasks, documents and settings unchanged by hash; {len(new)} new audit entries, all the manager's "
+                "client-view opens" if ok else "; ".join(problems))
+
+
+_ACCENT_JS = r"""
+() => {
+  const canvas = document.createElement('canvas'); canvas.width = 1; canvas.height = 1;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const rgba = (col) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = col; ctx.fillRect(0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
+  const over = (t, b) => [0, 1, 2].map((i) => t[i] * t[3] + b[i] * (1 - t[3])).concat([1]);
+  const backdrop = (el) => { const st = []; for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+      const c = rgba(getComputedStyle(n).backgroundColor); if (c[3] > 0) st.push(c); if (c[3] >= 1) break; }
+    let col = [255, 255, 255, 1]; for (let i = st.length - 1; i >= 0; i--) col = over(st[i], col); return col; };
+  const lum = (rgb) => { const c = rgb.slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const root = document.querySelector('.client-portal');
+  const acc = rgba(getComputedStyle(root).getPropertyValue('--client-accent').trim() || 'transparent');
+  const same = (c) => acc[3] > 0 && Math.abs(c[0] - acc[0]) + Math.abs(c[1] - acc[1]) + Math.abs(c[2] - acc[2]) < 6 && c[3] > 0.9;
+  const out = { accent: acc, text: [], fills: [], borders: [] };
+  for (const el of root.querySelectorAll('*')) {
+    const r = el.getBoundingClientRect(); if (!r.width || !r.height) continue;
+    const cs = getComputedStyle(el);
+    if (same(rgba(cs.color)) && (el.textContent || '').trim() && el.childElementCount === 0)
+      out.text.push(ratio(rgba(cs.color), backdrop(el.parentElement || el)));
+    if (same(rgba(cs.backgroundColor)) && (el.textContent || '').trim())
+      out.fills.push(ratio(rgba(cs.color), rgba(cs.backgroundColor)));
+    if (parseFloat(cs.borderTopWidth) > 0 && same(rgba(cs.borderTopColor)))
+      out.borders.push(ratio(rgba(cs.borderTopColor), backdrop(el.parentElement || el)));
+  }
+  return out;
+}
+"""
+
+
+def drv_second_accent_contrast(page, cfg, line, res, errors):
+    """Line 93: the accent on the second organisation's portal, measured on
+    every use the tracker, a module page and the Statement show: text 4.5:1,
+    text on an accent fill 4.5:1, accent borders 3:1."""
+    settle_ms = line.get("settle_ms", 600)
+    problems, counts = [], [0, 0, 0]
+    try:
+        oid = _second_org_id(cfg)
+        _view_org_as_client(page, cfg, oid, settle_ms)
+    except RuntimeError as exc:
+        return False, str(exc)
+    try:
+        for path in ("/tracker", "/tracker/areas/1", "/value/statement"):
+            page.goto(cfg["_target"].rstrip("/") + path)
+            _wait_for(page, "main h1, main h2", 10000)
+            page.wait_for_timeout(settle_ms * 2)
+            m = page.evaluate(_ACCENT_JS)
+            acc = m["accent"]
+            if "#%02X%02X%02X" % tuple(acc[:3]) != SECOND_ACCENT:
+                problems.append(f"{path}: the portal accent is not the client's")
+                continue
+            for i, (key, floor) in enumerate((("text", 4.5), ("fills", 4.5), ("borders", 3.0))):
+                counts[i] += len(m[key])
+                low = [v for v in m[key] if v < floor]
+                if low:
+                    problems.append(f"{path}: {len(low)} {key} below {floor}:1 (lowest {min(low):.2f})")
+    finally:
+        _back_to_demo(page, cfg, settle_ms)
+    ok = not problems and counts[0] > 0
+    return ok, (f"accent {SECOND_ACCENT}: {counts[0]} text uses 4.5:1+, {counts[1]} fills with text 4.5:1+, "
+                f"{counts[2]} borders 3:1+" if ok else "; ".join(problems[:6]) or "no accent use found")
+
+
 DRIVERS = {
     "sign_in_lands_on_portal": drv_sign_in_lands_on_portal,
     "views_render": drv_views_render,
@@ -6873,6 +7533,14 @@ DRIVERS = {
     "client_org_quiet": drv_client_org_quiet,
     # v1.9, FRAGO 10.
     "register_slots": drv_register_slots,
+    # v1.10 (FRAGO 11)
+    "second_org_ready": drv_second_org_ready,
+    "coverage_tile": drv_coverage_tile,
+    "coverage_absent": drv_coverage_absent,
+    "jurisdictions_roundtrip": drv_jurisdictions_roundtrip,
+    "second_org_pages": drv_second_org_pages,
+    "second_org_quiet": drv_second_org_quiet,
+    "second_accent_contrast": drv_second_accent_contrast,
 }
 
 
@@ -6928,6 +7596,8 @@ def main():
     # logo when material/restricted is absent (FRAGO 10 section 7).
     cfg["_target"] = target
     _client_org_baseline(cfg)
+    # v1.10: the second organisation as it stood when the run began (line 92).
+    _second_org_baseline(cfg)
     run_static(cfg)
     driven_state = run_driven(cfg, target)
 

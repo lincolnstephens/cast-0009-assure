@@ -21,6 +21,10 @@ export function StatementDocument({ data }: { data: StatementResponse }) {
   const ioName = data.ioName || "Information Officer";
   const lead = data.lead || "MITMARK contract lead";
   const monthlyRetainer = data.fee !== null ? data.fee / data.months : null;
+  // v1.10 (FRAGO 11 3.2): with nothing on the Record the statement says so
+  // plainly, and gives the fee, rather than counts, ratios and "all met" of
+  // nothing.
+  const nothingYet = totals.items === 0 && !data.illustrative;
 
   return (
     <div
@@ -72,141 +76,160 @@ export function StatementDocument({ data }: { data: StatementResponse }) {
 
       <section data-testid="statement-done">
       <h3 className="text-[15px] font-semibold">What MITMARK has done</h3>
-      <p className="max-w-[58ch]">
-        In {data.period} MITMARK completed {totals.items} items of work under the retainer across{" "}
-        {totals.byModule.length} of the eight modules. {totals.deadlinesMet} of them carried a
-        statutory or governance deadline; all were met. Each item was reviewed by a named MITMARK
-        person before it was recorded.
-      </p>
-      {data.items.length > 0 && (
-        <table className="my-3 w-full border-collapse text-[13px]" data-testid="statement-items">
-          <thead>
-            <tr>
-              <StH>Date</StH>
-              <StH>Work</StH>
-              <StH>Module</StH>
-              <StH align="right">Hours</StH>
-              <StH align="right">Officer's time at £{data.ioRate}/hour</StH>
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.map((e) => (
-              <tr key={e.id}>
-                <StTd className="whitespace-nowrap font-mono">{formatDateGB(e.date)}</StTd>
-                <StTd>{e.what}</StTd>
-                <StTd>{areaName(e.area)}</StTd>
-                <StTd align="right">{e.hours}</StTd>
-                <StTd align="right">{formatGBP(e.hours * data.ioRate)}</StTd>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <table className="my-3 w-full border-collapse text-[13px]">
-        <thead>
-          <tr>
-            <StH>Module</StH>
-            <StH align="right">Items</StH>
-            <StH align="right">Hours of the officer's time replaced</StH>
-          </tr>
-        </thead>
-        <tbody>
-          {totals.byModule.map((m) => (
-            <tr key={m.area} data-testid="statement-module-total">
-              <StTd>{m.name}</StTd>
-              <StTd align="right">{m.items}</StTd>
-              <StTd align="right">{m.hours}</StTd>
-            </tr>
-          ))}
-          <tr>
-            <StTd>
-              <b>Total</b>
-            </StTd>
-            <StTd align="right">
-              <b>{totals.items}</b>
-            </StTd>
-            <StTd align="right">
-              <b>{totals.hours}</b>
-            </StTd>
-          </tr>
-        </tbody>
-      </table>
-
-      <h3 className="text-[15px] font-semibold">What it would otherwise have cost</h3>
-      <p className="max-w-[58ch]">
-        The {ioName} role is part-time within a full-time post. The hours above are an estimate of
-        the officer's own time the work would have taken. Two comparators are given; both depend on
-        rates that should be confirmed by the client.
-      </p>
-      <table className="my-3 w-full border-collapse text-[13px]">
-        <thead>
-          <tr>
-            <StH>Comparator</StH>
-            <StH>Basis</StH>
-            <StH align="right">Amount</StH>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <StTd>Officer's own time</StTd>
-            <StTd>
-              {totals.hours} hours at £{data.ioRate}/hour loaded
-            </StTd>
-            <StTd align="right">{formatGBP(totals.io)}</StTd>
-          </tr>
-          <tr>
-            <StTd>External consultant</StTd>
-            <StTd>
-              {(totals.hours / 8).toFixed(1)} days at £{data.dayRate}/day ex VAT
-            </StTd>
-            <StTd align="right">{formatGBP(totals.con)}</StTd>
-          </tr>
-          <tr>
-            <StTd>Retainer for the period</StTd>
-            <StTd>
-              {monthlyRetainer !== null
-                ? `${data.months} months at £${Math.round(monthlyRetainer).toLocaleString("en-GB")}/month ex VAT`
-                : "fee not entered"}
-            </StTd>
-            <StTd align="right">{data.fee !== null ? formatGBP(data.fee) : "not entered"}</StTd>
-          </tr>
-        </tbody>
-      </table>
-      {data.fee !== null ? (
-        <p className="max-w-[58ch]">
-          Against the retainer, the consultant comparator is {(data.conRatio ?? 0).toFixed(1)}x and
-          the officer's-time comparator is {(data.ioRatio ?? 0).toFixed(1)}x. Neither comparator
-          includes the cost of a missed statutory deadline, which is not estimated here.
-        </p>
+      {nothingYet ? (
+        <>
+          <p data-testid="statement-nothing-yet" className="max-w-[58ch]">
+            No work has yet been recorded. Each piece of work MITMARK does is recorded here once the
+            engagement starts, with its date, its module and the officer's time it replaces, and is
+            reviewed by a named MITMARK person before it is recorded.
+          </p>
+          <h3 className="mt-4 text-[15px] font-semibold">The fee</h3>
+          <p data-testid="statement-fee" className="max-w-[58ch]">
+            {monthlyRetainer !== null
+              ? `The retainer is £${Math.round(monthlyRetainer).toLocaleString("en-GB")} a month ex VAT; work beyond it is at £${data.dayRate.toLocaleString("en-GB")} a day ex VAT.`
+              : "No retainer fee has been entered."}{" "}
+            The comparators against the fee are given once work is recorded.
+          </p>
+        </>
       ) : (
+        <>
         <p className="max-w-[58ch]">
-          No ratio is shown because the retainer fee has not been entered. When it is, this
-          paragraph states the comparators against it.
+          In {data.period} MITMARK completed {totals.items} items of work under the retainer across{" "}
+          {totals.byModule.length} of the eight modules. {totals.deadlinesMet} of them carried a
+          statutory or governance deadline; all were met. Each item was reviewed by a named MITMARK
+          person before it was recorded.
         </p>
-      )}
-
-      <h3 className="text-[15px] font-semibold">Obligations met</h3>
-      {data.deadlines.length ? (
+        {data.items.length > 0 && (
+          <table className="my-3 w-full border-collapse text-[13px]" data-testid="statement-items">
+            <thead>
+              <tr>
+                <StH>Date</StH>
+                <StH>Work</StH>
+                <StH>Module</StH>
+                <StH align="right">Hours</StH>
+                <StH align="right">Officer's time at £{data.ioRate}/hour</StH>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.map((e) => (
+                <tr key={e.id}>
+                  <StTd className="whitespace-nowrap font-mono">{formatDateGB(e.date)}</StTd>
+                  <StTd>{e.what}</StTd>
+                  <StTd>{areaName(e.area)}</StTd>
+                  <StTd align="right">{e.hours}</StTd>
+                  <StTd align="right">{formatGBP(e.hours * data.ioRate)}</StTd>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
         <table className="my-3 w-full border-collapse text-[13px]">
           <thead>
             <tr>
-              <StH>Date</StH>
-              <StH>Obligation</StH>
-              <StH>Result</StH>
+              <StH>Module</StH>
+              <StH align="right">Items</StH>
+              <StH align="right">Hours of the officer's time replaced</StH>
             </tr>
           </thead>
           <tbody>
-            {data.deadlines.map((e) => (
-              <tr key={e.id}>
-                <StTd className="whitespace-nowrap font-mono">{formatDateGB(e.date)}</StTd>
-                <StTd>{e.deadline}</StTd>
-                <StTd>{e.outcome}</StTd>
+            {totals.byModule.map((m) => (
+              <tr key={m.area} data-testid="statement-module-total">
+                <StTd>{m.name}</StTd>
+                <StTd align="right">{m.items}</StTd>
+                <StTd align="right">{m.hours}</StTd>
               </tr>
             ))}
+            <tr>
+              <StTd>
+                <b>Total</b>
+              </StTd>
+              <StTd align="right">
+                <b>{totals.items}</b>
+              </StTd>
+              <StTd align="right">
+                <b>{totals.hours}</b>
+              </StTd>
+            </tr>
           </tbody>
         </table>
-      ) : (
-        <p className="max-w-[58ch]">No statutory deadlines fell in this period.</p>
+
+        <h3 className="text-[15px] font-semibold">What it would otherwise have cost</h3>
+        <p className="max-w-[58ch]">
+          The {ioName} role is part-time within a full-time post. The hours above are an estimate of
+          the officer's own time the work would have taken. Two comparators are given; both depend on
+          rates that should be confirmed by the client.
+        </p>
+        <table className="my-3 w-full border-collapse text-[13px]">
+          <thead>
+            <tr>
+              <StH>Comparator</StH>
+              <StH>Basis</StH>
+              <StH align="right">Amount</StH>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <StTd>Officer's own time</StTd>
+              <StTd>
+                {totals.hours} hours at £{data.ioRate}/hour loaded
+              </StTd>
+              <StTd align="right">{formatGBP(totals.io)}</StTd>
+            </tr>
+            <tr>
+              <StTd>External consultant</StTd>
+              <StTd>
+                {(totals.hours / 8).toFixed(1)} days at £{data.dayRate}/day ex VAT
+              </StTd>
+              <StTd align="right">{formatGBP(totals.con)}</StTd>
+            </tr>
+            <tr>
+              <StTd>Retainer for the period</StTd>
+              <StTd>
+                {monthlyRetainer !== null
+                  ? `${data.months} months at £${Math.round(monthlyRetainer).toLocaleString("en-GB")}/month ex VAT`
+                  : "fee not entered"}
+              </StTd>
+              <StTd align="right">{data.fee !== null ? formatGBP(data.fee) : "not entered"}</StTd>
+            </tr>
+          </tbody>
+        </table>
+        {data.fee !== null ? (
+          <p className="max-w-[58ch]">
+            Against the retainer, the consultant comparator is {(data.conRatio ?? 0).toFixed(1)}x and
+            the officer's-time comparator is {(data.ioRatio ?? 0).toFixed(1)}x. Neither comparator
+            includes the cost of a missed statutory deadline, which is not estimated here.
+          </p>
+        ) : (
+          <p className="max-w-[58ch]">
+            No ratio is shown because the retainer fee has not been entered. When it is, this
+            paragraph states the comparators against it.
+          </p>
+        )}
+
+        <h3 className="text-[15px] font-semibold">Obligations met</h3>
+        {data.deadlines.length ? (
+          <table className="my-3 w-full border-collapse text-[13px]">
+            <thead>
+              <tr>
+                <StH>Date</StH>
+                <StH>Obligation</StH>
+                <StH>Result</StH>
+              </tr>
+            </thead>
+            <tbody>
+              {data.deadlines.map((e) => (
+                <tr key={e.id}>
+                  <StTd className="whitespace-nowrap font-mono">{formatDateGB(e.date)}</StTd>
+                  <StTd>{e.deadline}</StTd>
+                  <StTd>{e.outcome}</StTd>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="max-w-[58ch]">No statutory deadlines fell in this period.</p>
+        )}
+        </>
       )}
       </section>
 

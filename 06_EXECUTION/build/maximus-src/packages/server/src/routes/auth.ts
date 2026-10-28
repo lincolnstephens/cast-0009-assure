@@ -94,7 +94,9 @@ authRoutes.get("/session", async (c) => {
 
   // As /me: in "View as client" the operator's session carries the
   // previewed organisation's branding, so a reload keeps the client's look.
-  const brandingOrg = user.orgId ?? (user.role === "mitmark_admin" ? previewOrgOf(c) : null);
+  // v1.10: a manager's preview wins over any organisation the account itself
+  // carries (the demo manager has one), so the look is the previewed client's.
+  const brandingOrg = (user.role === "mitmark_admin" ? previewOrgOf(c) : null) ?? user.orgId;
   const org = brandingOrg ? await readOrg(brandingOrg) : null;
   const officer = usersDoc.users.find((u) => u.role === "mitmark_admin");
   return c.json({
@@ -183,7 +185,7 @@ authRoutes.get("/me", requireAuth, async (c) => {
   // organisation's name and branding, exactly as its client seat receives
   // them. A client session ignores the header.
   const previewOrg = user.role === "mitmark_admin" ? previewOrgOf(c) : null;
-  const orgForBranding = user.clientAccountId ?? previewOrg;
+  const orgForBranding = previewOrg ?? user.clientAccountId;
   if (orgForBranding) {
     const org = await readOrg(orgForBranding);
     clientAccountName = org?.name ?? null;
